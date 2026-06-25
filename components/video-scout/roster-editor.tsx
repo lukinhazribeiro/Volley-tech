@@ -27,22 +27,22 @@ export function RosterEditor({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Editar elenco"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-800 bg-slate-900"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-orange-100 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-slate-800 p-5">
+        <div className="flex items-start justify-between border-b border-orange-100 p-5">
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-blue-400" aria-hidden="true" />
+            <Users className="h-5 w-5 text-orange-600" aria-hidden="true" />
             <div>
-              <h3 className="text-base font-semibold text-slate-100">Editar elenco</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className="text-base font-semibold text-slate-800">Editar elenco</h3>
+              <p className="text-xs text-slate-500">
                 Corrija os números e a equipe (Casa/Adversário) de cada atleta.
               </p>
             </div>
@@ -50,7 +50,7 @@ export function RosterEditor({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200"
+            className="text-slate-400 hover:text-slate-600"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -68,8 +68,8 @@ export function RosterEditor({
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
                       team === "casa"
-                        ? "bg-blue-500/15 text-blue-300"
-                        : "bg-orange-500/15 text-orange-300"
+                        ? "bg-blue-50 text-blue-700"
+                        : "bg-orange-50 text-orange-700"
                     }`}
                   >
                     {TEAM_LABEL[team]} · {list.length}
@@ -77,7 +77,7 @@ export function RosterEditor({
                   <button
                     type="button"
                     onClick={() => onAddPlayer(team)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                   >
                     <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                     Adicionar atleta
@@ -85,7 +85,7 @@ export function RosterEditor({
                 </div>
 
                 {list.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-slate-800 py-4 text-center text-xs text-slate-500">
+                  <p className="rounded-lg border border-dashed border-slate-200 py-4 text-center text-xs text-slate-400">
                     Nenhum atleta nesta equipe.
                   </p>
                 ) : (
@@ -93,12 +93,12 @@ export function RosterEditor({
                     {list.map((p) => (
                       <li
                         key={p.id}
-                        className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-800/40 p-2"
+                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2"
                       >
                         <div className="flex flex-col">
                           <label
                             htmlFor={`num-${p.id}`}
-                            className="px-1 text-[10px] uppercase text-slate-500"
+                            className="px-1 text-[10px] uppercase text-slate-400"
                           >
                             Nº
                           </label>
@@ -114,14 +114,14 @@ export function RosterEditor({
                                 number: Math.max(0, Math.min(99, Number(e.target.value) || 0)),
                               })
                             }
-                            className="w-16 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-center text-sm font-bold tabular-nums text-slate-100 outline-none focus:border-blue-500"
+                            className="w-16 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-center text-sm font-bold tabular-nums text-slate-800 outline-none focus:border-orange-400"
                           />
                         </div>
 
                         <div className="flex flex-1 flex-col">
                           <label
                             htmlFor={`name-${p.id}`}
-                            className="px-1 text-[10px] uppercase text-slate-500"
+                            className="px-1 text-[10px] uppercase text-slate-400"
                           >
                             Nome
                           </label>
@@ -130,14 +130,14 @@ export function RosterEditor({
                             type="text"
                             value={p.name}
                             onChange={(e) => onUpdatePlayer({ ...p, name: e.target.value })}
-                            className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-blue-500"
+                            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700 outline-none focus:border-orange-400"
                           />
                         </div>
 
                         <div className="flex flex-col">
                           <label
                             htmlFor={`team-${p.id}`}
-                            className="px-1 text-[10px] uppercase text-slate-500"
+                            className="px-1 text-[10px] uppercase text-slate-400"
                           >
                             Equipe
                           </label>
@@ -147,7 +147,7 @@ export function RosterEditor({
                             onChange={(e) =>
                               onUpdatePlayer({ ...p, team: e.target.value as TeamSide })
                             }
-                            className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-blue-500"
+                            className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700 outline-none focus:border-orange-400"
                           >
                             <option value="casa">Casa</option>
                             <option value="adversario">Adversário</option>
@@ -157,7 +157,7 @@ export function RosterEditor({
                         <button
                           type="button"
                           onClick={() => onRemovePlayer(p.id)}
-                          className="mt-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-red-500/15 hover:text-red-300"
+                          className="mt-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600"
                           aria-label={`Remover atleta ${p.number}`}
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -171,11 +171,11 @@ export function RosterEditor({
           })}
         </div>
 
-        <div className="border-t border-slate-800 p-4">
+        <div className="border-t border-orange-100 p-4">
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500"
+            className="w-full rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
           >
             Concluir
           </button>

@@ -112,19 +112,15 @@ export function ValidationView({
     <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
       {/* Coluna do vídeo + timeline */}
       <div className="space-y-4">
-        <VideoPlayer
-          ref={playerRef}
-          src={videoUrl}
-          onTimeUpdate={setCurrentTime}
-        />
+        <VideoPlayer ref={playerRef} src={videoUrl} onTimeUpdate={setCurrentTime} />
 
         {/* Timeline horizontal com rallies e marcadores */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+        <div className="rounded-xl border border-orange-100 bg-white p-4 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-200">Linha do tempo</h3>
-            <span className="text-xs text-slate-400">{rallies.length} rallies detectados</span>
+            <h3 className="text-sm font-semibold text-slate-800">Linha do tempo</h3>
+            <span className="text-xs text-slate-500">{rallies.length} rallies detectados</span>
           </div>
-          <div className="relative h-12 w-full rounded-lg bg-slate-800/70">
+          <div className="relative h-12 w-full rounded-lg bg-slate-100">
             {/* Segmentos de rally */}
             {rallies.map((r) => (
               <button
@@ -132,7 +128,7 @@ export function ValidationView({
                 type="button"
                 onClick={() => seekTo(r.startTime)}
                 title={`Rally ${r.index + 1}`}
-                className="absolute top-1 bottom-1 rounded bg-slate-700/70 transition-colors hover:bg-slate-600"
+                className="absolute top-1 bottom-1 rounded bg-slate-200 transition-colors hover:bg-slate-300"
                 style={{
                   left: `${(r.startTime / duration) * 100}%`,
                   width: `${Math.max(1, ((r.endTime - r.startTime) / duration) * 100)}%`,
@@ -146,20 +142,20 @@ export function ValidationView({
                 type="button"
                 onClick={() => seekTo(a.timestamp)}
                 title={`${FUNDAMENTO_LABEL[a.fundamento]} - ${formatTime(a.timestamp)}`}
-                className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-slate-900 ${FUNDAMENTO_STYLE[a.fundamento].dot}`}
+                className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white ${FUNDAMENTO_STYLE[a.fundamento].dot}`}
                 style={{ left: `${(a.timestamp / duration) * 100}%` }}
               />
             ))}
             {/* Cursor de reprodução */}
             <div
-              className="absolute top-0 bottom-0 w-0.5 bg-white"
+              className="absolute top-0 bottom-0 w-0.5 bg-orange-500"
               style={{ left: `${(currentTime / duration) * 100}%` }}
             />
           </div>
           {/* Legenda */}
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
             {FUNDAMENTO_ORDER.map((f) => (
-              <span key={f} className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span key={f} className="flex items-center gap-1.5 text-xs text-slate-500">
                 <span className={`h-2 w-2 rounded-full ${FUNDAMENTO_STYLE[f].dot}`} />
                 {FUNDAMENTO_LABEL[f]}
               </span>
@@ -169,14 +165,14 @@ export function ValidationView({
       </div>
 
       {/* Coluna de validação */}
-      <div className="flex min-h-0 flex-col rounded-xl border border-slate-800 bg-slate-900/60">
-        <div className="border-b border-slate-800 p-4">
+      <div className="flex min-h-0 flex-col rounded-xl border border-orange-100 bg-white shadow-sm">
+        <div className="border-b border-orange-100 p-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <BadgeCheck className="h-4 w-4 text-blue-400" aria-hidden="true" />
-              <h3 className="text-sm font-semibold text-slate-200">Validar ações</h3>
+              <BadgeCheck className="h-4 w-4 text-orange-600" aria-hidden="true" />
+              <h3 className="text-sm font-semibold text-slate-800">Validar ações</h3>
             </div>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-500">
               {validatedCount}/{actions.length} confirmadas
             </span>
           </div>
@@ -185,17 +181,17 @@ export function ValidationView({
             <button
               type="button"
               onClick={() => setShowRoster(true)}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-2 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800"
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
-              <Users className="h-4 w-4 text-blue-400" aria-hidden="true" />
+              <Users className="h-4 w-4 text-orange-600" aria-hidden="true" />
               Editar elenco
             </button>
             <button
               type="button"
               onClick={() => setShowFormation(true)}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-2 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800"
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
-              <LayoutGrid className="h-4 w-4 text-blue-400" aria-hidden="true" />
+              <LayoutGrid className="h-4 w-4 text-orange-600" aria-hidden="true" />
               Formação em quadra
             </button>
           </div>
@@ -208,8 +204,8 @@ export function ValidationView({
                 onClick={() => setFundamentoFilter("todos")}
                 className={`rounded-full border px-2.5 py-1 text-xs ${
                   fundamentoFilter === "todos"
-                    ? "border-blue-500 bg-blue-500/15 text-blue-200"
-                    : "border-slate-700 text-slate-400 hover:text-slate-200"
+                    ? "border-orange-400 bg-orange-50 text-orange-700"
+                    : "border-slate-200 text-slate-500 hover:text-slate-700"
                 }`}
               >
                 Todos
@@ -221,8 +217,8 @@ export function ValidationView({
                   onClick={() => setFundamentoFilter(f)}
                   className={`rounded-full border px-2.5 py-1 text-xs ${
                     fundamentoFilter === f
-                      ? "border-blue-500 bg-blue-500/15 text-blue-200"
-                      : "border-slate-700 text-slate-400 hover:text-slate-200"
+                      ? "border-orange-400 bg-orange-50 text-orange-700"
+                      : "border-slate-200 text-slate-500 hover:text-slate-700"
                   }`}
                 >
                   {FUNDAMENTO_LABEL[f]}
@@ -232,7 +228,7 @@ export function ValidationView({
             <select
               value={athleteFilter}
               onChange={(e) => setAthleteFilter(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-100 outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-orange-400"
               aria-label="Filtrar por atleta"
             >
               <option value="todos">Todos os atletas</option>
@@ -248,7 +244,7 @@ export function ValidationView({
         {/* Lista de ações */}
         <div className="max-h-[420px] flex-1 overflow-y-auto p-3">
           {filteredActions.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-500">
+            <p className="py-8 text-center text-sm text-slate-400">
               Nenhuma ação para os filtros selecionados.
             </p>
           ) : (
@@ -261,15 +257,15 @@ export function ValidationView({
                     <div
                       className={`rounded-lg border p-2.5 transition-colors ${
                         isActive
-                          ? "border-blue-500/60 bg-blue-500/10"
-                          : "border-slate-800 bg-slate-800/40 hover:border-slate-700"
+                          ? "border-orange-300 bg-orange-50"
+                          : "border-slate-200 bg-white hover:border-slate-300"
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => seekTo(a.timestamp)}
-                          className="font-mono text-xs text-slate-400 hover:text-blue-300"
+                          className="font-mono text-xs text-slate-500 hover:text-orange-600"
                         >
                           {formatTime(a.timestamp)}
                         </button>
@@ -284,29 +280,29 @@ export function ValidationView({
                           {RESULTADO_LABEL[a.resultado]}
                         </span>
                         {a.detalhe && (
-                          <span className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300">
+                          <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
                             {DETALHE_OPCOES[a.fundamento]?.find((o) => o.value === a.detalhe)?.label ??
                               a.detalhe}
                           </span>
                         )}
                         {a.validated && (
                           <CheckCircle2
-                            className="ml-auto h-4 w-4 text-emerald-400"
+                            className="ml-auto h-4 w-4 text-emerald-600"
                             aria-label="Confirmada"
                           />
                         )}
                         <button
                           type="button"
                           onClick={() => setEditing(a)}
-                          className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-slate-100 ${a.validated ? "" : "ml-auto"}`}
+                          className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 ${a.validated ? "" : "ml-auto"}`}
                           aria-label="Editar ação"
                         >
                           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                       </div>
                       <div className="mt-1.5 flex items-center justify-between text-xs">
-                        <span className="text-slate-300">{labelPlayer(a)}</span>
-                        <span className="text-slate-500">
+                        <span className="text-slate-600">{labelPlayer(a)}</span>
+                        <span className="text-slate-400">
                           IA {Math.round(a.confidence * 100)}%
                         </span>
                       </div>
@@ -318,11 +314,11 @@ export function ValidationView({
           )}
         </div>
 
-        <div className="border-t border-slate-800 p-3">
+        <div className="border-t border-orange-100 p-3">
           <button
             type="button"
             onClick={() => onAddAction(currentTime)}
-            className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+            className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Adicionar ação em {formatTime(currentTime)}
@@ -330,7 +326,7 @@ export function ValidationView({
           <button
             type="button"
             onClick={onGenerateScout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-500"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
           >
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             Gerar scout da partida

@@ -49,29 +49,36 @@ export function ActionEditor({
     })
   }
 
+  const optionClass = (active: boolean) =>
+    `rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
+      active
+        ? "border-orange-400 bg-orange-50 text-orange-700"
+        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+    }`
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Editar ação"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-5"
+        className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="text-base font-semibold text-slate-100">Editar ação</h3>
-            <p className="text-xs text-slate-400">
+            <h3 className="text-base font-semibold text-slate-800">Editar ação</h3>
+            <p className="text-xs text-slate-500">
               Momento {formatTime(action.timestamp)} no vídeo
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200"
+            className="text-slate-400 hover:text-slate-600"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -80,7 +87,7 @@ export function ActionEditor({
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-300">
+            <label className="mb-1.5 block text-xs font-medium text-slate-600">
               Fundamento
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -92,11 +99,7 @@ export function ActionEditor({
                     setFundamento(f)
                     setDetalhe(null)
                   }}
-                  className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
-                    fundamento === f
-                      ? "border-blue-500 bg-blue-500/15 text-blue-200"
-                      : "border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600"
-                  }`}
+                  className={optionClass(fundamento === f)}
                 >
                   {FUNDAMENTO_LABEL[f]}
                 </button>
@@ -105,7 +108,7 @@ export function ActionEditor({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-300">
+            <label className="mb-1.5 block text-xs font-medium text-slate-600">
               Resultado
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -114,11 +117,7 @@ export function ActionEditor({
                   key={r}
                   type="button"
                   onClick={() => setResultado(r)}
-                  className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
-                    resultado === r
-                      ? "border-blue-500 bg-blue-500/15 text-blue-200"
-                      : "border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600"
-                  }`}
+                  className={optionClass(resultado === r)}
                 >
                   {RESULTADO_LABEL[r]}
                 </button>
@@ -128,7 +127,7 @@ export function ActionEditor({
 
           {opcoesDetalhe && (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-300">
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">
                 {fundamento === "levantamento"
                   ? "Para onde foi (alvo)"
                   : fundamento === "bloqueio"
@@ -141,11 +140,7 @@ export function ActionEditor({
                     key={o.value}
                     type="button"
                     onClick={() => setDetalhe(o.value)}
-                    className={`rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${
-                      detalhe === o.value
-                        ? "border-blue-500 bg-blue-500/15 text-blue-200"
-                        : "border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-600"
-                    }`}
+                    className={optionClass(detalhe === o.value)}
                   >
                     {o.label}
                   </button>
@@ -157,7 +152,7 @@ export function ActionEditor({
           <div>
             <label
               htmlFor="player-select"
-              className="mb-1.5 block text-xs font-medium text-slate-300"
+              className="mb-1.5 block text-xs font-medium text-slate-600"
             >
               Atleta
             </label>
@@ -165,7 +160,7 @@ export function ActionEditor({
               id="player-select"
               value={playerId ?? ""}
               onChange={(e) => setPlayerId(e.target.value || null)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-orange-400"
             >
               <option value="">Sem atleta definido</option>
               {players.map((p) => (
@@ -181,7 +176,7 @@ export function ActionEditor({
           <button
             type="button"
             onClick={() => onDelete(action.id)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/20"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
             Excluir
@@ -190,14 +185,14 @@ export function ActionEditor({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
             >
               Cancelar
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+              className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700"
             >
               Confirmar
             </button>

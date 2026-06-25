@@ -330,7 +330,7 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
         <button
           type="button"
           onClick={onBackToValidation}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Voltar para validação
@@ -339,7 +339,7 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
           <select
             value={teamFilter}
             onChange={(e) => setTeamFilter(e.target.value as TeamSide | "todos")}
-            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-500"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-orange-400"
             aria-label="Filtrar por equipe"
           >
             <option value="todos">Ambas as equipes</option>
@@ -349,7 +349,7 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
           <select
             value={fundamentoFilter}
             onChange={(e) => setFundamentoFilter(e.target.value as Fundamento | "todos")}
-            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-500"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-orange-400"
             aria-label="Filtrar por fundamento"
           >
             <option value="todos">Todos os fundamentos</option>
@@ -362,7 +362,7 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
           <select
             value={athleteFilter}
             onChange={(e) => setAthleteFilter(e.target.value)}
-            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-500"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-orange-400"
             aria-label="Filtrar por atleta"
           >
             <option value="todos">Todos os atletas</option>
@@ -421,7 +421,7 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
             type="button"
             onClick={exportCSV}
             disabled={summary.jogadores.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Download className="h-3.5 w-3.5" aria-hidden="true" />
             Exportar CSV

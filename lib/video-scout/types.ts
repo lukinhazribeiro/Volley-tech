@@ -148,40 +148,40 @@ export const FUNDAMENTO_STYLE: Record<
 > = {
   saque: {
     dot: "bg-sky-500",
-    chip: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+    chip: "bg-sky-50 text-sky-700 border-sky-200",
     bar: "bg-sky-500",
   },
   recepcao: {
     dot: "bg-emerald-500",
-    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+    chip: "bg-emerald-50 text-emerald-700 border-emerald-200",
     bar: "bg-emerald-500",
   },
   levantamento: {
     dot: "bg-amber-500",
-    chip: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    chip: "bg-amber-50 text-amber-700 border-amber-200",
     bar: "bg-amber-500",
   },
   ataque: {
     dot: "bg-blue-500",
-    chip: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+    chip: "bg-blue-50 text-blue-700 border-blue-200",
     bar: "bg-blue-500",
   },
   bloqueio: {
-    dot: "bg-violet-500",
-    chip: "bg-violet-500/15 text-violet-300 border-violet-500/30",
-    bar: "bg-violet-500",
+    dot: "bg-indigo-500",
+    chip: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    bar: "bg-indigo-500",
   },
   defesa: {
     dot: "bg-teal-500",
-    chip: "bg-teal-500/15 text-teal-300 border-teal-500/30",
+    chip: "bg-teal-50 text-teal-700 border-teal-200",
     bar: "bg-teal-500",
   },
 }
 
 export const RESULTADO_STYLE: Record<Resultado, string> = {
-  ponto: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  erro: "bg-red-500/15 text-red-300 border-red-500/30",
-  continuidade: "bg-slate-500/15 text-slate-300 border-slate-500/30",
+  ponto: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  erro: "bg-red-50 text-red-700 border-red-200",
+  continuidade: "bg-slate-100 text-slate-600 border-slate-200",
 }
 
 export const TEAM_LABEL: Record<TeamSide, string> = {
@@ -191,9 +191,9 @@ export const TEAM_LABEL: Record<TeamSide, string> = {
 
 /** Cores por equipe (Casa = azul, Adversário = laranja). */
 export const TEAM_STYLE: Record<TeamSide, { chip: string; hex: string }> = {
-  casa: { chip: "bg-blue-500/15 text-blue-300 border-blue-500/30", hex: "#3b82f6" },
+  casa: { chip: "bg-blue-50 text-blue-700 border-blue-200", hex: "#3b82f6" },
   adversario: {
-    chip: "bg-orange-500/15 text-orange-300 border-orange-500/30",
+    chip: "bg-orange-50 text-orange-700 border-orange-200",
     hex: "#f97316",
   },
 }
@@ -294,10 +294,10 @@ export const QUALIDADE_LABEL: Record<Qualidade, string> = {
 }
 
 export const QUALIDADE_STYLE: Record<Qualidade, string> = {
-  ponto: "text-emerald-400",
-  perfeito: "text-emerald-400",
-  positivo: "text-emerald-400",
-  erro: "text-red-400",
+  ponto: "text-emerald-600",
+  perfeito: "text-emerald-600",
+  positivo: "text-emerald-600",
+  erro: "text-red-600",
 }
 
 /** Converte a qualidade detalhada no Resultado simples para estatísticas. */

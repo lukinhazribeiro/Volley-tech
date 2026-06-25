@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { History, Menu, Plus, Sparkles, Upload } from "lucide-react"
+import { History, Link2, Menu, Plus, Sparkles, Upload, X } from "lucide-react"
 import type { Posicao, ScoutAction, TeamSide } from "@/lib/video-scout/types"
 import {
   amendLastQuality,
@@ -21,7 +21,7 @@ import {
   saveToHistory,
   type MatchHistoryEntry,
 } from "@/lib/video-scout/history"
-import { VideoPlayer, type VideoPlayerHandle } from "../video-player"
+import { VideoPlayer, parseYouTubeId, type VideoPlayerHandle } from "../video-player"
 import { ScoutReport } from "../scout-report"
 import { VideoScoutModule } from "../video-scout-module"
 import { PanelSidebar } from "./panel-sidebar"
@@ -36,8 +36,11 @@ export function AnalysisPanel() {
   const [match, setMatch] = useState<MatchState>(() => createMatch())
   const [view, setView] = useState<View>("painel")
 
-  // Vídeo opcional.
+  // Vídeo opcional: pode ser um arquivo (blob) ou um link (YouTube / URL direta).
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const isBlobRef = useRef(false)
+  const [linkInput, setLinkInput] = useState("")
+  const [linkError, setLinkError] = useState<string | null>(null)
   const videoTimeRef = useRef(0)
   const playerRef = useRef<VideoPlayerHandle>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -54,9 +57,15 @@ export function AnalysisPanel() {
     setHistory(loadHistory())
   }, [])
 
+  const clearVideo = useCallback(() => {
+    if (videoUrl && isBlobRef.current) URL.revokeObjectURL(videoUrl)
+    isBlobRef.current = false
+    setVideoUrl(null)
+  }, [videoUrl])
+
   useEffect(() => {
     return () => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl)
+      if (videoUrl && isBlobRef.current) URL.revokeObjectURL(videoUrl)
     }
   }, [videoUrl])
 
@@ -79,7 +88,6 @@ export function AnalysisPanel() {
     setMatch((prev) => amendLastQuality(prev, side, quality))
   }, [])
 
-  // Uma equipe pode "corrigir" se sua última ação (não automática) ainda for positiva.
   const canAmend = useMemo(() => {
     const lastOf = (side: TeamSide) => {
       for (let i = match.actions.length - 1; i >= 0; i--) {
@@ -103,14 +111,29 @@ export function AnalysisPanel() {
 
   const handleVideoSelect = useCallback(
     (file: File) => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl)
+      if (videoUrl && isBlobRef.current) URL.revokeObjectURL(videoUrl)
+      isBlobRef.current = true
+      setLinkError(null)
       setVideoUrl(URL.createObjectURL(file))
     },
     [videoUrl],
   )
 
-  // Salva a partida atual no histórico (se tiver dados) para não misturar com
-  // a próxima, e retorna se algo foi salvo.
+  const handleLinkLoad = useCallback(() => {
+    const url = linkInput.trim()
+    if (!url) return
+    const isYouTube = !!parseYouTubeId(url)
+    const isHttp = /^https?:\/\//i.test(url)
+    if (!isYouTube && !isHttp) {
+      setLinkError("Cole um link do YouTube ou uma URL de vídeo (.mp4) válida.")
+      return
+    }
+    if (videoUrl && isBlobRef.current) URL.revokeObjectURL(videoUrl)
+    isBlobRef.current = false
+    setLinkError(null)
+    setVideoUrl(url)
+  }, [linkInput, videoUrl])
+
   const archiveCurrent = useCallback(() => {
     if (hasData(match)) {
       setHistory(saveToHistory(match))
@@ -121,17 +144,15 @@ export function AnalysisPanel() {
 
   function newMatch() {
     archiveCurrent()
-    if (videoUrl) URL.revokeObjectURL(videoUrl)
-    setVideoUrl(null)
+    clearVideo()
+    setLinkInput("")
     setMatch(createMatch())
     setView("painel")
   }
 
   function openHistoryEntry(entry: MatchHistoryEntry) {
-    // Guarda a partida em andamento antes de abrir uma do histórico.
     archiveCurrent()
-    if (videoUrl) URL.revokeObjectURL(videoUrl)
-    setVideoUrl(null)
+    clearVideo()
     setMatch(entry.match)
     setShowHistory(false)
     setView("relatorio")
@@ -146,7 +167,6 @@ export function AnalysisPanel() {
     [match.teamA.players, match.teamB.players],
   )
 
-  // Para o relatório, usa apenas ações com atleta atribuído (mantém auto-levantamento).
   const reportActions: ScoutAction[] = match.actions
 
   if (view === "ia") {
@@ -155,7 +175,7 @@ export function AnalysisPanel() {
 
   if (view === "relatorio") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100">
+      <div className="min-h-screen bg-slate-50 text-slate-800">
         <div className="mx-auto max-w-6xl px-4 py-6">
           <ScoutReport
             actions={reportActions}
@@ -177,7 +197,7 @@ export function AnalysisPanel() {
     setupTarget === "casa" ? match.teamA : setupTarget === "adversario" ? match.teamB : null
 
   return (
-    <div className="flex min-h-screen bg-[#070a14] text-slate-100">
+    <div className="flex min-h-screen bg-slate-50 text-slate-800">
       <PanelSidebar
         teamAName={match.teamA.name}
         teamBName={match.teamB.name}
@@ -186,12 +206,10 @@ export function AnalysisPanel() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <header className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+        <header className="flex items-center justify-between border-b border-orange-100 bg-white px-5 py-4">
           <div className="flex items-center gap-3">
             <Menu className="h-5 w-5 text-slate-400 lg:hidden" aria-hidden="true" />
-            <h1 className="text-lg font-bold tracking-wide text-slate-100">
-              PAINEL DE ANÁLISE
-            </h1>
+            <h1 className="text-lg font-bold tracking-wide text-slate-800">PAINEL DE ANÁLISE</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -200,15 +218,15 @@ export function AnalysisPanel() {
                 setHistory(loadHistory())
                 setShowHistory(true)
               }}
-              className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700"
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
-              <History className="h-4 w-4 text-violet-400" aria-hidden="true" />
+              <History className="h-4 w-4 text-orange-600" aria-hidden="true" />
               Histórico
             </button>
             <button
               type="button"
               onClick={newMatch}
-              className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500"
+              className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
               Nova Partida
@@ -231,41 +249,90 @@ export function AnalysisPanel() {
 
             {/* Centro: vídeo + ações */}
             <div className="flex min-h-0 flex-col gap-4">
-              <div className="rounded-xl border border-slate-800 bg-[#0e1322] p-3">
+              <div className="rounded-xl border border-orange-100 bg-white p-3 shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-violet-400">
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-orange-600">
                     Vídeo
                   </h2>
                   <button
                     type="button"
                     onClick={() => setView("ia")}
-                    className="flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/20"
+                    className="flex items-center gap-1.5 rounded-md border border-orange-200 bg-orange-50 px-2 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
                   >
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                    Análise por IA
+                    Análise por IA (opcional)
                   </button>
                 </div>
+
                 {videoUrl ? (
-                  <VideoPlayer
-                    ref={playerRef}
-                    src={videoUrl}
-                    onTimeUpdate={(t) => {
-                      videoTimeRef.current = t
-                    }}
-                  />
+                  <div className="space-y-2">
+                    <VideoPlayer
+                      ref={playerRef}
+                      src={videoUrl}
+                      onTimeUpdate={(t) => {
+                        videoTimeRef.current = t
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearVideo()
+                        setLinkInput("")
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      Remover vídeo
+                    </button>
+                  </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 text-slate-400 hover:border-slate-500"
-                  >
-                    <Upload className="h-7 w-7" aria-hidden="true" />
-                    <span className="text-sm font-medium">Carregar vídeo (opcional)</span>
-                    <span className="text-xs text-slate-500">
-                      Você também pode registrar sem vídeo
-                    </span>
-                  </button>
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:border-orange-300 hover:bg-orange-50/40"
+                    >
+                      <Upload className="h-7 w-7" aria-hidden="true" />
+                      <span className="text-sm font-medium">Carregar vídeo do dispositivo</span>
+                      <span className="text-xs text-slate-400">
+                        Tudo é opcional — você também pode registrar sem vídeo
+                      </span>
+                    </button>
+
+                    {/* Link do YouTube / URL direta */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Link2
+                            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                            aria-hidden="true"
+                          />
+                          <input
+                            type="url"
+                            inputMode="url"
+                            value={linkInput}
+                            onChange={(e) => setLinkInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleLinkLoad()
+                            }}
+                            placeholder="Cole o link do YouTube (ou URL .mp4)"
+                            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                            aria-label="Link do vídeo"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleLinkLoad}
+                          className="shrink-0 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                        >
+                          Carregar
+                        </button>
+                      </div>
+                      {linkError && <p className="text-xs text-red-600">{linkError}</p>}
+                    </div>
+                  </div>
                 )}
+
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -278,11 +345,7 @@ export function AnalysisPanel() {
                 />
               </div>
 
-              <PanelActions
-                actions={match.actions}
-                onDelete={handleDelete}
-                onUndo={handleUndo}
-              />
+              <PanelActions actions={match.actions} onDelete={handleDelete} onUndo={handleUndo} />
             </div>
 
             {/* Equipe B */}
