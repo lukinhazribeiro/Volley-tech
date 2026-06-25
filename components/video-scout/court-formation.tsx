@@ -63,7 +63,7 @@ export function CourtFormation({
     const occ = playerAt(pos)
     const info = POSICAO_INFO[pos]
     return (
-      <div className="rounded-xl border-2 border-white/40 bg-white/95 p-2 shadow-sm">
+      <div className="rounded-xl border-2 border-orange-100 bg-white p-2 shadow-sm">
         <div className="flex items-center justify-between">
           <span
             className="rounded px-1.5 py-0.5 text-[11px] font-bold text-white"
@@ -94,7 +94,7 @@ export function CourtFormation({
               max={99}
               value={occ.number}
               onChange={(e) => setNumber(occ, e.target.value)}
-              className="w-12 rounded-md border border-slate-300 px-1 py-1 text-center text-lg font-extrabold tabular-nums text-slate-800 outline-none focus:border-blue-500"
+              className="w-12 rounded-md border border-slate-300 px-1 py-1 text-center text-lg font-extrabold tabular-nums text-slate-800 outline-none focus:border-orange-400"
               aria-label={`Número do atleta em ${pos}`}
             />
             <span className="truncate text-xs font-medium text-slate-600">{occ.name}</span>
@@ -107,7 +107,7 @@ export function CourtFormation({
         <select
           value={occ?.id ?? ""}
           onChange={(e) => (e.target.value ? assign(pos, e.target.value) : clearPos(pos))}
-          className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-1 py-1 text-[11px] text-slate-700 outline-none focus:border-blue-500"
+          className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-1 py-1 text-[11px] text-slate-700 outline-none focus:border-orange-400"
           aria-label={`Definir atleta na posição ${pos}`}
         >
           <option value="">— escolher —</option>
@@ -124,22 +124,22 @@ export function CourtFormation({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Formação em quadra"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-2xl border border-slate-800 bg-slate-900"
+        className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-2xl border border-orange-100 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-slate-800 p-5">
+        <div className="flex items-start justify-between border-b border-orange-100 p-5">
           <div className="flex items-center gap-2">
-            <LayoutGrid className="h-5 w-5 text-blue-400" aria-hidden="true" />
+            <LayoutGrid className="h-5 w-5 text-orange-600" aria-hidden="true" />
             <div>
-              <h3 className="text-base font-semibold text-slate-100">Formação em quadra</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className="text-base font-semibold text-slate-800">Formação em quadra</h3>
+              <p className="text-xs text-slate-500">
                 Posicione os atletas por número. P1 é o saque; P4/P3/P2 na rede; P5/P6/P1 no fundo.
               </p>
             </div>
@@ -147,7 +147,7 @@ export function CourtFormation({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200"
+            className="text-slate-400 hover:text-slate-600"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -164,8 +164,8 @@ export function CourtFormation({
                 onClick={() => setTeam(t)}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
                   team === t
-                    ? "border-blue-500 bg-blue-500/15 text-blue-200"
-                    : "border-slate-700 text-slate-400 hover:text-slate-200"
+                    ? "border-orange-400 bg-orange-50 text-orange-700"
+                    : "border-slate-200 text-slate-500 hover:text-slate-700"
                 }`}
               >
                 {TEAM_LABEL[t]}
@@ -174,36 +174,33 @@ export function CourtFormation({
           </div>
 
           {/* Quadra */}
-          <div
-            className="rounded-2xl p-4"
-            style={{ background: "linear-gradient(180deg,#1e3a8a22,#0f172a)" }}
-          >
+          <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4">
             {/* Rede */}
             <div className="mb-1 flex items-center gap-2">
-              <div className="h-1 flex-1 rounded bg-white/60" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">
+              <div className="h-1 flex-1 rounded bg-orange-300" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-orange-500">
                 Rede
               </span>
-              <div className="h-1 flex-1 rounded bg-white/60" />
+              <div className="h-1 flex-1 rounded bg-orange-300" />
             </div>
             <div className="grid grid-cols-3 gap-2">
               {LINHA_REDE.map((pos) => (
                 <Slot key={pos} pos={pos} />
               ))}
             </div>
-            <div className="my-2 border-t border-dashed border-white/20" />
+            <div className="my-2 border-t border-dashed border-orange-200" />
             <div className="grid grid-cols-3 gap-2">
               {LINHA_FUNDO.map((pos) => (
                 <Slot key={pos} pos={pos} />
               ))}
             </div>
-            <p className="mt-2 text-center text-[10px] text-white/50">
+            <p className="mt-2 text-center text-[10px] text-slate-400">
               Linha de fundo (saque em P1)
             </p>
           </div>
 
           {/* Reservas / banco */}
-          <div className="rounded-xl border border-slate-800 bg-slate-800/40 p-3">
+          <div className="rounded-xl border border-orange-100 bg-slate-50 p-3">
             <div className="mb-2 flex items-center justify-between">
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -214,7 +211,7 @@ export function CourtFormation({
               <button
                 type="button"
                 onClick={() => onAddPlayer(team)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                 Adicionar atleta
@@ -222,7 +219,7 @@ export function CourtFormation({
             </div>
 
             {reservas.length === 0 ? (
-              <p className="py-2 text-center text-xs text-slate-500">
+              <p className="py-2 text-center text-xs text-slate-400">
                 Todos os atletas desta equipe estão em quadra.
               </p>
             ) : (
@@ -230,7 +227,7 @@ export function CourtFormation({
                 {reservas.map((p) => (
                   <li
                     key={p.id}
-                    className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 p-1.5"
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5"
                   >
                     <input
                       type="number"
@@ -238,20 +235,20 @@ export function CourtFormation({
                       max={99}
                       value={p.number}
                       onChange={(e) => setNumber(p, e.target.value)}
-                      className="w-12 rounded-md border border-slate-700 bg-slate-800 px-1 py-1 text-center text-sm font-bold tabular-nums text-slate-100 outline-none focus:border-blue-500"
+                      className="w-12 rounded-md border border-slate-300 px-1 py-1 text-center text-sm font-bold tabular-nums text-slate-800 outline-none focus:border-orange-400"
                       aria-label={`Número de ${p.name}`}
                     />
                     <input
                       type="text"
                       value={p.name}
                       onChange={(e) => onUpdatePlayer({ ...p, name: e.target.value })}
-                      className="w-24 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 outline-none focus:border-blue-500"
+                      className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 outline-none focus:border-orange-400"
                       aria-label={`Nome de ${p.name}`}
                     />
                     <button
                       type="button"
                       onClick={() => onRemovePlayer(p.id)}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-500/15 hover:text-red-300"
+                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-500"
                       aria-label={`Remover ${p.name}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -260,17 +257,17 @@ export function CourtFormation({
                 ))}
               </ul>
             )}
-            <p className="mt-2 text-[11px] text-slate-500">
+            <p className="mt-2 text-[11px] text-slate-400">
               Para substituir, escolha o reserva no menu da posição desejada na quadra.
             </p>
           </div>
         </div>
 
-        <div className="border-t border-slate-800 p-4">
+        <div className="border-t border-orange-100 p-4">
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500"
+            className="w-full rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
           >
             Concluir
           </button>
