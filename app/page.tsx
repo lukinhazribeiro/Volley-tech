@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Activity, Target, ClipboardCheck, Zap, LogOut, ShieldCheck } from "lucide-react"
+import { Activity, Target, ClipboardCheck, Video, Zap, LogOut, ShieldCheck } from "lucide-react"
 import { AppCard } from "@/components/hub/app-card"
 import { TrialBanner } from "@/components/hub/trial-banner"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
@@ -37,6 +37,15 @@ const apps = [
     icon: ClipboardCheck,
     status: "Online",
     features: ["Súmula digital", "Estatísticas", "Relatório"],
+  },
+  {
+    title: "Scout Video",
+    subtitle: "Análise por vídeo",
+    description: "Painel de análise com vídeo e leitura por IA para gerar o scout direto das imagens da partida.",
+    href: "/scout-video",
+    icon: Video,
+    status: "Online",
+    features: ["Vídeo + IA", "Por posição", "Relatório"],
   },
 ]
 
