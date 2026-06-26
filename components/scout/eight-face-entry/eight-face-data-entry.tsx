@@ -299,8 +299,50 @@ export default function EightFaceDataEntry({
       case 8:
         if (value === "ERR_LEV") {
           newData.resultComplemento = "%"
+          // Associação automática do levantador pela marcação no elenco:
+          // se a equipe atacante tem um levantador marcado, credita o erro a ele
+          // sem pedir o número (sem travar o analista). Senão, abre a seleção manual.
+          const attackingPlayers = newData.attackingTeam === "A" ? teamAPlayers : teamBPlayers
+          const markedSetter = attackingPlayers.find((p) => p.isSetter)?.number ?? 0
+          if (markedSetter > 0) {
+            const settingErrorAction: MatchAction = {
+              id: Math.random().toString(),
+              timestamp: Date.now(),
+              servingTeam: newData.servingTeam as "A" | "B",
+              servingPlayer: newData.servingPlayer as number,
+              serveQuality: newData.serveQuality as "+" | "-" | "ka",
+              serveZone: newData.serveZone as "7.5" | "8.6" | "9.1",
+              passingQuality: newData.passingQuality as "A" | "B" | "C" | "D" | "R",
+              passingPlayer: newData.passingPlayer as number,
+              attackingTeam: newData.attackingTeam as "A" | "B",
+              actionPlayer: markedSetter,
+              resultComplemento: "%",
+              pointScoredBy: newData.attackingTeam === "A" ? "B" : "A",
+              pointType: "error",
+            }
+            console.log("[v0] Setting error (levantador automático):", settingErrorAction)
+            onActionComplete(settingErrorAction)
+            setCurrentFace(1)
+            setActionData({
+              servingTeam: "",
+              servingPlayer: 0,
+              serveQuality: "",
+              serveZone: "",
+              passingQuality: "",
+              passingPlayer: 0,
+              attackingTeam: "",
+              attackPosition: "",
+              resultComplemento: "",
+              actionPlayer: 0,
+              defensivePlayer: 0,
+              transitionType: "k1",
+              blockingPosition: "",
+              blockingPlayer: 0,
+            })
+            return
+          }
           setActionData(newData)
-          setCurrentFace(8.5) // identificar o levantador que errou
+          setCurrentFace(8.5) // nenhum levantador marcado: identificar manualmente
           return
         }
         newData.attackPosition = value as string
