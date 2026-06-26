@@ -179,21 +179,24 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
     let newTeamARotation = matchData.teamARotation
     let newTeamBRotation = matchData.teamBRotation
 
-    if (matchData.actions.length > 0) {
-      const previousAction = matchData.actions[matchData.actions.length - 1]
-      const currentAction = action
-
-      if (previousAction.servingTeam === "A" && currentAction.servingTeam === "B") {
-        newTeamBRotation = {
-          ...matchData.teamBRotation,
-          currentRotation: rotatePositions(matchData.teamBRotation.currentRotation),
-          rotationHistory: [...matchData.teamBRotation.rotationHistory, matchData.teamBRotation.currentRotation],
-        }
-      } else if (previousAction.servingTeam === "B" && currentAction.servingTeam === "A") {
+    // Rotação automática pela regra de side-out: a equipe rotaciona quando
+    // RECONQUISTA o saque, ou seja, quando ganha o rally estando na recepção.
+    // Isso dispara já na primeira virada de saque (antes a rotação dependia de
+    // o analista trocar o "servingTeam" na ação seguinte, e a 1ª não ocorria).
+    const rallyWinner = pointScoredBy
+    const server = action.servingTeam as "A" | "B" | ""
+    if (rallyWinner && server && rallyWinner !== server) {
+      if (rallyWinner === "A") {
         newTeamARotation = {
           ...matchData.teamARotation,
           currentRotation: rotatePositions(matchData.teamARotation.currentRotation),
           rotationHistory: [...matchData.teamARotation.rotationHistory, matchData.teamARotation.currentRotation],
+        }
+      } else {
+        newTeamBRotation = {
+          ...matchData.teamBRotation,
+          currentRotation: rotatePositions(matchData.teamBRotation.currentRotation),
+          rotationHistory: [...matchData.teamBRotation.rotationHistory, matchData.teamBRotation.currentRotation],
         }
       }
     }
