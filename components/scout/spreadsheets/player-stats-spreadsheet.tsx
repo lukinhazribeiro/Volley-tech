@@ -70,37 +70,31 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     const filteredActions =
       selectedSet === "all" ? actions : actions.filter((action) => action.setNumber === selectedSet)
 
-    let teamTotalPoints = 0
-    for (const action of filteredActions) {
-      const servingTeam = action.servingTeam
-      const attackingTeam = action.attackingTeam
+    // Conta os pontos conquistados por uma equipe específica (t).
+    const countPointsFor = (t: "A" | "B"): number => {
+      let pts = 0
+      for (const action of filteredActions) {
+        const servingTeam = action.servingTeam
+        const attackingTeam = action.attackingTeam
 
-      if (action.serveQuality === "ka" && servingTeam === team) {
-        teamTotalPoints++
+        if (action.serveQuality === "ka" && servingTeam === t) pts++
+        if (action.serveQuality === "-" && servingTeam !== t) pts++
+        if (action.passingQuality === "D" && attackingTeam === t) pts++
+        if (action.resultComplemento === "#" && attackingTeam === t) pts++
+        if (action.resultComplemento === "!" && attackingTeam !== t) pts++
+        if (action.resultComplemento === "+" && attackingTeam !== t) pts++
+        if (action.resultComplemento === "%" && attackingTeam !== t) pts++
+        // Ponto direto a partir do rebote: vai para a equipe escolhida na face 5b+
+        if (action.passingQuality === "R" && action.pointType === "point" && action.pointScoredBy === t) pts++
       }
-      if (action.serveQuality === "-" && servingTeam !== team) {
-        teamTotalPoints++
-      }
-      if (action.passingQuality === "D" && attackingTeam === team) {
-        teamTotalPoints++
-      }
-      if (action.resultComplemento === "#" && attackingTeam === team) {
-        teamTotalPoints++
-      }
-      if (action.resultComplemento === "!" && attackingTeam !== team) {
-        teamTotalPoints++
-      }
-      if (action.resultComplemento === "+" && attackingTeam !== team) {
-        teamTotalPoints++
-      }
-      if (action.resultComplemento === "%" && attackingTeam !== team) {
-        teamTotalPoints++
-      }
-      // Ponto direto a partir do rebote: vai para a equipe escolhida na face 5b+
-      if (action.passingQuality === "R" && action.pointType === "point" && action.pointScoredBy === team) {
-        teamTotalPoints++
-      }
+      return pts
     }
+
+    const teamTotalPoints = countPointsFor(team)
+    // TGP é a participação em relação ao PLACAR TOTAL DO JOGO (somatório dos
+    // pontos das duas equipes), não apenas aos pontos da própria equipe.
+    const opponentTotalPoints = countPointsFor(team === "A" ? "B" : "A")
+    const gameTotalPoints = teamTotalPoints + opponentTotalPoints
 
     for (const action of filteredActions) {
       const receivingTeam = action.servingTeam === "A" ? "B" : "A"
@@ -289,7 +283,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
 
       stat.te = stat.reception.erro + stat.serve.erro + stat.attack.erro
 
-      stat.tgp = stat.tp > 0 ? Math.round((stat.tp / teamTotalPoints) * 100) : 0
+      stat.tgp = stat.tp > 0 && gameTotalPoints > 0 ? Math.round((stat.tp / gameTotalPoints) * 100) : 0
 
       return stat
     })
