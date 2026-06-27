@@ -90,11 +90,9 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       return pts
     }
 
+    // TGP é a participação do atleta em relação ao PLACAR DA PRÓPRIA EQUIPE
+    // (pontos conquistados pela equipe dele). Não tem relação com a equipe adversária.
     const teamTotalPoints = countPointsFor(team)
-    // TGP é a participação em relação ao PLACAR TOTAL DO JOGO (somatório dos
-    // pontos das duas equipes), não apenas aos pontos da própria equipe.
-    const opponentTotalPoints = countPointsFor(team === "A" ? "B" : "A")
-    const gameTotalPoints = teamTotalPoints + opponentTotalPoints
 
     for (const action of filteredActions) {
       const receivingTeam = action.servingTeam === "A" ? "B" : "A"
@@ -283,7 +281,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
 
       stat.te = stat.reception.erro + stat.serve.erro + stat.attack.erro
 
-      stat.tgp = stat.tp > 0 && gameTotalPoints > 0 ? Math.round((stat.tp / gameTotalPoints) * 100) : 0
+      stat.tgp = stat.tp > 0 && teamTotalPoints > 0 ? Math.round((stat.tp / teamTotalPoints) * 100) : 0
 
       return stat
     })

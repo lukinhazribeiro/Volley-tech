@@ -305,7 +305,7 @@ export default function EightFaceDataEntry({
           const attackingPlayers = newData.attackingTeam === "A" ? teamAPlayers : teamBPlayers
           const markedSetter = attackingPlayers.find((p) => p.isSetter)?.number ?? 0
           if (markedSetter > 0) {
-            const settingErrorAction: MatchAction = {
+            const autoSetterErrorAction: MatchAction = {
               id: Math.random().toString(),
               timestamp: Date.now(),
               servingTeam: newData.servingTeam as "A" | "B",
@@ -320,8 +320,7 @@ export default function EightFaceDataEntry({
               pointScoredBy: newData.attackingTeam === "A" ? "B" : "A",
               pointType: "error",
             }
-            console.log("[v0] Setting error (levantador automático):", settingErrorAction)
-            onActionComplete(settingErrorAction)
+            onActionComplete(autoSetterErrorAction)
             setCurrentFace(1)
             setActionData({
               servingTeam: "",
