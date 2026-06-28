@@ -175,13 +175,26 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         else if (action.attackPosition === "F" || action.attackPosition === "S")
           playerStats[action.actionPlayer].attack.FS++
 
+        console.log(
+          "[v0] Processing attack - Player:",
+          action.actionPlayer,
+          "Team:",
+          action.attackingTeam,
+          "DefensivePlayer:",
+          action.defensivePlayer,
+          "ResultComplemento:",
+          action.resultComplemento,
+        )
+
         // Ataque Certo: quando há defesa (D) ou volume (V) - ataque sem ponto
         if (action.resultComplemento === "D" || action.resultComplemento === "V") {
+          console.log("[v0] Counting attack certo for player", action.actionPlayer, "on team", team)
           playerStats[action.actionPlayer].attack.certo++
         }
 
         // Ataque Ponto: quando resultComplemento === "#"
         if (action.resultComplemento === "#") {
+          console.log("[v0] Counting attack ponto for player", action.actionPlayer, "on team", team)
           playerStats[action.actionPlayer].attack.ponto++
         } else if (action.resultComplemento === "!") {
           playerStats[action.actionPlayer].attack.erro++
@@ -254,20 +267,15 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     }
 
     const result = Object.values(playerStats).map((stat) => {
-      // TP = TODAS as participações do atleta, EXCETO os erros.
-      // Recepção: A + B + C (exclui erro)
+      // Reception: A + B + C (but NOT erro)
       const totalReceptionCorrect = stat.reception.A + stat.reception.B + stat.reception.C
-      // Saque: certo + ace (exclui erro)
+      // Serve: certo + ace (but NOT erro)
       const totalServeCorrect = stat.serve.certo + stat.serve.ace
-      // Ataque: todas as tentativas (somatório por posição O+P+M+FS) menos os erros.
-      // Usamos as posições porque todo ataque incrementa a posição, inclusive os
-      // que não caem em ponto/certo (ex.: continuidade), garantindo que NENHUMA
-      // ação de ataque que não seja erro fique de fora do TP.
-      const totalAttackAttempts = stat.attack.O + stat.attack.P + stat.attack.M + stat.attack.FS
-      const totalAttackCorrect = Math.max(0, totalAttackAttempts - stat.attack.erro)
-      // Bloqueio: todos contam (não há erro contabilizado em bloqueio)
+      // Attack: ponto + certo (but NOT erro)
+      const totalAttackCorrect = stat.attack.ponto + stat.attack.certo
+      // Block: all blocks count (no errors in blocks)
       const totalBlock = stat.block.O + stat.block.P + stat.block.M + stat.block.FS
-      // Defesa: todas contam
+
       const totalDefense = stat.defense.D + stat.defense.V + stat.defense.R
       stat.tp = totalReceptionCorrect + totalServeCorrect + totalAttackCorrect + totalBlock + totalDefense
 
