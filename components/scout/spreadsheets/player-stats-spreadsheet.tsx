@@ -40,7 +40,6 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
   })
 
   const [selectedSet, setSelectedSet] = useState<"all" | number>("all")
-  const [selectedTeam, setSelectedTeam] = useState<"A" | "B">("A")
 
   const updatePlayerName = (team: "A" | "B", playerNumber: number, name: string) => {
     setPlayerNames((prev) => ({
@@ -742,35 +741,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 no-print">
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equipe</span>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedTeam("A")}
-              className={`rounded-lg px-4 py-2.5 text-sm font-bold transition-colors ${
-                selectedTeam === "A"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-blue-50 text-blue-700 hover:bg-blue-100"
-              }`}
-            >
-              {teamAName}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedTeam("B")}
-              className={`rounded-lg px-4 py-2.5 text-sm font-bold transition-colors ${
-                selectedTeam === "B"
-                  ? "bg-red-600 text-white shadow-sm"
-                  : "bg-red-50 text-red-700 hover:bg-red-100"
-              }`}
-            >
-              {teamBName}
-            </button>
-          </div>
-        </div>
-
+      <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 no-print sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visualizar</span>
           <div className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
@@ -832,9 +803,8 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       </div>
 
       <div id="spreadsheet-content" className="space-y-6">
-        {selectedTeam === "A"
-          ? renderTeamTable("A", teamAName)
-          : renderTeamTable("B", teamBName)}
+        {renderTeamTable("A", teamAName)}
+        {renderTeamTable("B", teamBName)}
       </div>
     </div>
   )
