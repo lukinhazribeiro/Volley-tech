@@ -1,6 +1,6 @@
 "use client"
 
-import { OptionButton, FaceHeading } from "./face-buttons"
+import { Button } from "@/components/scout/ui/button"
 
 interface Face12TransitionProps {
   onSelect: (value: string) => void
@@ -14,18 +14,22 @@ export default function Face12Transition({ onSelect }: Face12TransitionProps) {
   ]
 
   return (
-    <div>
-      <FaceHeading title="Tipo de Transição" subtitle="Selecione o tipo de transição para encerrar a ação" />
-      <div className="grid grid-cols-1 gap-3">
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">Tipo de Transição</h2>
+        <p className="text-sm text-slate-600 mb-4">Selecione o tipo de transição para encerrar a ação</p>
+      </div>
+      <div className="space-y-3">
         {transitions.map((transition) => (
-          <OptionButton
+          <Button
             key={transition.id}
             onClick={() => onSelect(transition.id)}
-            tone="positive"
-            subLabel={transition.description}
+            variant="default"
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-6 flex flex-col items-center justify-center gap-1"
           >
-            {transition.label}
-          </OptionButton>
+            <span className="text-lg">{transition.label}</span>
+            <span className="text-xs font-normal">{transition.description}</span>
+          </Button>
         ))}
       </div>
     </div>

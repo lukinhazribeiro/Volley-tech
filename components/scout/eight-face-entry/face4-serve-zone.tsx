@@ -1,6 +1,6 @@
 "use client"
 
-import { OptionButton, FaceHeading } from "./face-buttons"
+import { Button } from "@/components/scout/ui/button"
 
 interface Face4ServeZoneProps {
   onSelect: (value: string) => void
@@ -9,12 +9,12 @@ interface Face4ServeZoneProps {
 export default function Face4ServeZone({ onSelect }: Face4ServeZoneProps) {
   return (
     <div>
-      <FaceHeading title="Zona de Recepção" subtitle="Onde a bola foi recebida" />
-      <div className="grid grid-cols-3 gap-3">
+      <h2 className="text-lg font-semibold mb-4">Zona de Recepção</h2>
+      <div className="flex gap-4">
         {["7.5", "8.6", "9.1"].map((zone) => (
-          <OptionButton key={zone} onClick={() => onSelect(zone)} tone="info">
+          <Button key={zone} onClick={() => onSelect(zone)} className="flex-1 h-12 text-lg" variant="default">
             {zone}
-          </OptionButton>
+          </Button>
         ))}
       </div>
     </div>

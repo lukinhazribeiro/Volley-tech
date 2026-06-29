@@ -1,6 +1,6 @@
 "use client"
 
-import { OptionButton, FaceHeading } from "./face-buttons"
+import { Button } from "@/components/scout/ui/button"
 
 interface Face11TransitionProps {
   onSelect: (value: string) => void
@@ -9,16 +9,16 @@ interface Face11TransitionProps {
 export default function Face11Transition({ onSelect }: Face11TransitionProps) {
   return (
     <div>
-      <FaceHeading title="Transição" subtitle="Tipo de transição do rally" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <h2 className="text-lg font-semibold mb-4">Transição</h2>
+      <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "K1", sub: "Side-out", value: "K1" },
-          { label: "K2", sub: "Contra-ataque", value: "K2" },
-          { label: "K3", sub: "Rally", value: "K3" },
-        ].map(({ label, sub, value }) => (
-          <OptionButton key={value} onClick={() => onSelect(value)} tone="primary" subLabel={sub}>
+          { label: "K1 (Side-out)", value: "K1" },
+          { label: "K2 (Contra-ataque)", value: "K2" },
+          { label: "K3 (Rally)", value: "K3" },
+        ].map(({ label, value }) => (
+          <Button key={value} onClick={() => onSelect(value)} className="h-12" variant="default">
             {label}
-          </OptionButton>
+          </Button>
         ))}
       </div>
     </div>

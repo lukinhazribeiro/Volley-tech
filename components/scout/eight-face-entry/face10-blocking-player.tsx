@@ -1,6 +1,6 @@
 "use client"
 
-import { NumberButton, FaceHeading } from "./face-buttons"
+import { Button } from "@/components/scout/ui/button"
 
 interface Face10BlockingPlayerProps {
   onSelect: (value: number) => void
@@ -11,10 +11,13 @@ interface Face10BlockingPlayerProps {
 export default function Face10BlockingPlayer({ onSelect, team, context }: Face10BlockingPlayerProps) {
   return (
     <div>
-      <FaceHeading title={context} subtitle={team.name} />
-      <div className="grid grid-cols-5 gap-2 sm:grid-cols-7 sm:gap-3">
+      <h2 className="text-lg font-semibold mb-2">{context}</h2>
+      <p className="text-sm text-slate-600 mb-4">{team.name}</p>
+      <div className="grid grid-cols-7 gap-2">
         {team.players.map((player) => (
-          <NumberButton key={player} value={player} onClick={() => onSelect(player)} />
+          <Button key={player} onClick={() => onSelect(player)} variant="default" className="h-10">
+            {player}
+          </Button>
         ))}
       </div>
     </div>

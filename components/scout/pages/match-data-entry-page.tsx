@@ -6,7 +6,6 @@ import { Button } from "@/components/scout/ui/button"
 import EightFaceDataEntry from "@/components/scout/eight-face-entry/eight-face-data-entry"
 import ModernStatsDashboard from "@/components/scout/heatmaps/modern-stats-dashboard"
 import PlayerStatsSpreadsheet from "@/components/scout/spreadsheets/player-stats-spreadsheet"
-import QuickReport from "@/components/scout/quick-report"
 import MatchSetupPage from "./match-setup-page"
 import { type MatchAction, calculateMatchStats } from "@/lib/scout/match-parser"
 import { createEmptyStats } from "@/lib/scout/match-parser"
@@ -180,24 +179,21 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
     let newTeamARotation = matchData.teamARotation
     let newTeamBRotation = matchData.teamBRotation
 
-    // Rotação automática pela regra de side-out: a equipe rotaciona quando
-    // RECONQUISTA o saque, ou seja, quando ganha o rally estando na recepção.
-    // Isso dispara já na primeira virada de saque (antes a rotação dependia de
-    // o analista trocar o "servingTeam" na ação seguinte, e a 1ª não ocorria).
-    const rallyWinner = pointScoredBy
-    const server = action.servingTeam as "A" | "B" | ""
-    if (rallyWinner && server && rallyWinner !== server) {
-      if (rallyWinner === "A") {
-        newTeamARotation = {
-          ...matchData.teamARotation,
-          currentRotation: rotatePositions(matchData.teamARotation.currentRotation),
-          rotationHistory: [...matchData.teamARotation.rotationHistory, matchData.teamARotation.currentRotation],
-        }
-      } else {
+    if (matchData.actions.length > 0) {
+      const previousAction = matchData.actions[matchData.actions.length - 1]
+      const currentAction = action
+
+      if (previousAction.servingTeam === "A" && currentAction.servingTeam === "B") {
         newTeamBRotation = {
           ...matchData.teamBRotation,
           currentRotation: rotatePositions(matchData.teamBRotation.currentRotation),
           rotationHistory: [...matchData.teamBRotation.rotationHistory, matchData.teamBRotation.currentRotation],
+        }
+      } else if (previousAction.servingTeam === "B" && currentAction.servingTeam === "A") {
+        newTeamARotation = {
+          ...matchData.teamARotation,
+          currentRotation: rotatePositions(matchData.teamARotation.currentRotation),
+          rotationHistory: [...matchData.teamARotation.rotationHistory, matchData.teamARotation.currentRotation],
         }
       }
     }
@@ -359,21 +355,12 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         <Tabs defaultValue="stats" className="w-full">
           <div className="flex items-center justify-between px-4 border-b p-4">
             <TabsList className="justify-start rounded-none border-b-0">
-              <TabsTrigger value="quick">Relatório Rápido</TabsTrigger>
               <TabsTrigger value="stats">Estatísticas</TabsTrigger>
               <TabsTrigger value="spreadsheet">Planilha</TabsTrigger>
               <TabsTrigger value="charts">Gráficos</TabsTrigger>
               <TabsTrigger value="transitions">Transições</TabsTrigger>
             </TabsList>
           </div>
-
-          <TabsContent value="quick" className="p-4">
-            <QuickReport
-              actions={matchData.actions}
-              teamAName={matchData.teamAName}
-              teamBName={matchData.teamBName}
-            />
-          </TabsContent>
 
           <TabsContent value="stats" className="p-4">
             <div className="space-y-6">
@@ -485,7 +472,6 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         <div className="flex items-center justify-between px-4 border-b">
           <TabsList className="justify-start rounded-none border-b-0">
             <TabsTrigger value="entry">Coleta de Dados</TabsTrigger>
-            <TabsTrigger value="quick">Relatório Rápido</TabsTrigger>
             <TabsTrigger value="stats">Estatísticas</TabsTrigger>
             <TabsTrigger value="spreadsheet">Planilha</TabsTrigger>
             <TabsTrigger value="charts">Gráficos</TabsTrigger>
@@ -505,14 +491,6 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
             teamBScore={currentSet.teamBScore}
             teamAPlayers={matchData.teamAPlayers}
             teamBPlayers={matchData.teamBPlayers}
-          />
-        </TabsContent>
-
-        <TabsContent value="quick" className="h-[calc(100%-45px)] overflow-auto p-4">
-          <QuickReport
-            actions={matchData.actions}
-            teamAName={matchData.teamAName}
-            teamBName={matchData.teamBName}
           />
         </TabsContent>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { OptionButton, FaceHeading } from "./face-buttons"
+import { Button } from "@/components/scout/ui/button"
 
 interface Face5PassQualityProps {
   onSelect: (value: string) => void
@@ -9,24 +9,27 @@ interface Face5PassQualityProps {
 export default function Face5PassQuality({ onSelect }: Face5PassQualityProps) {
   return (
     <div>
-      <FaceHeading title="Qualidade do Passe" subtitle="Avalie a recepção" />
-      <div className="grid grid-cols-2 gap-3">
-        <OptionButton onClick={() => onSelect("A")} tone="positive" subLabel="A">
+      <h2 className="text-lg font-semibold mb-4">Qualidade do Passe</h2>
+      <div className="grid grid-cols-2 gap-4">
+        <Button onClick={() => onSelect("A")} className="h-12 text-lg" variant="default">
           Bom
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("B")} tone="info" subLabel="B">
+        </Button>
+        <Button onClick={() => onSelect("B")} className="h-12 text-lg" variant="default">
           Regular
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("C")} tone="warning" subLabel="C">
+        </Button>
+        <Button onClick={() => onSelect("C")} className="h-12 text-lg" variant="default">
           Irregular
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("D")} tone="negative" subLabel="D">
+        </Button>
+        <Button onClick={() => onSelect("D")} className="h-12 text-lg" variant="default">
           Erro
-        </OptionButton>
+        </Button>
       </div>
-      <OptionButton onClick={() => onSelect("R")} tone="warning" className="mt-3">
+      <Button
+        onClick={() => onSelect("R")}
+        className="h-12 text-lg w-full mt-4 bg-amber-500 hover:bg-amber-600 text-white"
+      >
         Rebote de Passe
-      </OptionButton>
+      </Button>
     </div>
   )
 }

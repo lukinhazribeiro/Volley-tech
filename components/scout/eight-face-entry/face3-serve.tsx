@@ -1,6 +1,6 @@
 "use client"
 
-import { OptionButton, FaceHeading } from "./face-buttons"
+import { Button } from "@/components/scout/ui/button"
 
 interface Face3ServeProps {
   onSelect: (value: string) => void
@@ -9,17 +9,17 @@ interface Face3ServeProps {
 export default function Face3Serve({ onSelect }: Face3ServeProps) {
   return (
     <div>
-      <FaceHeading title="Saque" subtitle="Qual foi o resultado do saque?" />
-      <div className="grid grid-cols-3 gap-3">
-        <OptionButton onClick={() => onSelect("+")} tone="neutral">
+      <h2 className="text-lg font-semibold mb-4">Saque</h2>
+      <div className="grid grid-cols-3 gap-4">
+        <Button onClick={() => onSelect("+")} className="h-12 text-lg" variant="default">
           Certo
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("ka")} tone="positive">
+        </Button>
+        <Button onClick={() => onSelect("ka")} className="h-12 text-lg" variant="default">
           ACE
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("-")} tone="negative">
+        </Button>
+        <Button onClick={() => onSelect("-")} className="h-12 text-lg" variant="default">
           Erro
-        </OptionButton>
+        </Button>
       </div>
     </div>
   )

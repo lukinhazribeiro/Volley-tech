@@ -1,6 +1,6 @@
 "use client"
 
-import { OptionButton, FaceHeading } from "./face-buttons"
+import { Button } from "@/components/scout/ui/button"
 
 interface Face9ResultTypeProps {
   onSelect: (value: string) => void
@@ -9,26 +9,32 @@ interface Face9ResultTypeProps {
 export default function Face9ResultType({ onSelect }: Face9ResultTypeProps) {
   return (
     <div>
-      <FaceHeading title="Resultado da Ação" subtitle="Como terminou o ataque" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <OptionButton onClick={() => onSelect("#")} tone="positive">
+      <h2 className="text-lg font-semibold mb-4">Resultado da Ação</h2>
+      <div className="grid grid-cols-2 gap-4">
+        <Button onClick={() => onSelect("#")} className="h-12 text-lg" variant="default">
           Ponto
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("!")} tone="negative">
+        </Button>
+        <Button onClick={() => onSelect("!")} className="h-12 text-lg" variant="default">
           Erro
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("+")} tone="primary">
+        </Button>
+        <Button onClick={() => onSelect("+")} className="h-12 text-lg" variant="default">
           Bloqueio
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("D")} tone="neutral">
+        </Button>
+        <Button onClick={() => onSelect("D")} className="h-12 text-lg" variant="default">
           Defesa
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("V")} tone="info">
+        </Button>
+        <Button
+          onClick={() => onSelect("V")}
+          className="h-12 text-lg bg-sky-600 hover:bg-sky-700 text-white"
+        >
           Volume
-        </OptionButton>
-        <OptionButton onClick={() => onSelect("REC")} tone="warning">
+        </Button>
+        <Button
+          onClick={() => onSelect("REC")}
+          className="h-12 text-lg bg-emerald-600 hover:bg-emerald-700 text-white"
+        >
           Recuperação
-        </OptionButton>
+        </Button>
       </div>
     </div>
   )

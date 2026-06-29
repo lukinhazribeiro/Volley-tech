@@ -1,6 +1,6 @@
 "use client"
 
-import { OptionButton, FaceHeading } from "./face-buttons"
+import { Button } from "@/components/scout/ui/button"
 
 interface Face1TeamProps {
   onSelect: (value: string) => void
@@ -10,12 +10,12 @@ interface Face1TeamProps {
 export default function Face1Team({ onSelect, teamNames }: Face1TeamProps) {
   return (
     <div>
-      <FaceHeading title="Equipe Sacadora" subtitle="Quem inicia o saque?" />
-      <div className="grid grid-cols-2 gap-3">
+      <h2 className="text-lg font-semibold mb-4">Equipe Sacadora</h2>
+      <div className="flex gap-4">
         {teamNames.map((team) => (
-          <OptionButton key={team} onClick={() => onSelect(team)} tone="primary">
+          <Button key={team} onClick={() => onSelect(team)} className="flex-1 h-12 text-lg">
             Equipe {team}
-          </OptionButton>
+          </Button>
         ))}
       </div>
     </div>

@@ -4,12 +4,11 @@ import { useState } from "react"
 import { Button } from "@/components/scout/ui/button"
 import { Input } from "@/components/scout/ui/input"
 import { Card } from "@/components/scout/ui/card"
-import { X, Plus, Hand } from 'lucide-react'
+import { X, Plus } from 'lucide-react'
 
 export interface Player {
   number: number
   name: string
-  isSetter?: boolean
 }
 
 interface TeamRosterManagementProps {
@@ -42,18 +41,6 @@ export default function TeamRosterManagement({
       setTeamAPlayers(players)
     } else {
       setTeamBPlayers(players)
-    }
-  }
-
-  const handleToggleSetter = (team: "A" | "B", index: number) => {
-    const players = team === "A" ? [...teamAPlayers] : [...teamBPlayers]
-    const willBeSetter = !players[index].isSetter
-    // Apenas 1 levantador por equipe: limpa os demais e marca o escolhido.
-    const updated = players.map((p, i) => ({ ...p, isSetter: i === index ? willBeSetter : false }))
-    if (team === "A") {
-      setTeamAPlayers(updated)
-    } else {
-      setTeamBPlayers(updated)
     }
   }
 
@@ -125,21 +112,6 @@ export default function TeamRosterManagement({
                     />
                   </div>
                   <Button
-                    onClick={() => handleToggleSetter("A", index)}
-                    size="sm"
-                    variant="ghost"
-                    title="Marcar como levantador"
-                    aria-pressed={player.isSetter ? true : false}
-                    className={
-                      player.isSetter
-                        ? "bg-orange-600 text-white hover:bg-orange-700"
-                        : "text-slate-400 hover:text-orange-600 hover:bg-orange-50"
-                    }
-                  >
-                    <Hand className="h-4 w-4" />
-                    <span className="ml-1 text-xs font-semibold">LEV</span>
-                  </Button>
-                  <Button
                     onClick={() => handleRemovePlayer("A", index)}
                     size="sm"
                     variant="ghost"
@@ -183,21 +155,6 @@ export default function TeamRosterManagement({
                     />
                   </div>
                   <Button
-                    onClick={() => handleToggleSetter("B", index)}
-                    size="sm"
-                    variant="ghost"
-                    title="Marcar como levantador"
-                    aria-pressed={player.isSetter ? true : false}
-                    className={
-                      player.isSetter
-                        ? "bg-orange-600 text-white hover:bg-orange-700"
-                        : "text-slate-400 hover:text-orange-600 hover:bg-orange-50"
-                    }
-                  >
-                    <Hand className="h-4 w-4" />
-                    <span className="ml-1 text-xs font-semibold">LEV</span>
-                  </Button>
-                  <Button
                     onClick={() => handleRemovePlayer("B", index)}
                     size="sm"
                     variant="ghost"
@@ -220,8 +177,7 @@ export default function TeamRosterManagement({
         <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
           <p className="text-sm text-slate-700">
             <strong>Importante:</strong> Configure os números e nomes dos jogadores. Os números serão usados na seleção
-            durante a coleta de dados. Toque em <strong>LEV</strong> para marcar o levantador de cada equipe — o app o
-            associa automaticamente pela rotação, sem precisar digitar o número durante a coleta.
+            durante a coleta de dados.
           </p>
         </div>
       </Card>
