@@ -44,10 +44,11 @@ function StatCard({
   )
 }
 
+// Cor do TGP (% de participação do atleta nos pontos da equipe).
 function tgpColor(value: number) {
-  if (value > 25) return "text-emerald-600"
-  if (value >= 0) return "text-amber-600"
-  return "text-red-600"
+  if (value >= 20) return "text-emerald-600"
+  if (value >= 10) return "text-amber-600"
+  return "text-slate-600"
 }
 
 /** Soma os valores de um fundamento para um jogador. */
@@ -108,10 +109,13 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
   FLAT_COLS.forEach((c) => {
     colTotals[c.key] = stats.reduce((acc, s) => acc + c.get(s), 0)
   })
-  const totTP = stats.reduce((acc, s) => acc + s.pontos, 0)
+  // Pontos conquistados pela equipe (base do TGP = % de participação nos pontos).
+  const teamPts = stats.reduce((acc, s) => acc + s.pontos, 0)
+  // TP = todas as ações do atleta EXCETO os erros (saque, ace, passe, defesa,
+  // bloqueio, ataque, levantamento... tudo que não é erro).
+  const totTP = stats.reduce((acc, s) => acc + (s.total - s.erros), 0)
   const totTE = stats.reduce((acc, s) => acc + s.erros, 0)
-  const totAll = stats.reduce((acc, s) => acc + s.total, 0)
-  const totTGP = totAll === 0 ? 0 : Math.round(((totTP - totTE) / totAll) * 100)
+  const totTGP = teamPts === 0 ? 0 : Math.round((totTP / teamPts) * 100)
 
   const accent = TEAM_STYLE[team].hex
 
@@ -180,7 +184,8 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
           </thead>
           <tbody>
             {stats.map((s, idx) => {
-              const tgp = s.total === 0 ? 0 : Math.round(((s.pontos - s.erros) / s.total) * 100)
+              const tp = s.total - s.erros
+              const tgp = teamPts === 0 ? 0 : Math.round((tp / teamPts) * 100)
               return (
                 <tr
                   key={s.player.id}
@@ -206,7 +211,7 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
                     )
                   })}
                   <td className="border border-slate-200 px-2 py-2 font-bold tabular-nums text-emerald-600">
-                    {s.pontos}
+                    {tp}
                   </td>
                   <td className="border border-slate-200 px-2 py-2 font-bold tabular-nums text-red-600">
                     {s.erros}
@@ -300,14 +305,21 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
       "TE",
       "TGP_%",
     ]
+    // Pontos por equipe (base do TGP) para o cálculo da % de participação.
+    const teamPtsMap: Record<TeamSide, number> = { casa: 0, adversario: 0 }
+    summary.jogadores.forEach((s) => {
+      teamPtsMap[s.player.team] += s.pontos
+    })
     const rows = summary.jogadores.map((s) => {
-      const tgp = s.total === 0 ? 0 : Math.round(((s.pontos - s.erros) / s.total) * 100)
+      const tp = s.total - s.erros
+      const teamPts = teamPtsMap[s.player.team]
+      const tgp = teamPts === 0 ? 0 : Math.round((tp / teamPts) * 100)
       return [
         TEAM_LABEL[s.player.team],
         s.player.number,
         s.player.name,
         ...FLAT_COLS.map((c) => c.get(s)),
-        s.pontos,
+        tp,
         s.erros,
         tgp,
       ]
@@ -414,9 +426,15 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
       {/* Planilhas separadas por equipe */}
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">
-            Planilha por equipe
-          </h2>
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">
+              Planilha por equipe
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              TP = ações certas (tudo exceto erros) · TE = total de erros · TGP = participação do atleta nos pontos da
+              equipe
+            </p>
+          </div>
           <button
             type="button"
             onClick={exportCSV}
