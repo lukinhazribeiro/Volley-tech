@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@/components/scout/ui/button"
+import { NumberButton, FaceHeading } from "./face-buttons"
 
 interface Face2PlayerProps {
   onSelect: (value: number) => void
@@ -11,13 +11,10 @@ interface Face2PlayerProps {
 export default function Face2Player({ onSelect, team, context }: Face2PlayerProps) {
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-2">{context}</h2>
-      <p className="text-sm text-slate-600 mb-4">{team.name}</p>
-      <div className="grid grid-cols-5 gap-2">
+      <FaceHeading title={context} subtitle={team.name} />
+      <div className="grid grid-cols-5 gap-2 sm:gap-3">
         {team.players.map((player) => (
-          <Button key={player} onClick={() => onSelect(player)} variant="default" className="h-10">
-            {player}
-          </Button>
+          <NumberButton key={player} value={player} onClick={() => onSelect(player)} />
         ))}
       </div>
     </div>

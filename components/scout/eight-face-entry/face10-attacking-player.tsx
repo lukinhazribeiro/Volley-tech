@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@/components/scout/ui/button"
+import { NumberButton, FaceHeading } from "./face-buttons"
 
 interface Face10AttackingPlayerProps {
   onSelect: (value: number) => void
@@ -10,21 +10,11 @@ interface Face10AttackingPlayerProps {
 
 export default function Face10AttackingPlayer({ onSelect, team, context }: Face10AttackingPlayerProps) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">{context}</h2>
-        <p className="text-sm text-slate-600 mb-4">Time {team.name}</p>
-      </div>
-      <div className="grid grid-cols-7 gap-2">
+    <div>
+      <FaceHeading title={context} subtitle={`Time ${team.name}`} />
+      <div className="grid grid-cols-5 gap-2 sm:grid-cols-7 sm:gap-3">
         {team.players.map((player) => (
-          <Button
-            key={player}
-            onClick={() => onSelect(player)}
-            variant="default"
-            className="bg-orange-600 hover:bg-orange-700 text-white font-bold"
-          >
-            {player}
-          </Button>
+          <NumberButton key={player} value={player} onClick={() => onSelect(player)} />
         ))}
       </div>
     </div>

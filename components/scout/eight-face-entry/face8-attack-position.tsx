@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@/components/scout/ui/button"
+import { OptionButton, FaceHeading } from "./face-buttons"
 
 interface Face8AttackPositionProps {
   onSelect: (value: string) => void
@@ -9,8 +9,8 @@ interface Face8AttackPositionProps {
 export default function Face8AttackPosition({ onSelect }: Face8AttackPositionProps) {
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-4">Posição de Ataque</h2>
-      <div className="grid grid-cols-2 gap-4">
+      <FaceHeading title="Posição de Ataque" subtitle="De onde veio o ataque" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[
           { label: "Ponta", value: "P" },
           { label: "Meio", value: "M" },
@@ -18,17 +18,14 @@ export default function Face8AttackPosition({ onSelect }: Face8AttackPositionPro
           { label: "Fundo", value: "F" },
           { label: "Segunda", value: "S" },
         ].map(({ label, value }) => (
-          <Button key={value} onClick={() => onSelect(value)} className="h-12" variant="default">
+          <OptionButton key={value} onClick={() => onSelect(value)} tone="primary">
             {label}
-          </Button>
+          </OptionButton>
         ))}
       </div>
-      <Button
-        onClick={() => onSelect("ERR_LEV")}
-        className="h-12 w-full mt-4 bg-red-600 hover:bg-red-700 text-white"
-      >
+      <OptionButton onClick={() => onSelect("ERR_LEV")} tone="negative" className="mt-3">
         Erro de Levantamento
-      </Button>
+      </OptionButton>
     </div>
   )
 }
