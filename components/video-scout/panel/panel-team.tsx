@@ -152,15 +152,15 @@ export function PanelTeam({
       <button
         type="button"
         onClick={() => (big ? onSubstitute(pos) : setActivePos(pos))}
-        className="flex flex-col items-center gap-1"
+        className="flex touch-manipulation select-none flex-col items-center gap-1"
         title={big ? "Clique para substituir" : "Selecionar posição da ação"}
       >
         <span
-          className={`relative flex items-center justify-center rounded-full border-2 font-bold transition-all ${
-            big ? "h-14 w-14 text-lg" : "h-11 w-11 text-sm"
+          className={`relative flex items-center justify-center rounded-full border-2 font-extrabold shadow-sm transition-all active:scale-90 ${
+            big ? "h-16 w-16 text-2xl" : "h-14 w-14 text-xl"
           } ${
             !big && activePos === pos
-              ? `${accentBar} border-transparent text-white`
+              ? `${accentBar} border-transparent text-white ring-2 ring-offset-2 ring-orange-300`
               : isLiberoAt(pos)
                 ? "border-amber-400 bg-amber-50 text-amber-600"
                 : `border-slate-300 bg-slate-50 ${accentText}`
