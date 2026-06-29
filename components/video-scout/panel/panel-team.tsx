@@ -152,15 +152,15 @@ export function PanelTeam({
       <button
         type="button"
         onClick={() => (big ? onSubstitute(pos) : setActivePos(pos))}
-        className="flex flex-col items-center gap-1"
+        className="flex touch-manipulation select-none flex-col items-center gap-1"
         title={big ? "Clique para substituir" : "Selecionar posição da ação"}
       >
         <span
-          className={`relative flex items-center justify-center rounded-full border-2 font-bold transition-all ${
-            big ? "h-14 w-14 text-lg" : "h-11 w-11 text-sm"
+          className={`relative flex items-center justify-center rounded-full border-2 font-extrabold shadow-sm transition-all active:scale-90 ${
+            big ? "h-16 w-16 text-2xl" : "h-14 w-14 text-xl"
           } ${
             !big && activePos === pos
-              ? `${accentBar} border-transparent text-white`
+              ? `${accentBar} border-transparent text-white ring-2 ring-offset-2 ring-orange-300`
               : isLiberoAt(pos)
                 ? "border-amber-400 bg-amber-50 text-amber-600"
                 : `border-slate-300 bg-slate-50 ${accentText}`
@@ -224,13 +224,13 @@ export function PanelTeam({
         <p className={`mb-2 text-xs font-bold uppercase tracking-wide ${accentText}`}>
           Formação
         </p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2.5">
           {FUND_BUTTONS.map((b) => (
             <button
               key={b.label}
               type="button"
               onClick={() => handleFundClick(b.fundamento)}
-              className={`rounded-lg px-3 py-3 text-sm font-bold text-white transition-colors ${b.className}`}
+              className={`flex min-h-16 touch-manipulation select-none items-center justify-center rounded-xl px-2 py-4 text-base font-extrabold tracking-wide text-white shadow-sm transition-all active:scale-95 active:shadow-none ${b.className}`}
             >
               {b.label}
             </button>
@@ -243,7 +243,7 @@ export function PanelTeam({
         <button
           type="button"
           onClick={handlePonto}
-          className="flex h-full min-h-16 flex-1 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-500"
+          className="flex h-full min-h-20 flex-1 touch-manipulation select-none items-center justify-center rounded-xl bg-emerald-600 px-4 text-lg font-extrabold tracking-wide text-white shadow-sm transition-all hover:bg-emerald-500 active:scale-95 active:shadow-none"
         >
           PONTO
         </button>
@@ -297,7 +297,7 @@ export function PanelTeam({
                       qualidade: pending.quality,
                     })
                   }
-                  className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  className="min-h-12 touch-manipulation select-none rounded-lg border border-slate-200 bg-white px-2 py-3 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-100 active:scale-95 active:shadow-none"
                 >
                   {f.label}
                 </button>

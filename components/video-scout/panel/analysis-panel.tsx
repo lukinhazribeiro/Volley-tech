@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { History, Link2, Menu, Plus, Sparkles, Upload, X } from "lucide-react"
+import Link from "next/link"
+import { ArrowLeft, History, Link2, Menu, Plus, Sparkles, Upload, X } from "lucide-react"
 import type { Posicao, ScoutAction, TeamSide } from "@/lib/video-scout/types"
 import {
   amendLastQuality,
@@ -208,6 +209,13 @@ export function AnalysisPanel() {
         {/* Topbar */}
         <header className="flex items-center justify-between border-b border-orange-100 bg-white px-5 py-4">
           <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-4 w-4 text-orange-600" aria-hidden="true" />
+              <span className="hidden sm:inline">Voltar para a Hub</span>
+            </Link>
             <Menu className="h-5 w-5 text-slate-400 lg:hidden" aria-hidden="true" />
             <h1 className="text-lg font-bold tracking-wide text-slate-800">PAINEL DE ANÁLISE</h1>
           </div>
