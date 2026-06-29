@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@/components/scout/ui/button"
+import { OptionButton, FaceHeading } from "./face-buttons"
 
 interface Face7AttackingTeamProps {
   onSelect: (value: string) => void
@@ -10,12 +10,12 @@ interface Face7AttackingTeamProps {
 export default function Face7AttackingTeam({ onSelect, teamNames }: Face7AttackingTeamProps) {
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-4">Equipe Atacadora</h2>
-      <div className="flex gap-4">
+      <FaceHeading title="Equipe Atacante" subtitle="Quem realizou o ataque?" />
+      <div className="grid grid-cols-2 gap-3">
         {teamNames.map((team) => (
-          <Button key={team} onClick={() => onSelect(team)} className="flex-1 h-12 text-lg" variant="default">
+          <OptionButton key={team} onClick={() => onSelect(team)} tone="primary">
             Equipe {team}
-          </Button>
+          </OptionButton>
         ))}
       </div>
     </div>

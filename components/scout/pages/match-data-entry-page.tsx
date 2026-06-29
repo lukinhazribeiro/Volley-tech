@@ -6,6 +6,7 @@ import { Button } from "@/components/scout/ui/button"
 import EightFaceDataEntry from "@/components/scout/eight-face-entry/eight-face-data-entry"
 import ModernStatsDashboard from "@/components/scout/heatmaps/modern-stats-dashboard"
 import PlayerStatsSpreadsheet from "@/components/scout/spreadsheets/player-stats-spreadsheet"
+import QuickReport from "@/components/scout/quick-report"
 import MatchSetupPage from "./match-setup-page"
 import { type MatchAction, calculateMatchStats } from "@/lib/scout/match-parser"
 import { createEmptyStats } from "@/lib/scout/match-parser"
@@ -358,12 +359,21 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         <Tabs defaultValue="stats" className="w-full">
           <div className="flex items-center justify-between px-4 border-b p-4">
             <TabsList className="justify-start rounded-none border-b-0">
+              <TabsTrigger value="quick">Relatório Rápido</TabsTrigger>
               <TabsTrigger value="stats">Estatísticas</TabsTrigger>
               <TabsTrigger value="spreadsheet">Planilha</TabsTrigger>
               <TabsTrigger value="charts">Gráficos</TabsTrigger>
               <TabsTrigger value="transitions">Transições</TabsTrigger>
             </TabsList>
           </div>
+
+          <TabsContent value="quick" className="p-4">
+            <QuickReport
+              actions={matchData.actions}
+              teamAName={matchData.teamAName}
+              teamBName={matchData.teamBName}
+            />
+          </TabsContent>
 
           <TabsContent value="stats" className="p-4">
             <div className="space-y-6">
@@ -475,6 +485,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         <div className="flex items-center justify-between px-4 border-b">
           <TabsList className="justify-start rounded-none border-b-0">
             <TabsTrigger value="entry">Coleta de Dados</TabsTrigger>
+            <TabsTrigger value="quick">Relatório Rápido</TabsTrigger>
             <TabsTrigger value="stats">Estatísticas</TabsTrigger>
             <TabsTrigger value="spreadsheet">Planilha</TabsTrigger>
             <TabsTrigger value="charts">Gráficos</TabsTrigger>
@@ -494,6 +505,14 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
             teamBScore={currentSet.teamBScore}
             teamAPlayers={matchData.teamAPlayers}
             teamBPlayers={matchData.teamBPlayers}
+          />
+        </TabsContent>
+
+        <TabsContent value="quick" className="h-[calc(100%-45px)] overflow-auto p-4">
+          <QuickReport
+            actions={matchData.actions}
+            teamAName={matchData.teamAName}
+            teamBName={matchData.teamBName}
           />
         </TabsContent>
 
