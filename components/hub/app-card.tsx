@@ -55,11 +55,13 @@ export function AppCard({
       <div className="mb-5">
         <p className="mb-1 text-[11px] font-medium uppercase tracking-widest text-[var(--hub-accent)]">{subtitle}</p>
         <h3 className="text-xl font-semibold text-[var(--hub-text)]">{title}</h3>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--hub-muted)] text-pretty">{description}</p>
+        <p className="mt-2 min-h-[3.75rem] text-sm leading-relaxed text-[var(--hub-muted)] text-pretty">
+          {description}
+        </p>
       </div>
 
       {/* features */}
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex min-h-[2rem] flex-wrap content-start gap-2">
         {features.map((f) => (
           <span
             key={f}
