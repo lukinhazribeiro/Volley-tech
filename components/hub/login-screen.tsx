@@ -94,23 +94,23 @@ export function LoginScreen() {
             </span>
           </div>
 
-          {/* Selo de trial */}
-          <div className="absolute right-10 top-12 w-52 rounded-2xl border border-white/10 bg-black/40 p-5 backdrop-blur-md">
-            <Gift className="h-8 w-8 text-orange-500" aria-hidden="true" />
-            <p className="mt-3 text-lg font-extrabold uppercase tracking-wide text-orange-500">
-              {TRIAL_DAYS} dias grátis
-            </p>
-            <span className="mt-2 block h-0.5 w-12 bg-orange-500" />
-            <p className="mt-4 text-sm text-neutral-300">
-              Depois apenas
-              <br />
-              <span className="text-base font-bold text-white">{formatPrice()}/mês</span>.
-            </p>
-            <p className="mt-1 text-xs text-neutral-400">Cancele quando quiser.</p>
-          </div>
-
           {/* Chamada inferior */}
           <div className="absolute inset-x-0 bottom-0 p-10">
+            {/* Selo de trial */}
+            <div className="mb-6 inline-flex flex-col rounded-2xl border border-white/10 bg-black/40 px-5 py-4 backdrop-blur-md">
+              <div className="flex items-center gap-2.5">
+                <Gift className="h-6 w-6 text-orange-500" aria-hidden="true" />
+                <span className="text-lg font-extrabold uppercase tracking-wide text-orange-500">
+                  {TRIAL_DAYS} dias grátis
+                </span>
+              </div>
+              <span className="mt-2 block h-0.5 w-12 bg-orange-500" />
+              <p className="mt-3 text-sm text-neutral-300">
+                Depois apenas <span className="font-bold text-white">{formatPrice()}/mês</span>.
+              </p>
+              <p className="mt-0.5 text-xs text-neutral-400">Cancele quando quiser.</p>
+            </div>
+
             <h2 className="text-4xl font-extrabold leading-[1.05] tracking-tight">
               DADOS QUE
               <br />
