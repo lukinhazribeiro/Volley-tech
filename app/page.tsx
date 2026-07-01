@@ -19,7 +19,7 @@ const apps = [
     icon: Activity,
     status: "On-line",
     features: ["Tempo real", "Por fundamento", "Sincronização"],
-    image: "/placeholder.svg?height=320&width=520&query=volleyball%20player%20spiking%20at%20net%20dark%20arena",
+    image: "/images/hub-scout-volleyball.jpg",
   },
   {
     title: "Attack Position",
@@ -29,7 +29,7 @@ const apps = [
     icon: Target,
     status: "On-line",
     features: ["Quadra interativa", "Coletor por fases", "Exportar PDF"],
-    image: "/placeholder.svg?height=320&width=520&query=volleyball%20players%20blocking%20at%20the%20net%20dark",
+    image: "/images/hub-attack-position.jpg",
   },
   {
     title: "Summary Game",
@@ -39,7 +39,7 @@ const apps = [
     icon: ClipboardCheck,
     status: "On-line",
     features: ["Súmula digital", "Estatísticas", "Relatório"],
-    image: "/placeholder.svg?height=320&width=520&query=volleyball%20tactics%20clipboard%20on%20court%20dark",
+    image: "/images/hub-summary-game.jpg",
   },
   {
     title: "Scout Video",
@@ -49,7 +49,7 @@ const apps = [
     icon: Video,
     status: "On-line",
     features: ["Vídeo + IA", "Por posição", "Relatório"],
-    image: "/placeholder.svg?height=320&width=520&query=camera%20filming%20volleyball%20match%20dark%20arena",
+    image: "/images/hub-scout-video.jpg",
   },
 ]
 
@@ -167,7 +167,7 @@ export default function HubPage() {
             {/* highlight block */}
             <div className="relative flex min-h-[19rem] flex-col justify-center overflow-hidden rounded-2xl border border-[var(--hub-border)] bg-[var(--hub-surface)] p-8 md:col-span-2 lg:col-span-2">
               <img
-                src="/placeholder.svg?height=480&width=760&query=female%20volleyball%20player%20digging%20the%20ball%20dark%20dramatic"
+                src="/images/hub-scout-volleyball.jpg"
                 alt=""
                 aria-hidden="true"
                 className="absolute inset-0 h-full w-full object-cover opacity-40"
