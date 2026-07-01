@@ -73,43 +73,45 @@ export function LoginScreen() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0a0b] text-white">
-      <div className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 items-center gap-8 px-5 py-8 lg:grid-cols-2 lg:gap-12 lg:px-8">
+    <main className="min-h-screen bg-black text-white">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
         {/* Painel visual */}
-        <section className="relative hidden overflow-hidden rounded-3xl border border-white/5 bg-neutral-950 lg:block lg:min-h-[38rem]">
+        <section className="relative hidden overflow-hidden bg-neutral-950 lg:block">
           <img
             src="/images/hub-highlight.jpg"
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 h-full w-full object-cover object-right opacity-80"
+            className="absolute inset-0 h-full w-full object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/30" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/40" />
 
           {/* Logo */}
-          <div className="relative flex items-center gap-3 p-8">
-            <VolleyTechLogo className="h-14 w-14 text-orange-500" />
-            <span className="text-2xl font-extrabold tracking-tight">
+          <div className="absolute left-10 top-10 flex items-center gap-3">
+            <VolleyTechLogo className="h-16 w-16 text-orange-500" />
+            <span className="text-3xl font-extrabold tracking-tight">
               VOLLEY<span className="text-orange-500">TECH</span>
             </span>
           </div>
 
           {/* Selo de trial */}
-          <div className="absolute left-8 top-28 w-56 rounded-2xl border border-white/10 bg-black/50 p-5 backdrop-blur-sm">
+          <div className="absolute right-10 top-12 w-52 rounded-2xl border border-white/10 bg-black/40 p-5 backdrop-blur-md">
             <Gift className="h-8 w-8 text-orange-500" aria-hidden="true" />
             <p className="mt-3 text-lg font-extrabold uppercase tracking-wide text-orange-500">
               {TRIAL_DAYS} dias grátis
             </p>
-            <span className="mt-2 block h-0.5 w-10 bg-orange-500" />
-            <p className="mt-3 text-sm text-neutral-300">
-              Depois apenas <span className="font-bold text-white">{formatPrice()}/mês</span>.
+            <span className="mt-2 block h-0.5 w-12 bg-orange-500" />
+            <p className="mt-4 text-sm text-neutral-300">
+              Depois apenas
+              <br />
+              <span className="text-base font-bold text-white">{formatPrice()}/mês</span>.
             </p>
             <p className="mt-1 text-xs text-neutral-400">Cancele quando quiser.</p>
           </div>
 
           {/* Chamada inferior */}
-          <div className="absolute inset-x-0 bottom-0 p-8">
-            <h2 className="text-3xl font-extrabold leading-tight tracking-tight">
+          <div className="absolute inset-x-0 bottom-0 p-10">
+            <h2 className="text-4xl font-extrabold leading-[1.05] tracking-tight">
               DADOS QUE
               <br />
               <span className="text-orange-500">TRANSFORMAM</span>
@@ -119,24 +121,25 @@ export function LoginScreen() {
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-neutral-300 text-pretty">
               Análise inteligente para equipes que querem vencer.
             </p>
-            <div className="mt-5 flex items-center gap-3">
-              <VolleyTechLogo className="h-7 w-7 text-orange-500" />
-              <span className="h-px w-40 bg-gradient-to-r from-orange-500 to-transparent" />
+            <div className="mt-6 flex items-center gap-3">
+              <VolleyTechLogo className="h-8 w-8 text-orange-500" />
+              <span className="h-px w-44 bg-gradient-to-r from-orange-500 to-transparent" />
             </div>
           </div>
         </section>
 
         {/* Painel do formulário */}
-        <section className="w-full">
+        <section className="flex w-full items-center justify-center px-5 py-10 sm:px-8">
           {/* Logo (apenas mobile) */}
-          <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
-            <VolleyTechLogo className="h-12 w-12 text-orange-500" />
-            <span className="text-xl font-extrabold tracking-tight">
-              VOLLEY<span className="text-orange-500">TECH</span>
-            </span>
-          </div>
+          <div className="w-full max-w-md">
+            <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
+              <VolleyTechLogo className="h-12 w-12 text-orange-500" />
+              <span className="text-xl font-extrabold tracking-tight">
+                VOLLEY<span className="text-orange-500">TECH</span>
+              </span>
+            </div>
 
-          <div className="mx-auto w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900/60 p-7 shadow-2xl sm:p-8">
+            <div className="w-full rounded-3xl border border-white/10 bg-neutral-900/60 p-7 shadow-2xl sm:p-8">
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
               Bem-vindo ao <span className="text-orange-500">VolleyTech</span>
             </h1>
@@ -272,6 +275,7 @@ export function LoginScreen() {
               <span className="font-semibold text-orange-500">Termos</span> e{" "}
               <span className="font-semibold text-orange-500">Política de Privacidade</span>.
             </p>
+            </div>
           </div>
         </section>
       </div>
