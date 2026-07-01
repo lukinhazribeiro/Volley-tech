@@ -115,18 +115,30 @@ export default function HubPage() {
         </header>
 
         {/* hero */}
-        <section className="flex flex-col items-center py-16 text-center sm:py-24">
-          <VolleyTechLogo className="mb-5 h-24 w-24 text-[var(--hub-accent)] drop-shadow-[0_0_24px_var(--hub-accent-soft)] hub-float sm:h-28 sm:w-28" />
-          <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--hub-border)] bg-[var(--hub-surface)] px-4 py-1.5 text-xs font-medium text-[var(--hub-muted)]">
-            <Zap className="h-3.5 w-3.5 text-[var(--hub-accent)]" />
-            Plataforma de tecnologia para voleibol
-          </span>
-          <h1 className="max-w-4xl text-balance text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-            Sua central de <span className="text-[var(--hub-accent)]">performance</span> no voleibol
-          </h1>
-          <p className="mt-6 max-w-2xl text-pretty text-base leading-relaxed text-[var(--hub-muted)] sm:text-lg">
-            A plataforma que conecta e transforma dados em decisões vencedoras.
-          </p>
+        <section className="relative mt-6 overflow-hidden rounded-3xl border border-[var(--hub-border)]">
+          {/* imagem de fundo */}
+          <img
+            src="/images/hub-hero.jpg"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+          {/* degradê por cima para legibilidade */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--hub-bg)]/70 via-[var(--hub-bg)]/40 to-[var(--hub-bg)]/90" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--hub-bg)]/60 via-transparent to-[var(--hub-bg)]/60" />
+
+          <div className="relative flex flex-col items-center px-6 py-20 text-center sm:py-28">
+            <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--hub-border)] bg-[var(--hub-surface)]/70 px-4 py-1.5 text-xs font-medium text-[var(--hub-muted)] backdrop-blur-sm">
+              <Zap className="h-3.5 w-3.5 text-[var(--hub-accent)]" />
+              Plataforma de tecnologia para voleibol
+            </span>
+            <h1 className="max-w-4xl text-balance text-4xl font-bold leading-[1.05] tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] sm:text-6xl">
+              Sua central de <span className="text-[var(--hub-accent)]">performance</span> no voleibol
+            </h1>
+            <p className="mt-6 max-w-2xl text-pretty text-base leading-relaxed text-[var(--hub-muted)] drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)] sm:text-lg">
+              A plataforma que conecta e transforma dados em decisões vencedoras.
+            </p>
+          </div>
         </section>
 
         {/* ticker */}
