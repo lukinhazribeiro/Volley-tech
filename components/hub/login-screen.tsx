@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Eye, EyeOff, Mail, Lock, Gift, ArrowUpRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
 import { createClient } from "@/lib/supabase/client"
@@ -12,6 +13,7 @@ export function LoginScreen() {
   const [mode, setMode] = useState<Mode>("signin")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -71,139 +73,207 @@ export function LoginScreen() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-orange-50 via-amber-50 to-white px-6 text-slate-900">
-      <div
-        className="pointer-events-none absolute left-1/2 top-[-8rem] h-[24rem] w-[24rem] -translate-x-1/2 rounded-full bg-orange-300 opacity-30 blur-[120px]"
-        aria-hidden="true"
-      />
+    <main className="min-h-screen bg-[#0a0a0b] text-white">
+      <div className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 items-center gap-8 px-5 py-8 lg:grid-cols-2 lg:gap-12 lg:px-8">
+        {/* Painel visual */}
+        <section className="relative hidden overflow-hidden rounded-3xl border border-white/5 bg-neutral-950 lg:block lg:min-h-[38rem]">
+          <img
+            src="/images/hub-highlight.jpg"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover object-right opacity-80"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent" />
 
-      <div className="relative w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <VolleyTechLogo className="mb-4 h-20 w-20 text-orange-600 drop-shadow-[0_0_24px_rgba(234,88,12,0.25)]" />
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">VOLLEY TECH</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            {mode === "signin" ? "Entre para acessar a plataforma" : "Crie sua conta para começar"}
-          </p>
-        </div>
-
-        <div className="space-y-5 rounded-2xl border border-orange-100 bg-white p-6 shadow-2xl">
-          <div className="rounded-xl bg-orange-50 p-4 text-center">
-            <p className="text-sm font-semibold text-orange-700">{TRIAL_DAYS} dias grátis no primeiro acesso</p>
-            <p className="mt-1 text-xs text-slate-600">
-              Depois, assinatura mensal de {formatPrice()} cobrada via Mercado Pago.
-            </p>
+          {/* Logo */}
+          <div className="relative flex items-center gap-3 p-8">
+            <VolleyTechLogo className="h-14 w-14 text-orange-500" />
+            <span className="text-2xl font-extrabold tracking-tight">
+              VOLLEY<span className="text-orange-500">TECH</span>
+            </span>
           </div>
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-center text-sm text-red-600" role="alert">
-              {error}
+          {/* Selo de trial */}
+          <div className="absolute left-8 top-28 w-56 rounded-2xl border border-white/10 bg-black/50 p-5 backdrop-blur-sm">
+            <Gift className="h-8 w-8 text-orange-500" aria-hidden="true" />
+            <p className="mt-3 text-lg font-extrabold uppercase tracking-wide text-orange-500">
+              {TRIAL_DAYS} dias grátis
             </p>
-          )}
-          {info && (
-            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm text-emerald-700" role="status">
-              {info}
+            <span className="mt-2 block h-0.5 w-10 bg-orange-500" />
+            <p className="mt-3 text-sm text-neutral-300">
+              Depois apenas <span className="font-bold text-white">{formatPrice()}/mês</span>.
             </p>
-          )}
-
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={loading}
-            className="flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"
-              />
-            </svg>
-            Continuar com Google
-          </button>
-
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs text-slate-400">ou</span>
-            <span className="h-px flex-1 bg-slate-200" />
+            <p className="mt-1 text-xs text-neutral-400">Cancele quando quiser.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <label htmlFor="email" className="text-sm font-medium text-slate-700">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                placeholder="voce@email.com"
-              />
+          {/* Chamada inferior */}
+          <div className="absolute inset-x-0 bottom-0 p-8">
+            <h2 className="text-3xl font-extrabold leading-tight tracking-tight">
+              DADOS QUE
+              <br />
+              <span className="text-orange-500">TRANSFORMAM</span>
+              <br />
+              DESEMPENHO.
+            </h2>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-neutral-300 text-pretty">
+              Análise inteligente para equipes que querem vencer.
+            </p>
+            <div className="mt-5 flex items-center gap-3">
+              <VolleyTechLogo className="h-7 w-7 text-orange-500" />
+              <span className="h-px w-40 bg-gradient-to-r from-orange-500 to-transparent" />
             </div>
+          </div>
+        </section>
 
-            <div className="space-y-1">
-              <label htmlFor="password" className="text-sm font-medium text-slate-700">
-                Senha
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                minLength={6}
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                placeholder="Mínimo de 6 caracteres"
-              />
-            </div>
+        {/* Painel do formulário */}
+        <section className="w-full">
+          {/* Logo (apenas mobile) */}
+          <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
+            <VolleyTechLogo className="h-12 w-12 text-orange-500" />
+            <span className="text-xl font-extrabold tracking-tight">
+              VOLLEY<span className="text-orange-500">TECH</span>
+            </span>
+          </div>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="h-11 w-full bg-orange-600 font-semibold text-white hover:bg-orange-700"
-            >
-              {loading
-                ? "Aguarde..."
-                : mode === "signin"
-                  ? "Entrar"
-                  : "Criar conta e iniciar trial"}
-            </Button>
-          </form>
+          <div className="mx-auto w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900/60 p-7 shadow-2xl sm:p-8">
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Bem-vindo ao <span className="text-orange-500">VolleyTech</span>
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400 text-pretty">
+              A plataforma inteligente para análise de desempenho no voleibol.
+            </p>
 
-          <p className="text-center text-sm text-slate-600">
-            {mode === "signin" ? "Ainda não tem conta?" : "Já tem uma conta?"}{" "}
             <button
               type="button"
-              onClick={() => {
-                setMode(mode === "signin" ? "signup" : "signin")
-                setError(null)
-                setInfo(null)
-              }}
-              className="font-semibold text-orange-600 hover:underline"
+              onClick={handleGoogle}
+              disabled={loading}
+              className="mt-6 flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-neutral-900 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60"
             >
-              {mode === "signin" ? "Criar conta" : "Entrar"}
+              <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"
+                />
+                <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"
+                />
+              </svg>
+              Continuar com Google
             </button>
-          </p>
 
-          <p className="text-center text-xs text-slate-500">
-            Ao criar a conta, você concorda com a cobrança mensal recorrente após o período gratuito.
-          </p>
-        </div>
+            <div className="my-6 flex items-center gap-4">
+              <span className="h-px flex-1 bg-white/10" />
+              <span className="text-xs text-neutral-500">ou</span>
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+
+            {error && (
+              <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-center text-sm text-red-400" role="alert">
+                {error}
+              </p>
+            )}
+            {info && (
+              <p
+                className="mb-4 rounded-lg bg-emerald-500/10 px-3 py-2 text-center text-sm text-emerald-400"
+                role="status"
+              >
+                {info}
+              </p>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="text-sm font-semibold text-neutral-200">
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500"
+                    aria-hidden="true"
+                  />
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 w-full rounded-xl border border-white/10 bg-neutral-950/60 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                    placeholder="voce@email.com"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="password" className="text-sm font-semibold text-neutral-200">
+                  Senha
+                </label>
+                <div className="relative">
+                  <Lock
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500"
+                    aria-hidden="true"
+                  />
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-12 w-full rounded-xl border border-white/10 bg-neutral-950/60 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                    placeholder="Mínimo de 6 caracteres"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 transition hover:text-neutral-300"
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 text-base font-bold text-white transition hover:bg-orange-500 disabled:opacity-60"
+              >
+                {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta e iniciar trial"}
+                {!loading && <ArrowUpRight className="h-4 w-4" aria-hidden="true" />}
+              </Button>
+            </form>
+
+            <p className="mt-5 text-center text-sm text-neutral-300">
+              {mode === "signin" ? "Não possui conta?" : "Já tem uma conta?"}{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode(mode === "signin" ? "signup" : "signin")
+                  setError(null)
+                  setInfo(null)
+                }}
+                className="font-semibold text-orange-500 hover:underline"
+              >
+                {mode === "signin" ? "Criar conta" : "Entrar"}
+              </button>
+            </p>
+
+            <p className="mt-6 text-center text-xs leading-relaxed text-neutral-500">
+              Ao continuar você concorda com nossos{" "}
+              <span className="font-semibold text-orange-500">Termos</span> e{" "}
+              <span className="font-semibold text-orange-500">Política de Privacidade</span>.
+            </p>
+          </div>
+        </section>
       </div>
     </main>
   )
