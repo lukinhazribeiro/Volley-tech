@@ -80,17 +80,26 @@ export default function HubPage() {
       />
 
       <div className="relative mx-auto w-full max-w-6xl px-6">
-        {/* top bar */}
-        <header className="flex items-center justify-between py-6">
-          <div className="flex items-center gap-2.5">
-            <VolleyTechLogo className="h-9 w-9 text-[var(--hub-accent)]" />
-            <span className="text-sm font-semibold tracking-tight">VOLLEY TECH</span>
-          </div>
-          <div className="flex items-center gap-2">
+        {/* hero com barra superior integrada à imagem */}
+        <section className="relative mt-6 overflow-hidden rounded-3xl border border-[var(--hub-border)] bg-black">
+          {/* imagem completa, sem corte */}
+          <img
+            src="/images/hub-hero.jpg"
+            alt="VolleyTech - central de performance no voleibol"
+            className="block h-auto w-full"
+          />
+
+          {/* degradê no topo para legibilidade dos botões */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/80 to-transparent" />
+          {/* degradê no rodapé para legibilidade do texto */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black via-black/70 to-transparent" />
+
+          {/* barra superior sobre a imagem: apenas ações (sem texto VOLLEY TECH) */}
+          <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-end gap-2 px-5 py-4 sm:px-7">
             {isAdmin && (
               <Link
                 href="/admin"
-                className="flex items-center gap-2 rounded-full border border-[var(--hub-border)] px-3 py-1.5 text-xs text-[var(--hub-muted)] transition-colors hover:border-[var(--hub-border-strong)] hover:text-[var(--hub-text)]"
+                className="flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 text-xs text-neutral-200 backdrop-blur-md transition-colors hover:border-[var(--hub-accent)] hover:text-white"
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Admin
@@ -106,25 +115,14 @@ export default function HubPage() {
                 clearStoredUser()
                 window.location.reload()
               }}
-              className="flex items-center gap-2 rounded-full border border-[var(--hub-border)] px-3 py-1.5 text-xs text-[var(--hub-muted)] transition-colors hover:border-[var(--hub-border-strong)] hover:text-[var(--hub-text)]"
+              className="flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-3.5 py-1.5 text-xs text-neutral-200 backdrop-blur-md transition-colors hover:border-[var(--hub-accent)] hover:text-white"
             >
               <LogOut className="h-3.5 w-3.5" />
               Sair
             </button>
-          </div>
-        </header>
+          </header>
 
-        {/* hero */}
-        <section className="relative mt-6 overflow-hidden rounded-3xl border border-[var(--hub-border)] bg-black">
-          {/* imagem completa, sem corte */}
-          <img
-            src="/images/hub-hero.jpg"
-            alt="VolleyTech - central de performance no voleibol"
-            className="block h-auto w-full"
-          />
-          {/* degradê apenas no rodapé para legibilidade do texto */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black via-black/70 to-transparent" />
-
+          {/* título sobre a imagem */}
           <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-6 pb-8 text-center sm:pb-10">
             <h1 className="max-w-4xl text-balance text-2xl font-bold leading-[1.05] tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-4xl">
               Sua central de <span className="text-[var(--hub-accent)]">performance</span> no voleibol
@@ -187,7 +185,7 @@ export default function HubPage() {
                   Análise inteligente para equipes que querem vencer.
                 </p>
                 <div className="mt-6 flex items-center gap-3">
-                  <VolleyTechLogo className="h-8 w-8 text-[var(--hub-accent)]" />
+                  <VolleyTechLogo className="hub-logo-3d h-10 w-10 text-[var(--hub-accent)]" />
                   <span className="h-px flex-1 bg-gradient-to-r from-[var(--hub-accent)] to-transparent" />
                 </div>
               </div>

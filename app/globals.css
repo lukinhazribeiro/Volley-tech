@@ -167,3 +167,15 @@
   100% { transform: translateX(-50%); }
 }
 .hub-ticker { animation: hub-ticker 28s linear infinite; }
+
+/* logo girando em 3D */
+@keyframes hub-logo-3d {
+  0% { transform: perspective(700px) rotateY(0deg); }
+  100% { transform: perspective(700px) rotateY(360deg); }
+}
+.hub-logo-3d {
+  transform-style: preserve-3d;
+  animation: hub-logo-3d 7s linear infinite;
+  filter: drop-shadow(0 0 14px var(--hub-accent-soft));
+}
+.hub-logo-3d:hover { animation-play-state: paused; }
