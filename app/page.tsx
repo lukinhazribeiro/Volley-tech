@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Activity, Target, ClipboardCheck, Video, Zap, LogOut, ShieldCheck } from "lucide-react"
+import { Activity, Target, ClipboardCheck, Video, LogOut, ShieldCheck } from "lucide-react"
 import { AppCard } from "@/components/hub/app-card"
 import { TrialBanner } from "@/components/hub/trial-banner"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
@@ -115,18 +115,24 @@ export default function HubPage() {
         </header>
 
         {/* hero */}
-        <section className="flex flex-col items-center py-16 text-center sm:py-24">
-          <VolleyTechLogo className="mb-5 h-24 w-24 text-[var(--hub-accent)] drop-shadow-[0_0_24px_var(--hub-accent-soft)] hub-float sm:h-28 sm:w-28" />
-          <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--hub-border)] bg-[var(--hub-surface)] px-4 py-1.5 text-xs font-medium text-[var(--hub-muted)]">
-            <Zap className="h-3.5 w-3.5 text-[var(--hub-accent)]" />
-            Plataforma de tecnologia para voleibol
-          </span>
-          <h1 className="max-w-4xl text-balance text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
-            Sua central de <span className="text-[var(--hub-accent)]">performance</span> no voleibol
-          </h1>
-          <p className="mt-6 max-w-2xl text-pretty text-base leading-relaxed text-[var(--hub-muted)] sm:text-lg">
-            A plataforma que conecta e transforma dados em decisões vencedoras.
-          </p>
+        <section className="relative mt-6 overflow-hidden rounded-3xl border border-[var(--hub-border)] bg-black">
+          {/* imagem completa, sem corte */}
+          <img
+            src="/images/hub-hero.jpg"
+            alt="VolleyTech - central de performance no voleibol"
+            className="block h-auto w-full"
+          />
+          {/* degradê apenas no rodapé para legibilidade do texto */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black via-black/70 to-transparent" />
+
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-6 pb-8 text-center sm:pb-10">
+            <h1 className="max-w-4xl text-balance text-2xl font-bold leading-[1.05] tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-4xl">
+              Sua central de <span className="text-[var(--hub-accent)]">performance</span> no voleibol
+            </h1>
+            <p className="mt-3 max-w-2xl text-pretty text-sm leading-relaxed text-neutral-200 drop-shadow-[0_1px_8px_rgba(0,0,0,0.85)] sm:text-base">
+              A plataforma que conecta e transforma dados em decisões vencedoras.
+            </p>
+          </div>
         </section>
 
         {/* ticker */}
