@@ -19,7 +19,7 @@ const apps = [
     icon: Activity,
     status: "On-line",
     features: ["Tempo real", "Por fundamento", "Sincronização"],
-    image: "/images/hub-scout-volleyball.svg",
+    image: "/images/hub-scout-volleyball.jpg",
   },
   {
     title: "Attack Position",
@@ -29,7 +29,7 @@ const apps = [
     icon: Target,
     status: "On-line",
     features: ["Quadra interativa", "Coletor por fases", "Exportar PDF"],
-    image: "/images/hub-attack-position.svg",
+    image: "/images/hub-attack-position.jpg",
   },
   {
     title: "Summary Game",
@@ -39,7 +39,7 @@ const apps = [
     icon: ClipboardCheck,
     status: "On-line",
     features: ["Súmula digital", "Estatísticas", "Relatório"],
-    image: "/images/hub-summary-game.svg",
+    image: "/images/hub-summary-game.jpg",
   },
   {
     title: "Scout Video",
@@ -49,7 +49,7 @@ const apps = [
     icon: Video,
     status: "On-line",
     features: ["Vídeo + IA", "Por posição", "Relatório"],
-    image: "/images/hub-scout-video.svg",
+    image: "/images/hub-scout-video.jpg",
   },
 ]
 
@@ -167,10 +167,10 @@ export default function HubPage() {
             {/* highlight block */}
             <div className="relative flex min-h-[19rem] flex-col justify-center overflow-hidden rounded-2xl border border-[var(--hub-border)] bg-[var(--hub-surface)] p-8 md:col-span-2 lg:col-span-2">
               <img
-                src="/images/hub-highlight.svg"
+                src="/images/hub-highlight.jpg"
                 alt=""
                 aria-hidden="true"
-                className="absolute inset-0 h-full w-full object-cover opacity-60"
+                className="absolute inset-0 h-full w-full object-cover object-right opacity-90"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-[var(--hub-surface)] via-[var(--hub-surface)]/80 to-transparent" />
               <div className="relative max-w-sm">
