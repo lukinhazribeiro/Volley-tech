@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Plus, Search, Users } from "lucide-react"
 import { AppShell } from "@/components/gestao/app-shell"
 import { listAtletas } from "@/app/actions/atletas"
-import { brl, initials, bolsaBadge } from "@/lib/format"
+import { brl, initials, bolsaBadge } from "@/lib/gestao/format"
 import { AtletaRowActions } from "@/components/gestao/atleta-row-actions"
 
 export const dynamic = "force-dynamic"
@@ -22,7 +22,7 @@ export default async function AtletasPage({
       subtitle={`${atletas.length} cadastrados · ${ativos} ativos`}
       action={
         <Link
-          href="/atletas/novo"
+          href="/gestao/atletas/novo"
           className="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-transform hover:scale-[1.02]"
         >
           <Plus className="h-4 w-4" />
@@ -30,7 +30,7 @@ export default async function AtletasPage({
         </Link>
       }
     >
-      <form className="relative max-w-md" action="/atletas">
+      <form className="relative max-w-md" action="/gestao/atletas">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
@@ -51,7 +51,7 @@ export default async function AtletasPage({
             <p className="max-w-xs text-sm text-muted-foreground">
               Comece cadastrando seu primeiro atleta. A ficha financeira e o histórico são criados automaticamente.
             </p>
-            <Link href="/atletas/novo" className="mt-2 flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+            <Link href="/gestao/atletas/novo" className="mt-2 flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
               <Plus className="h-4 w-4" /> Novo Atleta
             </Link>
           </div>
@@ -74,7 +74,7 @@ export default async function AtletasPage({
                   return (
                     <tr key={a.id} className="transition-colors hover:bg-secondary/40">
                       <td className="px-5 py-3">
-                        <Link href={`/atletas/${a.id}`} className="flex items-center gap-3">
+                        <Link href={`/gestao/atletas/${a.id}`} className="flex items-center gap-3">
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
                             {initials(a.nome)}
                           </span>

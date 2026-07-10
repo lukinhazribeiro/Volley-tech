@@ -1,7 +1,7 @@
 "use server"
 
-import { db } from "@/lib/db"
-import { turmas, atletas, categorias } from "@/lib/db/schema"
+import { db } from "@/lib/gestao/db"
+import { turmas, atletas, categorias } from "@/lib/gestao/db/schema"
 import { asc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
@@ -50,19 +50,19 @@ function parseTurma(formData: FormData) {
 
 export async function createTurma(formData: FormData) {
   await db.insert(turmas).values(parseTurma(formData))
-  revalidatePath("/turmas")
-  revalidatePath("/")
+  revalidatePath("/gestao/turmas")
+  revalidatePath("/gestao")
 }
 
 export async function updateTurma(id: number, formData: FormData) {
   await db.update(turmas).set(parseTurma(formData)).where(eq(turmas.id, id))
-  revalidatePath("/turmas")
-  revalidatePath("/")
+  revalidatePath("/gestao/turmas")
+  revalidatePath("/gestao")
 }
 
 export async function toggleTurma(id: number, ativo: boolean) {
   await db.update(turmas).set({ ativo }).where(eq(turmas.id, id))
-  revalidatePath("/turmas")
+  revalidatePath("/gestao/turmas")
 }
 
 export async function deleteTurma(id: number) {
@@ -72,5 +72,5 @@ export async function deleteTurma(id: number) {
     .where(eq(atletas.turmaId, id))
   if (Number(count) > 0) throw new Error("Não é possível excluir: há atletas vinculados a esta turma.")
   await db.delete(turmas).where(eq(turmas.id, id))
-  revalidatePath("/turmas")
+  revalidatePath("/gestao/turmas")
 }

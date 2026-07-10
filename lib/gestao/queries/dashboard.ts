@@ -1,4 +1,4 @@
-import { db } from "@/lib/db"
+import { db } from "@/lib/gestao/db"
 import { sql } from "drizzle-orm"
 
 type Row = Record<string, any>

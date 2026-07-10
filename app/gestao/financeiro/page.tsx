@@ -2,7 +2,7 @@ import Link from "next/link"
 import { AppShell } from "@/components/gestao/app-shell"
 import { FinanceiroTable } from "@/components/gestao/financeiro-table"
 import { listMensalidades, resumoFinanceiro } from "@/app/actions/financeiro"
-import { brl } from "@/lib/format"
+import { brl } from "@/lib/gestao/format"
 import { Wallet, TrendingUp, AlertCircle } from "lucide-react"
 
 export const dynamic = "force-dynamic"
@@ -44,7 +44,7 @@ export default async function FinanceiroPage({
         {filtros.map((item) => (
           <Link
             key={item.key}
-            href={`/financeiro?f=${item.key}`}
+            href={`/gestao/financeiro?f=${item.key}`}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               filtro === item.key
                 ? "bg-primary text-primary-foreground"

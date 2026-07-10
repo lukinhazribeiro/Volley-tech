@@ -11,7 +11,7 @@ export function AtletaRowActions({ id, ativo }: { id: number; ativo: boolean }) 
   return (
     <div className="flex items-center justify-end gap-1">
       <Link
-        href={`/atletas/${id}/editar`}
+        href={`/gestao/atletas/${id}/editar`}
         className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         title="Editar"
         aria-label="Editar atleta"

@@ -1,7 +1,7 @@
 "use server"
 
-import { db } from "@/lib/db"
-import { atletas, categorias, presencas, turmas } from "@/lib/db/schema"
+import { db } from "@/lib/gestao/db"
+import { atletas, categorias, presencas, turmas } from "@/lib/gestao/db/schema"
 import { eq, sql } from "drizzle-orm"
 
 const PRESENTE = sql`case when ${presencas.status} in ('presente','atrasado') then 1 else 0 end`

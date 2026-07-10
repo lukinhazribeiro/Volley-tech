@@ -40,7 +40,7 @@ export function TurmaForm({
     startTransition(async () => {
       try {
         await action(formData)
-        router.push("/turmas")
+        router.push("/gestao/turmas")
         router.refresh()
       } catch (e: any) {
         setError(e?.message ?? "Erro ao salvar a turma.")

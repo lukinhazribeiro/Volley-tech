@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { calcularMensalidade, brl, type DescontoTipo } from "@/lib/format"
+import { calcularMensalidade, brl, type DescontoTipo } from "@/lib/gestao/format"
 import { Save, Loader2, GraduationCap } from "lucide-react"
 
 export type TurmaOption = {

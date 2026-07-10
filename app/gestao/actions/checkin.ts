@@ -1,7 +1,7 @@
 "use server"
 
-import { db } from "@/lib/db"
-import { atletas, presencas, turmas } from "@/lib/db/schema"
+import { db } from "@/lib/gestao/db"
+import { atletas, presencas, turmas } from "@/lib/gestao/db/schema"
 import { and, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
@@ -29,9 +29,9 @@ export async function salvarChamada(input: {
     )
   }
 
-  revalidatePath("/check-in")
-  revalidatePath("/frequencia")
-  revalidatePath("/")
+  revalidatePath("/gestao/check-in")
+  revalidatePath("/gestao/frequencia")
+  revalidatePath("/gestao")
   return { ok: true }
 }
 

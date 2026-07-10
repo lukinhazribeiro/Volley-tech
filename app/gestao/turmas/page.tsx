@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Plus, Users2, Clock, MapPin, CalendarDays } from "lucide-react"
 import { AppShell } from "@/components/gestao/app-shell"
 import { listTurmas } from "@/app/actions/turmas"
-import { brl } from "@/lib/format"
+import { brl } from "@/lib/gestao/format"
 import { TurmaCardActions } from "@/components/gestao/turma-card-actions"
 
 export const dynamic = "force-dynamic"
@@ -16,7 +16,7 @@ export default async function TurmasPage() {
       subtitle={`${turmas.length} turmas cadastradas`}
       action={
         <Link
-          href="/turmas/novo"
+          href="/gestao/turmas/novo"
           className="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-transform hover:scale-[1.02]"
         >
           <Plus className="h-4 w-4" />
@@ -30,7 +30,7 @@ export default async function TurmasPage() {
             <Users2 className="h-7 w-7" />
           </span>
           <p className="text-sm font-medium">Nenhuma turma cadastrada</p>
-          <Link href="/turmas/novo" className="mt-2 flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+          <Link href="/gestao/turmas/novo" className="mt-2 flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
             <Plus className="h-4 w-4" /> Nova Turma
           </Link>
         </div>

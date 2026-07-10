@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Volleyball, Menu, Search, Bell, ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react"
-import { nav } from "@/lib/nav"
+import { nav } from "@/lib/gestao/nav"
 import { cn } from "@/lib/utils"
 
 export function AppShell({
@@ -22,7 +22,7 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href))
+  const isActive = (href: string) => (href === "/gestao" ? pathname === "/gestao" : pathname.startsWith(href))
 
   const NavList = ({ compact }: { compact: boolean }) => (
     <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">

@@ -33,7 +33,7 @@ import {
   getProximosTreinos,
   getAtletasPorCategoria,
   getSerieMensal,
-} from "@/lib/queries/dashboard"
+} from "@/lib/gestao/queries/dashboard"
 
 export const dynamic = "force-dynamic"
 
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
       subtitle="Painel geral do seu clube"
       action={
         <Link
-          href="/atletas/novo"
+          href="/gestao/atletas/novo"
           className="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-transform hover:scale-[1.02]"
         >
           <Plus className="h-4 w-4" />
@@ -174,7 +174,7 @@ export default async function DashboardPage() {
                 <ResumoItem icon={TrendingDown} tone="var(--color-destructive)" label="Inadimplência" value={`${ind.inadimplencia}%`} />
               </ul>
               <Link
-                href="/financeiro"
+                href="/gestao/financeiro"
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
               >
                 <FileText className="h-4 w-4" />
@@ -185,14 +185,14 @@ export default async function DashboardPage() {
 
           {/* Linha 3: atraso, frequência por turma, próximos treinos */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <Panel title="Mensalidades em Atraso" action={<VerTodos href="/financeiro" />}>
+            <Panel title="Mensalidades em Atraso" action={<VerTodos href="/gestao/financeiro" />}>
               {atraso.length === 0 ? (
                 <EmptyState label="Nenhuma mensalidade em atraso" />
               ) : (
                 <ul className="divide-y divide-border">
                   {atraso.map((m, i) => (
                     <li key={i}>
-                      <Link href="/financeiro" className="flex items-center gap-3 py-2.5 transition-colors hover:opacity-80">
+                      <Link href="/gestao/financeiro" className="flex items-center gap-3 py-2.5 transition-colors hover:opacity-80">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
                           {initials(m.nome)}
                         </span>
@@ -214,7 +214,7 @@ export default async function DashboardPage() {
               )}
             </Panel>
 
-            <Panel title="Frequência por Turma" action={<VerTodos href="/frequencia" />}>
+            <Panel title="Frequência por Turma" action={<VerTodos href="/gestao/frequencia" />}>
               {freqTurma.length === 0 ? (
                 <EmptyState label="Cadastre turmas e faça check-ins" />
               ) : (
@@ -239,14 +239,14 @@ export default async function DashboardPage() {
               )}
             </Panel>
 
-            <Panel title="Próximos Treinos" action={<VerTodos href="/turmas" />}>
+            <Panel title="Próximos Treinos" action={<VerTodos href="/gestao/turmas" />}>
               {treinos.length === 0 ? (
                 <EmptyState label="Nenhuma turma cadastrada" />
               ) : (
                 <ul className="space-y-3">
                   {treinos.map((t, i) => (
                     <li key={i}>
-                      <Link href="/turmas" className="flex items-center gap-3 rounded-lg bg-secondary/50 p-3 transition-colors hover:bg-muted">
+                      <Link href="/gestao/turmas" className="flex items-center gap-3 rounded-lg bg-secondary/50 p-3 transition-colors hover:bg-muted">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
                           <Users2 className="h-4 w-4" />
                         </span>
@@ -265,7 +265,7 @@ export default async function DashboardPage() {
                 </ul>
               )}
               <Link
-                href="/turmas"
+                href="/gestao/turmas"
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
               >
                 <CalendarDays className="h-4 w-4" />
@@ -293,25 +293,25 @@ export default async function DashboardPage() {
               />
             </Panel>
 
-            <Panel title="Alertas" action={<VerTodos href="/relatorios" />}>
+            <Panel title="Alertas" action={<VerTodos href="/gestao/relatorios" />}>
               <ul className="space-y-3">
                 <Alerta
                   icon={AlertTriangle}
                   tone="var(--color-destructive)"
                   title={`${atraso.length} atletas com mensalidades em atraso`}
-                  href="/financeiro"
+                  href="/gestao/financeiro"
                 />
                 <Alerta
                   icon={AlertCircle}
                   tone="var(--color-warning)"
                   title={`${freqTurma.filter((t) => t.percentual < 75).length} atletas com frequência abaixo de 75%`}
-                  href="/frequencia"
+                  href="/gestao/frequencia"
                 />
-                <Alerta icon={Info} tone="var(--color-info)" title="Aniversariantes da semana" href="/atletas" />
-                <Alerta icon={Gift} tone="var(--color-chart-5)" title="Bolsas: gerencie descontos por atleta" href="/atletas" />
+                <Alerta icon={Info} tone="var(--color-info)" title="Aniversariantes da semana" href="/gestao/atletas" />
+                <Alerta icon={Gift} tone="var(--color-chart-5)" title="Bolsas: gerencie descontos por atleta" href="/gestao/atletas" />
               </ul>
               <Link
-                href="/relatorios"
+                href="/gestao/relatorios"
                 className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/25 transition-transform hover:scale-[1.01]"
               >
                 <CalendarDays className="h-4 w-4" />
@@ -344,11 +344,11 @@ export default async function DashboardPage() {
 
           {/* Ações rápidas */}
           <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-4 lg:grid-cols-5">
-            <QuickAction href="/atletas/novo" icon={Plus} label="Novo Atleta" primary />
-            <QuickAction href="/turmas/novo" icon={Users2} label="Nova Turma" />
-            <QuickAction href="/check-in" icon={ClipboardCheck} label="Fazer Check-in" />
-            <QuickAction href="/pagamentos" icon={CircleDollarSign} label="Registrar Pagamento" />
-            <QuickAction href="/relatorios" icon={FileText} label="Gerar Relatório" />
+            <QuickAction href="/gestao/atletas/novo" icon={Plus} label="Novo Atleta" primary />
+            <QuickAction href="/gestao/turmas/novo" icon={Users2} label="Nova Turma" />
+            <QuickAction href="/gestao/check-in" icon={ClipboardCheck} label="Fazer Check-in" />
+            <QuickAction href="/gestao/pagamentos" icon={CircleDollarSign} label="Registrar Pagamento" />
+            <QuickAction href="/gestao/relatorios" icon={FileText} label="Gerar Relatório" />
           </div>
     </AppShell>
   )

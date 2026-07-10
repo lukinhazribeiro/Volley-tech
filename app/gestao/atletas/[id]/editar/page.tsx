@@ -6,7 +6,7 @@ import { AtletaForm } from "@/components/gestao/atleta-form"
 import { getAtleta, updateAtleta } from "@/app/actions/atletas"
 import { listTurmas } from "@/app/actions/turmas"
 import { listCategorias } from "@/app/actions/categorias"
-import type { DescontoTipo } from "@/lib/format"
+import type { DescontoTipo } from "@/lib/gestao/format"
 
 export const dynamic = "force-dynamic"
 
@@ -25,7 +25,7 @@ export default async function EditarAtletaPage({ params }: { params: Promise<{ i
       subtitle="Atualize dados, valor e bolsa do atleta"
       action={
         <Link
-          href={`/atletas/${atletaId}`}
+          href={`/gestao/atletas/${atletaId}`}
           className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
         >
           <ArrowLeft className="h-4 w-4" /> Voltar

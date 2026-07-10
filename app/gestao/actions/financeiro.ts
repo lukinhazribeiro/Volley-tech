@@ -1,7 +1,7 @@
 "use server"
 
-import { db } from "@/lib/db"
-import { atletas, mensalidades, turmas } from "@/lib/db/schema"
+import { db } from "@/lib/gestao/db"
+import { atletas, mensalidades, turmas } from "@/lib/gestao/db/schema"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
@@ -43,9 +43,9 @@ export async function registrarPagamento(id: number) {
     .update(mensalidades)
     .set({ status: "pago", dataPagamento: hoje })
     .where(eq(mensalidades.id, id))
-  revalidatePath("/financeiro")
-  revalidatePath("/pagamentos")
-  revalidatePath("/")
+  revalidatePath("/gestao/financeiro")
+  revalidatePath("/gestao/pagamentos")
+  revalidatePath("/gestao")
   return { ok: true }
 }
 
@@ -54,9 +54,9 @@ export async function reabrirMensalidade(id: number) {
     .update(mensalidades)
     .set({ status: "pendente", dataPagamento: null })
     .where(eq(mensalidades.id, id))
-  revalidatePath("/financeiro")
-  revalidatePath("/pagamentos")
-  revalidatePath("/")
+  revalidatePath("/gestao/financeiro")
+  revalidatePath("/gestao/pagamentos")
+  revalidatePath("/gestao")
   return { ok: true }
 }
 

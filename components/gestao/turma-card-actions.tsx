@@ -10,7 +10,7 @@ export function TurmaCardActions({ id, ativo }: { id: number; ativo: boolean }) 
   return (
     <div className="flex items-center gap-1">
       <Link
-        href={`/turmas/${id}/editar`}
+        href={`/gestao/turmas/${id}/editar`}
         className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         title="Editar turma"
         aria-label="Editar turma"

@@ -4,8 +4,8 @@ import { ArrowLeft, Pencil, Phone, Mail, IdCard, CalendarDays, GraduationCap } f
 import { AppShell } from "@/components/gestao/app-shell"
 import { Panel } from "@/components/gestao/panel"
 import { getAtleta, getHistoricoAtleta } from "@/app/actions/atletas"
-import { brl, initials, formatDate, competenciaLabel, bolsaBadge, labelDesconto, calcularMensalidade } from "@/lib/format"
-import type { DescontoTipo } from "@/lib/format"
+import { brl, initials, formatDate, competenciaLabel, bolsaBadge, labelDesconto, calcularMensalidade } from "@/lib/gestao/format"
+import type { DescontoTipo } from "@/lib/gestao/format"
 
 export const dynamic = "force-dynamic"
 
@@ -39,13 +39,13 @@ export default async function AtletaDetailPage({ params }: { params: Promise<{ i
       action={
         <div className="flex items-center gap-2">
           <Link
-            href="/atletas"
+            href="/gestao/atletas"
             className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
           >
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Link>
           <Link
-            href={`/atletas/${atletaId}/editar`}
+            href={`/gestao/atletas/${atletaId}/editar`}
             className="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25"
           >
             <Pencil className="h-4 w-4" /> Editar

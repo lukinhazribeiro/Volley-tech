@@ -1,4 +1,4 @@
-import { brl, formatDate } from "@/lib/format"
+import { brl, formatDate } from "@/lib/gestao/format"
 import { MensalidadeActions } from "@/components/gestao/mensalidade-actions"
 
 type Row = {

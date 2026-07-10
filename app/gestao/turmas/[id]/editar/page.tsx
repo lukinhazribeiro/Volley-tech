@@ -20,7 +20,7 @@ export default async function EditarTurmaPage({ params }: { params: Promise<{ id
       title={`Editar: ${t.nome}`}
       subtitle="Atualize dados e valor da turma"
       action={
-        <Link href="/turmas" className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
+        <Link href="/gestao/turmas" className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary">
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Link>
       }

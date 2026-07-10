@@ -1,8 +1,8 @@
 "use server"
 
-import { db } from "@/lib/db"
-import { atletas, turmas, categorias, mensalidades, presencas } from "@/lib/db/schema"
-import { calcularMensalidade, competenciaAtual, type DescontoTipo } from "@/lib/format"
+import { db } from "@/lib/gestao/db"
+import { atletas, turmas, categorias, mensalidades, presencas } from "@/lib/gestao/db/schema"
+import { calcularMensalidade, competenciaAtual, type DescontoTipo } from "@/lib/gestao/format"
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
@@ -138,9 +138,9 @@ export async function createAtleta(formData: FormData) {
     })
   }
 
-  revalidatePath("/atletas")
-  revalidatePath("/")
-  redirect(`/atletas/${novo.id}`)
+  revalidatePath("/gestao/atletas")
+  revalidatePath("/gestao")
+  redirect(`/gestao/atletas/${novo.id}`)
 }
 
 export async function updateAtleta(id: number, formData: FormData) {
@@ -160,16 +160,16 @@ export async function updateAtleta(id: number, formData: FormData) {
       ),
     )
 
-  revalidatePath("/atletas")
-  revalidatePath(`/atletas/${id}`)
-  revalidatePath("/")
-  redirect(`/atletas/${id}`)
+  revalidatePath("/gestao/atletas")
+  revalidatePath(`/gestao/atletas/${id}`)
+  revalidatePath("/gestao")
+  redirect(`/gestao/atletas/${id}`)
 }
 
 /** Inativa/reativa preservando todo o histórico financeiro e de frequência. */
 export async function toggleAtletaAtivo(id: number, ativo: boolean) {
   await db.update(atletas).set({ ativo }).where(eq(atletas.id, id))
-  revalidatePath("/atletas")
-  revalidatePath(`/atletas/${id}`)
-  revalidatePath("/")
+  revalidatePath("/gestao/atletas")
+  revalidatePath(`/gestao/atletas/${id}`)
+  revalidatePath("/gestao")
 }

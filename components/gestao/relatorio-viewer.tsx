@@ -1,6 +1,6 @@
 "use client"
 
-import { brl } from "@/lib/format"
+import { brl } from "@/lib/gestao/format"
 import { FileText, Printer, Users, Wallet, AlertTriangle, Clock } from "lucide-react"
 import { useState } from "react"
 
