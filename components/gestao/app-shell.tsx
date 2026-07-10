@@ -1,11 +1,19 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Volleyball, Menu, Search, Bell, ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react"
+import { Volleyball, Menu, Search, Bell, PanelLeftClose, PanelLeftOpen, X, ArrowLeft, Pencil, Check } from "lucide-react"
 import { nav } from "@/lib/gestao/nav"
 import { cn } from "@/lib/utils"
+import { getStoredUser } from "@/lib/auth"
+
+function initialsFrom(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "AD"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 export function AppShell({
   title,
@@ -21,6 +29,29 @@ export function AppShell({
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Nome do administrador, próprio de cada usuário
+  const [adminName, setAdminName] = useState("Administrador")
+  const [editingName, setEditingName] = useState(false)
+  const [tempName, setTempName] = useState("")
+  const [storageKey, setStorageKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    const user = getStoredUser()
+    const key = user ? `gestao_admin_name:${user.id}` : "gestao_admin_name:guest"
+    setStorageKey(key)
+    const saved = typeof window !== "undefined" ? localStorage.getItem(key) : null
+    setAdminName(saved || user?.name || "Administrador")
+  }, [])
+
+  const saveName = () => {
+    const next = tempName.trim()
+    if (next && storageKey) {
+      localStorage.setItem(storageKey, next)
+      setAdminName(next)
+    }
+    setEditingName(false)
+  }
 
   const isActive = (href: string) => (href === "/gestao" ? pathname === "/gestao" : pathname.startsWith(href))
 
@@ -169,16 +200,59 @@ export function AppShell({
               </span>
             </button>
 
-            <button className="flex items-center gap-2 rounded-full bg-card px-2 py-1.5 pr-3 text-left transition-colors hover:bg-secondary">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
-                LM
+            <div className="flex items-center gap-2 rounded-full bg-card px-2 py-1.5 pr-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
+                {initialsFrom(adminName)}
               </span>
-              <span className="hidden leading-tight sm:block">
-                <span className="block text-sm font-semibold">Lucas Mendes</span>
-                <span className="block text-xs text-muted-foreground">Administrador</span>
-              </span>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </button>
+              {editingName ? (
+                <span className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing || e.keyCode === 229) return
+                      if (e.key === "Enter") saveName()
+                      if (e.key === "Escape") setEditingName(false)
+                    }}
+                    placeholder="Seu nome"
+                    className="w-36 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground focus:border-primary focus:outline-none"
+                  />
+                  <button
+                    onClick={saveName}
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground"
+                    aria-label="Salvar nome"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                </span>
+              ) : (
+                <>
+                  <span className="hidden leading-tight sm:block">
+                    <span className="block text-sm font-semibold">{adminName}</span>
+                    <span className="block text-xs text-muted-foreground">Administrador</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      setTempName(adminName)
+                      setEditingName(true)
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    aria-label="Editar nome do administrador"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            <Link
+              href="/"
+              className="flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary hover:bg-secondary"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Voltar à Hub</span>
+            </Link>
 
             {action}
           </div>
