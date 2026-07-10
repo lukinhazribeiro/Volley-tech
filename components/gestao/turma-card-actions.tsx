@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useTransition } from "react"
 import { Pencil, Power, PowerOff, Loader2 } from "lucide-react"
-import { toggleTurma } from "@/app/actions/turmas"
+import { toggleTurma } from "@/app/gestao/actions/turmas"
 
 export function TurmaCardActions({ id, ativo }: { id: number; ativo: boolean }) {
   const [pending, startTransition] = useTransition()

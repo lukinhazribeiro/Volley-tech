@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/gestao/app-shell"
-import { listCategorias } from "@/app/actions/categorias"
+import { listCategorias } from "@/app/gestao/actions/categorias"
 import { CategoriasManager } from "@/components/gestao/categorias-manager"
 
 export const dynamic = "force-dynamic"

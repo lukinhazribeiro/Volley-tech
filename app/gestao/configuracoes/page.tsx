@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/gestao/app-shell"
-import { listCategorias } from "@/app/actions/categorias"
-import { listTurmas } from "@/app/actions/turmas"
-import { listAtletas } from "@/app/actions/atletas"
+import { listCategorias } from "@/app/gestao/actions/categorias"
+import { listTurmas } from "@/app/gestao/actions/turmas"
+import { listAtletas } from "@/app/gestao/actions/atletas"
 import { Building2, Users, Users2, Layers } from "lucide-react"
 
 export const dynamic = "force-dynamic"

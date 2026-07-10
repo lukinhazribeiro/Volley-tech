@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/gestao/app-shell"
 import { FinanceiroTable } from "@/components/gestao/financeiro-table"
-import { listMensalidades } from "@/app/actions/financeiro"
+import { listMensalidades } from "@/app/gestao/actions/financeiro"
 
 export const dynamic = "force-dynamic"
 

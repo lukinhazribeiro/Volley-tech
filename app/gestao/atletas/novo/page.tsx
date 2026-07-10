@@ -2,9 +2,9 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { AppShell } from "@/components/gestao/app-shell"
 import { AtletaForm } from "@/components/gestao/atleta-form"
-import { createAtleta } from "@/app/actions/atletas"
-import { listTurmas } from "@/app/actions/turmas"
-import { listCategorias } from "@/app/actions/categorias"
+import { createAtleta } from "@/app/gestao/actions/atletas"
+import { listTurmas } from "@/app/gestao/actions/turmas"
+import { listCategorias } from "@/app/gestao/actions/categorias"
 
 export const dynamic = "force-dynamic"
 

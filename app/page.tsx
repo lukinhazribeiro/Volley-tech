@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Activity, Target, ClipboardCheck, Video, LogOut, ShieldCheck } from "lucide-react"
+import { Activity, Target, ClipboardCheck, Video, Users, LogOut, ShieldCheck } from "lucide-react"
 import { AppCard } from "@/components/hub/app-card"
 import { TrialBanner } from "@/components/hub/trial-banner"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
@@ -50,6 +50,16 @@ const apps = [
     status: "On-line",
     features: ["Vídeo + IA", "Por posição", "Relatório"],
     image: "/images/hub-scout-video.jpg",
+  },
+  {
+    title: "Gestão de Clube",
+    subtitle: "Administração esportiva",
+    description: "Controle de atletas, turmas, frequência, mensalidades e financeiro do clube.",
+    href: "/gestao",
+    icon: Users,
+    status: "On-line",
+    features: ["Atletas", "Financeiro", "Frequência"],
+    image: "/images/hub-gestao-clube.svg",
   },
 ]
 

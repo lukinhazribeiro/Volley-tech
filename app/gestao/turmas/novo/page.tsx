@@ -2,8 +2,8 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { AppShell } from "@/components/gestao/app-shell"
 import { TurmaForm } from "@/components/gestao/turma-form"
-import { createTurma } from "@/app/actions/turmas"
-import { listCategorias } from "@/app/actions/categorias"
+import { createTurma } from "@/app/gestao/actions/turmas"
+import { listCategorias } from "@/app/gestao/actions/categorias"
 
 export const dynamic = "force-dynamic"
 

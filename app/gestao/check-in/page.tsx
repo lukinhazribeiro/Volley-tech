@@ -1,4 +1,4 @@
-import { getTurmasParaChamada } from "@/app/actions/checkin"
+import { getTurmasParaChamada } from "@/app/gestao/actions/checkin"
 import { CheckinPanel } from "@/components/gestao/checkin-panel"
 import { AppShell } from "@/components/gestao/app-shell"
 

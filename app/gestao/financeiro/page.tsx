@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { AppShell } from "@/components/gestao/app-shell"
 import { FinanceiroTable } from "@/components/gestao/financeiro-table"
-import { listMensalidades, resumoFinanceiro } from "@/app/actions/financeiro"
+import { listMensalidades, resumoFinanceiro } from "@/app/gestao/actions/financeiro"
 import { brl } from "@/lib/gestao/format"
 import { Wallet, TrendingUp, AlertCircle } from "lucide-react"
 

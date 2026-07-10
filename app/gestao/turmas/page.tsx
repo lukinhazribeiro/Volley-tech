@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Plus, Users2, Clock, MapPin, CalendarDays } from "lucide-react"
 import { AppShell } from "@/components/gestao/app-shell"
-import { listTurmas } from "@/app/actions/turmas"
+import { listTurmas } from "@/app/gestao/actions/turmas"
 import { brl } from "@/lib/gestao/format"
 import { TurmaCardActions } from "@/components/gestao/turma-card-actions"
 

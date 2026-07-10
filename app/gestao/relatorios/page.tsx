@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/gestao/app-shell"
-import { listAtletas } from "@/app/actions/atletas"
-import { listMensalidades, resumoFinanceiro } from "@/app/actions/financeiro"
-import { frequenciaPorTurma } from "@/app/actions/frequencia"
+import { listAtletas } from "@/app/gestao/actions/atletas"
+import { listMensalidades, resumoFinanceiro } from "@/app/gestao/actions/financeiro"
+import { frequenciaPorTurma } from "@/app/gestao/actions/frequencia"
 import { RelatorioViewer } from "@/components/gestao/relatorio-viewer"
 
 export const dynamic = "force-dynamic"

@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Plus, Search, Users } from "lucide-react"
 import { AppShell } from "@/components/gestao/app-shell"
-import { listAtletas } from "@/app/actions/atletas"
+import { listAtletas } from "@/app/gestao/actions/atletas"
 import { brl, initials, bolsaBadge } from "@/lib/gestao/format"
 import { AtletaRowActions } from "@/components/gestao/atleta-row-actions"
 

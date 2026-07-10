@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 512" width="768" height="512" role="img" aria-label="Gestão de clube">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e1526"/>
+      <stop offset="1" stop-color="#060a14"/>
+    </linearGradient>
+    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#fb923c"/>
+    </linearGradient>
+  </defs>
+  <rect width="768" height="512" fill="url(#bg)"/>
+  <g opacity="0.10" stroke="#93a4c9" stroke-width="1">
+    <path d="M0 128 H768 M0 256 H768 M0 384 H768 M128 0 V512 M256 0 V512 M384 0 V512 M512 0 V512 M640 0 V512"/>
+  </g>
+  <!-- painel/dashboard -->
+  <rect x="96" y="120" width="576" height="272" rx="18" fill="#141d33" stroke="#2a3550" stroke-width="2"/>
+  <!-- topo do painel -->
+  <rect x="120" y="146" width="150" height="16" rx="8" fill="url(#acc)"/>
+  <circle cx="640" cy="154" r="8" fill="#22c55e"/>
+  <!-- cartões de estatística -->
+  <g>
+    <rect x="120" y="188" width="150" height="80" rx="12" fill="#0f1728" stroke="#2a3550"/>
+    <rect x="140" y="206" width="70" height="10" rx="5" fill="#5b6b8f"/>
+    <rect x="140" y="228" width="46" height="20" rx="6" fill="url(#acc)"/>
+    <rect x="309" y="188" width="150" height="80" rx="12" fill="#0f1728" stroke="#2a3550"/>
+    <rect x="329" y="206" width="70" height="10" rx="5" fill="#5b6b8f"/>
+    <rect x="329" y="228" width="46" height="20" rx="6" fill="url(#acc)"/>
+    <rect x="498" y="188" width="150" height="80" rx="12" fill="#0f1728" stroke="#2a3550"/>
+    <rect x="518" y="206" width="70" height="10" rx="5" fill="#5b6b8f"/>
+    <rect x="518" y="228" width="46" height="20" rx="6" fill="url(#acc)"/>
+  </g>
+  <!-- barras -->
+  <g>
+    <rect x="120" y="356" width="30" height="0" fill="url(#acc)"><animate attributeName="height" values="20;70;20" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="356;306;356" dur="4s" repeatCount="indefinite"/></rect>
+    <rect x="170" y="316" width="30" height="60" fill="#3a4a6b"/>
+    <rect x="220" y="336" width="30" height="40" fill="#3a4a6b"/>
+    <rect x="270" y="300" width="30" height="76" fill="url(#acc)" opacity="0.85"/>
+  </g>
+  <!-- lista de atletas -->
+  <g>
+    <circle cx="510" cy="318" r="12" fill="url(#acc)"/>
+    <rect x="530" y="312" width="118" height="12" rx="6" fill="#3a4a6b"/>
+    <circle cx="510" cy="352" r="12" fill="#3a4a6b"/>
+    <rect x="530" y="346" width="90" height="12" rx="6" fill="#2a3550"/>
+  </g>
+</svg>

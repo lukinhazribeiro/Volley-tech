@@ -1,6 +1,6 @@
 "use client"
 
-import { registrarPagamento, reabrirMensalidade } from "@/app/actions/financeiro"
+import { registrarPagamento, reabrirMensalidade } from "@/app/gestao/actions/financeiro"
 import { Check, RotateCcw, Loader2 } from "lucide-react"
 import { useTransition } from "react"
 

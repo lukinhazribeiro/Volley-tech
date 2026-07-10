@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, Check, X, Power, PowerOff, Loader2, Layers } from "lucide-react"
-import { createCategoria, updateCategoria, toggleCategoria, deleteCategoria } from "@/app/actions/categorias"
+import { createCategoria, updateCategoria, toggleCategoria, deleteCategoria } from "@/app/gestao/actions/categorias"
 
 type Categoria = {
   id: number

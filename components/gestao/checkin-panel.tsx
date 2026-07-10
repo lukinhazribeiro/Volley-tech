@@ -1,6 +1,6 @@
 "use client"
 
-import { getChamada, salvarChamada, type StatusPresenca } from "@/app/actions/checkin"
+import { getChamada, salvarChamada, type StatusPresenca } from "@/app/gestao/actions/checkin"
 import { CheckCircle2, Clock, XCircle, FileText, Save, Loader2 } from "lucide-react"
 import { useEffect, useState, useTransition } from "react"
 

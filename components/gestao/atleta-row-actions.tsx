@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useTransition } from "react"
 import { Pencil, Power, PowerOff, Loader2 } from "lucide-react"
-import { toggleAtletaAtivo } from "@/app/actions/atletas"
+import { toggleAtletaAtivo } from "@/app/gestao/actions/atletas"
 
 export function AtletaRowActions({ id, ativo }: { id: number; ativo: boolean }) {
   const [pending, startTransition] = useTransition()

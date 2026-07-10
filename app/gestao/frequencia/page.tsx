@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/gestao/app-shell"
-import { frequenciaPorAtleta, frequenciaPorCategoria, frequenciaPorTurma } from "@/app/actions/frequencia"
+import { frequenciaPorAtleta, frequenciaPorCategoria, frequenciaPorTurma } from "@/app/gestao/actions/frequencia"
 
 export const dynamic = "force-dynamic"
 

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { ArrowLeft, Pencil, Phone, Mail, IdCard, CalendarDays, GraduationCap } from "lucide-react"
 import { AppShell } from "@/components/gestao/app-shell"
 import { Panel } from "@/components/gestao/panel"
-import { getAtleta, getHistoricoAtleta } from "@/app/actions/atletas"
+import { getAtleta, getHistoricoAtleta } from "@/app/gestao/actions/atletas"
 import { brl, initials, formatDate, competenciaLabel, bolsaBadge, labelDesconto, calcularMensalidade } from "@/lib/gestao/format"
 import type { DescontoTipo } from "@/lib/gestao/format"
 
