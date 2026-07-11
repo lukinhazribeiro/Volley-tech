@@ -34,6 +34,7 @@ import {
   getAtletasPorCategoria,
   getSerieMensal,
 } from "@/lib/gestao/queries/dashboard"
+import { sincronizarMensalidades } from "@/app/gestao/actions/financeiro"
 
 export const dynamic = "force-dynamic"
 
@@ -42,6 +43,7 @@ const spark = (seed: number) =>
   Array.from({ length: 16 }, (_, i) => 40 + Math.round(Math.sin(i / 2 + seed) * 20 + ((i * 7 + seed * 13) % 12)))
 
 export default async function DashboardPage() {
+  await sincronizarMensalidades()
   const [ind, semana, freqTurma, atraso, treinos, categorias, serie] = await Promise.all([
     getIndicadores(),
     getPresencasSemana(),

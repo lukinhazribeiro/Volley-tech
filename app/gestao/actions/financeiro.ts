@@ -5,6 +5,51 @@ import { atletas, mensalidades, turmas } from "@/lib/gestao/db/schema"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
+/**
+ * Garante que exista uma mensalidade por mês para cada atleta ativo,
+ * da data de inscrição até o mês atual. Idempotente: nunca duplica
+ * competências já existentes e nunca altera pagamentos. Deve ser chamada
+ * ao abrir as telas financeiras para manter o histórico e a previsão sempre completos.
+ */
+export async function sincronizarMensalidades() {
+  await db.execute(sql`
+    INSERT INTO mensalidades (atleta_id, turma_id, competencia, valor, data_vencimento, status)
+    SELECT
+      a.id,
+      a.turma_id,
+      to_char(m, 'YYYY-MM') AS competencia,
+      round(
+        CASE a.desconto_tipo
+          WHEN 'percentual' THEN a.valor_mensalidade * (1 - LEAST(GREATEST(a.desconto_valor, 0), 100) / 100.0)
+          WHEN 'valor' THEN GREATEST(0, a.valor_mensalidade - a.desconto_valor)
+          ELSE a.valor_mensalidade
+        END, 2) AS valor,
+      (to_char(m, 'YYYY-MM') || '-' ||
+        lpad(LEAST(GREATEST(COALESCE(t.dia_vencimento, EXTRACT(DAY FROM COALESCE(a.data_inscricao, a.created_at::date))::int), 1), 28)::text, 2, '0')
+      )::date AS data_vencimento,
+      'pendente'
+    FROM atletas a
+    LEFT JOIN turmas t ON t.id = a.turma_id
+    CROSS JOIN LATERAL generate_series(
+      date_trunc('month', COALESCE(a.data_inscricao, a.created_at::date)),
+      date_trunc('month', now()),
+      interval '1 month'
+    ) AS m
+    WHERE a.ativo = true
+      AND (
+        CASE a.desconto_tipo
+          WHEN 'percentual' THEN a.valor_mensalidade * (1 - LEAST(GREATEST(a.desconto_valor, 0), 100) / 100.0)
+          WHEN 'valor' THEN GREATEST(0, a.valor_mensalidade - a.desconto_valor)
+          ELSE a.valor_mensalidade
+        END
+      ) > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM mensalidades me
+        WHERE me.atleta_id = a.id AND me.competencia = to_char(m, 'YYYY-MM')
+      )
+  `)
+}
+
 export async function listMensalidades(filtro?: "todas" | "pendente" | "pago" | "atrasado") {
   const rows = await db
     .select({

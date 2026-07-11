@@ -1,13 +1,14 @@
 import { AppShell } from "@/components/gestao/app-shell"
 import { FinanceiroTable } from "@/components/gestao/financeiro-table"
 import { InadimplenciaPanel } from "@/components/gestao/inadimplencia-panel"
-import { listMensalidades, inadimplenciaPorAtleta, resumoFinanceiro } from "@/app/gestao/actions/financeiro"
+import { listMensalidades, inadimplenciaPorAtleta, resumoFinanceiro, sincronizarMensalidades } from "@/app/gestao/actions/financeiro"
 import { brl } from "@/lib/gestao/format"
 import { AlertTriangle, Clock, Wallet } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
 export default async function PagamentosPage() {
+  await sincronizarMensalidades()
   const [todas, porAtleta, resumo] = await Promise.all([
     listMensalidades("todas"),
     inadimplenciaPorAtleta(),
