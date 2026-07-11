@@ -37,7 +37,7 @@ function TooltipBox({ active, payload, label, suffix = "" }: any) {
 
 export function PresencasSemanaChart({ data }: { data: { dia: string; percentual: number }[] }) {
   return (
-    <ResponsiveContainer width="100%" height={230}>
+    <ResponsiveContainer width="100%" height={230} initialDimension={{ width: 500, height: 230 }}>
       <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
         <defs>
           <linearGradient id="presGrad" x1="0" y1="0" x2="0" y2="1">
@@ -72,7 +72,7 @@ export function ReceitaDonut({ recebida, pendente }: { recebida: number; pendent
   const fmt = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return (
     <div className="relative flex items-center justify-center">
-      <ResponsiveContainer width="100%" height={230}>
+      <ResponsiveContainer width="100%" height={230} initialDimension={{ width: 300, height: 230 }}>
         <PieChart>
           <Pie data={data} dataKey="value" innerRadius={70} outerRadius={95} paddingAngle={3} strokeWidth={0}>
             {data.map((d, i) => (
@@ -101,7 +101,7 @@ export function CategoriaDonut({ data }: { data: { nome: string; total: number }
   const total = data.reduce((s, d) => s + d.total, 0)
   return (
     <div className="relative">
-      <ResponsiveContainer width="100%" height={180}>
+      <ResponsiveContainer width="100%" height={180} initialDimension={{ width: 300, height: 180 }}>
         <PieChart>
           <Pie data={data} dataKey="total" nameKey="nome" innerRadius={50} outerRadius={72} paddingAngle={2} strokeWidth={0}>
             {data.map((_, i) => (
@@ -152,7 +152,7 @@ export function AnaliseCombinada({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
+    <ResponsiveContainer width="100%" height={320} initialDimension={{ width: 700, height: 320 }}>
       <ComposedChart data={data} margin={{ top: 10, right: 8, left: -8, bottom: 0 }}>
         <defs>
           <linearGradient id="recGrad" x1="0" y1="0" x2="0" y2="1">
@@ -234,7 +234,7 @@ function CombinadoTooltip({ active, payload, label }: any) {
 
 export function MiniBar({ data }: { data: { mes: string; recebido: number }[] }) {
   return (
-    <ResponsiveContainer width="100%" height={140}>
+    <ResponsiveContainer width="100%" height={140} initialDimension={{ width: 300, height: 140 }}>
       <BarChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 0 }}>
         <XAxis dataKey="mes" stroke={AXIS} tickLine={false} axisLine={false} fontSize={10} />
         <YAxis stroke={AXIS} tickLine={false} axisLine={false} fontSize={10} width={40} />
@@ -255,7 +255,7 @@ export function MiniLine({
   suffix?: string
 }) {
   return (
-    <ResponsiveContainer width="100%" height={140}>
+    <ResponsiveContainer width="100%" height={140} initialDimension={{ width: 300, height: 140 }}>
       <LineChart data={data} margin={{ top: 6, right: 6, left: -24, bottom: 0 }}>
         <XAxis dataKey="mes" stroke={AXIS} tickLine={false} axisLine={false} fontSize={10} />
         <YAxis stroke={AXIS} tickLine={false} axisLine={false} fontSize={10} width={40} tickFormatter={(v) => `${v}`} />
