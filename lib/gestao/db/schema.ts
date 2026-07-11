@@ -29,6 +29,7 @@ export const atletas = pgTable("atletas", {
   telefone: text("telefone"),
   email: text("email"),
   dataNascimento: date("data_nascimento"),
+  dataInscricao: date("data_inscricao"),
   categoriaId: integer("categoria_id"),
   turmaId: integer("turma_id"),
   fotoUrl: text("foto_url"),

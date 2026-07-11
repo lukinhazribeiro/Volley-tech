@@ -60,6 +60,61 @@ export async function reabrirMensalidade(id: number) {
   return { ok: true }
 }
 
+/** Agrupa as mensalidades em aberto por atleta, destacando os atrasos. */
+export async function inadimplenciaPorAtleta() {
+  const rows = await listMensalidades("todas")
+  const hoje = new Date()
+
+  const mapa = new Map<
+    number,
+    {
+      atletaId: number
+      atletaNome: string
+      turmaNome: string | null
+      pendentes: number
+      atrasadas: number
+      totalDevido: number
+      maiorAtrasoDias: number
+      vencimentoMaisAntigo: string | null
+    }
+  >()
+
+  for (const r of rows) {
+    if (r.status === "pago") continue
+    const atrasada = r.status === "atrasado"
+    const dias =
+      atrasada && r.dataVencimento
+        ? Math.max(0, Math.floor((hoje.getTime() - new Date(r.dataVencimento).getTime()) / 86400000))
+        : 0
+    const atual = mapa.get(r.atletaId) ?? {
+      atletaId: r.atletaId,
+      atletaNome: r.atletaNome ?? "—",
+      turmaNome: r.turmaNome,
+      pendentes: 0,
+      atrasadas: 0,
+      totalDevido: 0,
+      maiorAtrasoDias: 0,
+      vencimentoMaisAntigo: null as string | null,
+    }
+    atual.pendentes += 1
+    if (atrasada) atual.atrasadas += 1
+    atual.totalDevido += r.valor
+    atual.maiorAtrasoDias = Math.max(atual.maiorAtrasoDias, dias)
+    if (
+      r.dataVencimento &&
+      (!atual.vencimentoMaisAntigo || r.dataVencimento < atual.vencimentoMaisAntigo)
+    ) {
+      atual.vencimentoMaisAntigo = r.dataVencimento
+    }
+    mapa.set(r.atletaId, atual)
+  }
+
+  // Ordena: quem tem mais atraso primeiro, depois maior valor devido
+  return Array.from(mapa.values()).sort(
+    (a, b) => b.maiorAtrasoDias - a.maiorAtrasoDias || b.totalDevido - a.totalDevido,
+  )
+}
+
 export async function resumoFinanceiro() {
   const [row] = await db
     .select({

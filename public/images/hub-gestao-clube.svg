@@ -1,47 +1,92 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 512" width="768" height="512" role="img" aria-label="Gestão de clube">
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="512" viewBox="0 0 768 512" fill="none" role="img" aria-label="Dashboard de gestão de clube">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0e1526"/>
-      <stop offset="1" stop-color="#060a14"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="768" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#141821"/>
+      <stop offset="1" stop-color="#0b0d12"/>
     </linearGradient>
-    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#f97316"/>
-      <stop offset="1" stop-color="#fb923c"/>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff7a1a"/>
+      <stop offset="1" stop-color="#f7541e"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff7a1a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ff7a1a"/>
     </linearGradient>
   </defs>
+
   <rect width="768" height="512" fill="url(#bg)"/>
-  <g opacity="0.10" stroke="#93a4c9" stroke-width="1">
-    <path d="M0 128 H768 M0 256 H768 M0 384 H768 M128 0 V512 M256 0 V512 M384 0 V512 M512 0 V512 M640 0 V512"/>
-  </g>
-  <!-- painel/dashboard -->
-  <rect x="96" y="120" width="576" height="272" rx="18" fill="#141d33" stroke="#2a3550" stroke-width="2"/>
-  <!-- topo do painel -->
-  <rect x="120" y="146" width="150" height="16" rx="8" fill="url(#acc)"/>
-  <circle cx="640" cy="154" r="8" fill="#22c55e"/>
-  <!-- cartões de estatística -->
+
+  <!-- glow -->
+  <circle cx="620" cy="120" r="180" fill="#ff7a1a" opacity="0.10"/>
+
+  <!-- header -->
+  <rect x="48" y="44" width="220" height="18" rx="9" fill="#ffffff" opacity="0.85"/>
+  <rect x="48" y="72" width="140" height="12" rx="6" fill="#ffffff" opacity="0.35"/>
+
+  <!-- KPI cards -->
   <g>
-    <rect x="120" y="188" width="150" height="80" rx="12" fill="#0f1728" stroke="#2a3550"/>
-    <rect x="140" y="206" width="70" height="10" rx="5" fill="#5b6b8f"/>
-    <rect x="140" y="228" width="46" height="20" rx="6" fill="url(#acc)"/>
-    <rect x="309" y="188" width="150" height="80" rx="12" fill="#0f1728" stroke="#2a3550"/>
-    <rect x="329" y="206" width="70" height="10" rx="5" fill="#5b6b8f"/>
-    <rect x="329" y="228" width="46" height="20" rx="6" fill="url(#acc)"/>
-    <rect x="498" y="188" width="150" height="80" rx="12" fill="#0f1728" stroke="#2a3550"/>
-    <rect x="518" y="206" width="70" height="10" rx="5" fill="#5b6b8f"/>
-    <rect x="518" y="228" width="46" height="20" rx="6" fill="url(#acc)"/>
+    <rect x="48" y="110" width="200" height="96" rx="16" fill="#1b202b" stroke="#2a3140" stroke-width="1.5"/>
+    <rect x="66" y="128" width="70" height="10" rx="5" fill="#8b94a7"/>
+    <text x="66" y="180" font-family="Arial, sans-serif" font-size="34" font-weight="800" fill="#ffffff">128</text>
+    <rect x="150" y="128" width="40" height="40" rx="20" fill="#ff7a1a" opacity="0.15"/>
+    <path d="M170 140a10 10 0 100 20 10 10 0 000-20zm-18 40c0-9 8-14 18-14s18 5 18 14" stroke="url(#orange)" stroke-width="3" fill="none" stroke-linecap="round"/>
   </g>
-  <!-- barras -->
   <g>
-    <rect x="120" y="356" width="30" height="0" fill="url(#acc)"><animate attributeName="height" values="20;70;20" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="356;306;356" dur="4s" repeatCount="indefinite"/></rect>
-    <rect x="170" y="316" width="30" height="60" fill="#3a4a6b"/>
-    <rect x="220" y="336" width="30" height="40" fill="#3a4a6b"/>
-    <rect x="270" y="300" width="30" height="76" fill="url(#acc)" opacity="0.85"/>
+    <rect x="264" y="110" width="200" height="96" rx="16" fill="#1b202b" stroke="#2a3140" stroke-width="1.5"/>
+    <rect x="282" y="128" width="90" height="10" rx="5" fill="#8b94a7"/>
+    <text x="282" y="180" font-family="Arial, sans-serif" font-size="30" font-weight="800" fill="#3ddc84">R$ 24k</text>
   </g>
-  <!-- lista de atletas -->
   <g>
-    <circle cx="510" cy="318" r="12" fill="url(#acc)"/>
-    <rect x="530" y="312" width="118" height="12" rx="6" fill="#3a4a6b"/>
-    <circle cx="510" cy="352" r="12" fill="#3a4a6b"/>
-    <rect x="530" y="346" width="90" height="12" rx="6" fill="#2a3550"/>
+    <rect x="480" y="110" width="200" height="96" rx="16" fill="#1b202b" stroke="#2a3140" stroke-width="1.5"/>
+    <rect x="498" y="128" width="80" height="10" rx="5" fill="#8b94a7"/>
+    <text x="498" y="180" font-family="Arial, sans-serif" font-size="30" font-weight="800" fill="#ff5a4d">6 atraso</text>
   </g>
+
+  <!-- athletes list -->
+  <rect x="48" y="230" width="380" height="234" rx="18" fill="#1b202b" stroke="#2a3140" stroke-width="1.5"/>
+  <rect x="70" y="252" width="120" height="12" rx="6" fill="#ffffff" opacity="0.8"/>
+  <g font-family="Arial, sans-serif">
+    <!-- rows -->
+    <g>
+      <circle cx="86" cy="300" r="14" fill="#ff7a1a" opacity="0.2"/>
+      <rect x="112" y="292" width="150" height="9" rx="4.5" fill="#ffffff" opacity="0.6"/>
+      <rect x="112" y="306" width="90" height="8" rx="4" fill="#ffffff" opacity="0.25"/>
+      <rect x="340" y="292" width="66" height="22" rx="11" fill="#3ddc84" opacity="0.18"/>
+      <text x="373" y="308" font-size="12" font-weight="700" fill="#3ddc84" text-anchor="middle">Pago</text>
+    </g>
+    <g>
+      <circle cx="86" cy="344" r="14" fill="#ff7a1a" opacity="0.2"/>
+      <rect x="112" y="336" width="170" height="9" rx="4.5" fill="#ffffff" opacity="0.6"/>
+      <rect x="112" y="350" width="80" height="8" rx="4" fill="#ffffff" opacity="0.25"/>
+      <rect x="340" y="336" width="66" height="22" rx="11" fill="#ff5a4d" opacity="0.2"/>
+      <text x="373" y="352" font-size="12" font-weight="700" fill="#ff5a4d" text-anchor="middle">Atraso</text>
+    </g>
+    <g>
+      <circle cx="86" cy="388" r="14" fill="#ff7a1a" opacity="0.2"/>
+      <rect x="112" y="380" width="140" height="9" rx="4.5" fill="#ffffff" opacity="0.6"/>
+      <rect x="112" y="394" width="100" height="8" rx="4" fill="#ffffff" opacity="0.25"/>
+      <rect x="340" y="380" width="66" height="22" rx="11" fill="#ffb020" opacity="0.2"/>
+      <text x="373" y="396" font-size="11" font-weight="700" fill="#ffb020" text-anchor="middle">Pend.</text>
+    </g>
+    <g>
+      <circle cx="86" cy="432" r="14" fill="#ff7a1a" opacity="0.2"/>
+      <rect x="112" y="424" width="160" height="9" rx="4.5" fill="#ffffff" opacity="0.6"/>
+      <rect x="112" y="438" width="70" height="8" rx="4" fill="#ffffff" opacity="0.25"/>
+      <rect x="340" y="424" width="66" height="22" rx="11" fill="#3ddc84" opacity="0.18"/>
+      <text x="373" y="440" font-size="12" font-weight="700" fill="#3ddc84" text-anchor="middle">Pago</text>
+    </g>
+  </g>
+
+  <!-- revenue chart -->
+  <rect x="444" y="230" width="236" height="234" rx="18" fill="#1b202b" stroke="#2a3140" stroke-width="1.5"/>
+  <rect x="466" y="252" width="120" height="12" rx="6" fill="#ffffff" opacity="0.8"/>
+  <g>
+    <rect x="470" y="380" width="30" height="52" rx="6" fill="url(#bar)"/>
+    <rect x="512" y="352" width="30" height="80" rx="6" fill="url(#bar)"/>
+    <rect x="554" y="326" width="30" height="106" rx="6" fill="url(#bar)"/>
+    <rect x="596" y="360" width="30" height="72" rx="6" fill="url(#bar)"/>
+    <rect x="638" y="300" width="30" height="132" rx="6" fill="url(#bar)"/>
+  </g>
+  <polyline points="485,372 527,344 569,318 611,352 653,292" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+  <circle cx="653" cy="292" r="5" fill="#ff7a1a"/>
 </svg>

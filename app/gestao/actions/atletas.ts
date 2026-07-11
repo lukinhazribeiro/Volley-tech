@@ -103,6 +103,7 @@ function parseAtleta(formData: FormData) {
     telefone: String(formData.get("telefone") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     dataNascimento: String(formData.get("dataNascimento") ?? "").trim() || null,
+    dataInscricao: String(formData.get("dataInscricao") ?? "").trim() || null,
     responsavel: String(formData.get("responsavel") ?? "").trim() || null,
     telefoneResponsavel: String(formData.get("telefoneResponsavel") ?? "").trim() || null,
     categoriaId: categoriaIdRaw ? Number(categoriaIdRaw) : null,
@@ -120,12 +121,20 @@ export async function createAtleta(formData: FormData) {
 
   const [novo] = await db.insert(atletas).values(data).returning({ id: atletas.id })
 
-  // Automação: gerar mensalidade (ficha financeira) da competência atual
+  // Automação: gerar mensalidade (ficha financeira) a partir da data de inscrição.
+  // O valor considera o desconto/bolsa do próprio atleta (independe de ter turma).
   const { final } = calcularMensalidade(data.valorMensalidade, data.descontoTipo, data.descontoValor)
-  if (final > 0 && data.turmaId) {
-    const [t] = await db.select().from(turmas).where(eq(turmas.id, data.turmaId))
-    const dia = t?.diaVencimento ?? 10
-    const comp = competenciaAtual()
+  if (final > 0) {
+    // dia de vencimento: usa o da turma quando houver, senão o dia da inscrição
+    let dia = 10
+    if (data.turmaId) {
+      const [t] = await db.select().from(turmas).where(eq(turmas.id, data.turmaId))
+      dia = t?.diaVencimento ?? 10
+    } else if (data.dataInscricao) {
+      dia = Number(data.dataInscricao.split("-")[2]) || 10
+    }
+    // competência da inscrição (mês/ano da data de inscrição, ou mês atual)
+    const comp = data.dataInscricao ? data.dataInscricao.slice(0, 7) : competenciaAtual()
     const [ano, mes] = comp.split("-")
     const vencimento = `${ano}-${mes}-${String(dia).padStart(2, "0")}`
     await db.insert(mensalidades).values({
@@ -139,6 +148,8 @@ export async function createAtleta(formData: FormData) {
   }
 
   revalidatePath("/gestao/atletas")
+  revalidatePath("/gestao/pagamentos")
+  revalidatePath("/gestao/financeiro")
   revalidatePath("/gestao")
   redirect(`/gestao/atletas/${novo.id}`)
 }
