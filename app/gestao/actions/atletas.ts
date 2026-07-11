@@ -121,7 +121,8 @@ export async function createAtleta(formData: FormData) {
 
   const [novo] = await db.insert(atletas).values(data).returning({ id: atletas.id })
 
-  // Automação: gerar mensalidade (ficha financeira) a partir da data de inscrição.
+  // Automação: gerar TODAS as mensalidades desde a data de inscrição até o mês atual,
+  // para que o histórico fique completo (competências passadas em aberto aparecem como atraso).
   // O valor considera o desconto/bolsa do próprio atleta (independe de ter turma).
   const { final } = calcularMensalidade(data.valorMensalidade, data.descontoTipo, data.descontoValor)
   if (final > 0) {
@@ -133,18 +134,40 @@ export async function createAtleta(formData: FormData) {
     } else if (data.dataInscricao) {
       dia = Number(data.dataInscricao.split("-")[2]) || 10
     }
-    // competência da inscrição (mês/ano da data de inscrição, ou mês atual)
-    const comp = data.dataInscricao ? data.dataInscricao.slice(0, 7) : competenciaAtual()
-    const [ano, mes] = comp.split("-")
-    const vencimento = `${ano}-${mes}-${String(dia).padStart(2, "0")}`
-    await db.insert(mensalidades).values({
-      atletaId: novo.id,
-      turmaId: data.turmaId,
-      competencia: comp,
-      valor: String(final),
-      dataVencimento: vencimento,
-      status: "pendente",
-    })
+    const diaStr = String(Math.min(Math.max(dia, 1), 28)).padStart(2, "0")
+
+    // ponto de partida: mês da inscrição (ou mês atual, se não informado)
+    const inicio = data.dataInscricao ? data.dataInscricao.slice(0, 7) : competenciaAtual()
+    const [anoIni, mesIni] = inicio.split("-").map(Number)
+    const atual = competenciaAtual()
+    const [anoAtual, mesAtual] = atual.split("-").map(Number)
+
+    const fichas: (typeof mensalidades.$inferInsert)[] = []
+    let ano = anoIni
+    let mes = mesIni
+    // gera mês a mês, inclusivo, até a competência atual (limite de segurança de 240 meses)
+    for (let i = 0; i < 240; i++) {
+      const comp = `${ano}-${String(mes).padStart(2, "0")}`
+      fichas.push({
+        atletaId: novo.id,
+        turmaId: data.turmaId,
+        competencia: comp,
+        valor: String(final),
+        dataVencimento: `${comp}-${diaStr}`,
+        status: "pendente",
+      })
+      if (ano === anoAtual && mes === mesAtual) break
+      if (ano > anoAtual || (ano === anoAtual && mes > mesAtual)) break
+      mes += 1
+      if (mes > 12) {
+        mes = 1
+        ano += 1
+      }
+    }
+
+    if (fichas.length > 0) {
+      await db.insert(mensalidades).values(fichas)
+    }
   }
 
   revalidatePath("/gestao/atletas")
