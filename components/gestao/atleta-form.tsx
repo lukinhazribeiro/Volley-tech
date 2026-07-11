@@ -21,6 +21,7 @@ export type AtletaInitial = {
   telefone?: string | null
   email?: string | null
   dataNascimento?: string | null
+  dataInscricao?: string | null
   responsavel?: string | null
   telefoneResponsavel?: string | null
   categoriaId?: number | null
@@ -107,6 +108,18 @@ export function AtletaForm({
             <input id="dataNascimento" name="dataNascimento" type="date" defaultValue={initial?.dataNascimento ?? ""} className={inputCls} />
           </div>
           <div>
+            <label className={labelCls} htmlFor="dataInscricao">Data de inscrição *</label>
+            <input
+              id="dataInscricao"
+              name="dataInscricao"
+              type="date"
+              required
+              defaultValue={initial?.dataInscricao ?? new Date().toISOString().slice(0, 10)}
+              className={inputCls}
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">Base para o controle e vencimento das mensalidades.</p>
+          </div>
+          <div>
             <label className={labelCls} htmlFor="telefone">Telefone</label>
             <input id="telefone" name="telefone" defaultValue={initial?.telefone ?? ""} className={inputCls} placeholder="(00) 00000-0000" />
           </div>
@@ -155,7 +168,8 @@ export function AtletaForm({
           <GraduationCap className="h-4 w-4 text-primary" /> Mensalidade e bolsa
         </h2>
         <p className="mb-4 text-xs text-muted-foreground">
-          O valor base é sugerido pela turma, mas pode ser editado. Aplique uma bolsa em percentual ou valor fixo.
+          O valor é definido por atleta — a turma apenas sugere um valor base, que pode ser ajustado livremente.
+          Aplique uma bolsa em percentual ou valor fixo para cada aluno.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>

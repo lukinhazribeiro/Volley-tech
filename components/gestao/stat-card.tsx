@@ -91,7 +91,7 @@ export function StatCard({
       </div>
 
       <div className="mt-3 h-12 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 200, height: 48 }}>
           {variant === "area" ? (
             <AreaChart data={chartData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
               <defs>

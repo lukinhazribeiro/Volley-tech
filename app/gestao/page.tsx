@@ -12,8 +12,8 @@ import {
   FileText,
   Plus,
   AlertTriangle,
-  Info,
   Gift,
+  Cake,
 } from "lucide-react"
 import Link from "next/link"
 import { AppShell } from "@/components/gestao/app-shell"
@@ -33,7 +33,9 @@ import {
   getProximosTreinos,
   getAtletasPorCategoria,
   getSerieMensal,
+  getAniversariantesDoMes,
 } from "@/lib/gestao/queries/dashboard"
+import { sincronizarMensalidades } from "@/app/gestao/actions/financeiro"
 
 export const dynamic = "force-dynamic"
 
@@ -42,7 +44,8 @@ const spark = (seed: number) =>
   Array.from({ length: 16 }, (_, i) => 40 + Math.round(Math.sin(i / 2 + seed) * 20 + ((i * 7 + seed * 13) % 12)))
 
 export default async function DashboardPage() {
-  const [ind, semana, freqTurma, atraso, treinos, categorias, serie] = await Promise.all([
+  await sincronizarMensalidades()
+  const [ind, semana, freqTurma, atraso, treinos, categorias, serie, aniversariantes] = await Promise.all([
     getIndicadores(),
     getPresencasSemana(),
     getFrequenciaPorTurma(),
@@ -50,7 +53,10 @@ export default async function DashboardPage() {
     getProximosTreinos(),
     getAtletasPorCategoria(),
     getSerieMensal(),
+    getAniversariantesDoMes(),
   ])
+
+  const mesAtualNome = new Date().toLocaleDateString("pt-BR", { month: "long" })
 
   const palette = [
     "var(--color-primary)",
@@ -307,7 +313,12 @@ export default async function DashboardPage() {
                   title={`${freqTurma.filter((t) => t.percentual < 75).length} atletas com frequência abaixo de 75%`}
                   href="/gestao/frequencia"
                 />
-                <Alerta icon={Info} tone="var(--color-info)" title="Aniversariantes da semana" href="/gestao/atletas" />
+                <Alerta
+                  icon={Cake}
+                  tone="var(--color-info)"
+                  title={`${aniversariantes.length} aniversariante(s) neste mês`}
+                  href="/gestao/atletas"
+                />
                 <Alerta icon={Gift} tone="var(--color-chart-5)" title="Bolsas: gerencie descontos por atleta" href="/gestao/atletas" />
               </ul>
               <Link
@@ -319,6 +330,55 @@ export default async function DashboardPage() {
               </Link>
             </Panel>
           </div>
+
+          {/* Aniversariantes do mês */}
+          <Panel
+            title="Aniversariantes do Mês"
+            action={
+              <span className="flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 text-xs capitalize text-muted-foreground">
+                <Cake className="h-3.5 w-3.5" /> {mesAtualNome}
+              </span>
+            }
+          >
+            {aniversariantes.length === 0 ? (
+              <EmptyState label="Nenhum aniversariante neste mês" />
+            ) : (
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {aniversariantes.map((a, i) => (
+                  <li
+                    key={i}
+                    className={
+                      a.ehHoje
+                        ? "flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/10 p-3"
+                        : "flex items-center gap-3 rounded-lg bg-secondary/50 p-3"
+                    }
+                  >
+                    <span
+                      className={
+                        a.ehHoje
+                          ? "flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-primary text-primary-foreground"
+                          : "flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-primary/15 text-primary"
+                      }
+                    >
+                      <span className="text-sm font-extrabold leading-none">{a.dia}</span>
+                      <span className="text-[9px] uppercase leading-none opacity-80">{mesAtualNome.slice(0, 3)}</span>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{a.nome}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {a.categoria} · {a.idade} anos
+                      </p>
+                    </div>
+                    {a.ehHoje && (
+                      <span className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground">
+                        <Cake className="h-3 w-3" /> Hoje
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
 
           {/* Distribuição por categoria */}
           <Panel title="Distribuição de Atletas por Categoria">
