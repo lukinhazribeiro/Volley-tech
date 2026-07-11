@@ -1,10 +1,12 @@
 import Link from "next/link"
-import { AlertTriangle, Clock, CheckCircle2, ChevronRight } from "lucide-react"
-import { brl, formatDate } from "@/lib/gestao/format"
+import { AlertTriangle, Clock, CheckCircle2, ChevronRight, MessageCircle } from "lucide-react"
+import { brl, formatDate, linkCobrancaWhatsapp } from "@/lib/gestao/format"
 
 type Item = {
   atletaId: number
   atletaNome: string
+  atletaTelefone: string | null
+  telefoneResponsavel: string | null
   turmaNome: string | null
   pendentes: number
   atrasadas: number
@@ -30,11 +32,17 @@ export function InadimplenciaPanel({ itens }: { itens: Item[] }) {
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {itens.map((a) => {
         const emAtraso = a.atrasadas > 0
+        const telefone = a.atletaTelefone || a.telefoneResponsavel
+        const linkWhats = linkCobrancaWhatsapp({
+          telefone,
+          nome: a.atletaNome,
+          totalDevido: a.totalDevido,
+          parcelasAtrasadas: a.atrasadas || a.pendentes,
+        })
         return (
-          <Link
+          <div
             key={a.atletaId}
-            href={`/gestao/atletas/${a.atletaId}`}
-            className={`group relative flex flex-col gap-3 rounded-2xl border p-4 shadow-lg shadow-black/20 transition-transform hover:scale-[1.01] ${
+            className={`group relative flex flex-col gap-3 rounded-2xl border p-4 shadow-lg shadow-black/20 ${
               emAtraso ? "border-destructive/50 bg-destructive/5" : "border-border bg-card"
             }`}
           >
@@ -70,17 +78,40 @@ export function InadimplenciaPanel({ itens }: { itens: Item[] }) {
               </div>
             </div>
 
-            <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
+            <div className="border-t border-border/60 pt-2 text-xs text-muted-foreground">
               <span>
                 {emAtraso
                   ? `${a.maiorAtrasoDias} dia(s) de atraso`
                   : `Vence em ${formatDate(a.vencimentoMaisAntigo)}`}
               </span>
-              <span className="flex items-center gap-1 font-medium text-primary group-hover:underline">
-                Confirmar pagamento <ChevronRight className="h-3.5 w-3.5" />
-              </span>
             </div>
-          </Link>
+
+            <div className="flex items-center gap-2">
+              {linkWhats ? (
+                <a
+                  href={linkWhats}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-success/15 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/25"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" /> Cobrar no WhatsApp
+                </a>
+              ) : (
+                <span
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-secondary px-3 py-2 text-xs font-medium text-muted-foreground"
+                  title="Cadastre o telefone do atleta ou do responsável"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" /> Sem telefone
+                </span>
+              )}
+              <Link
+                href={`/gestao/atletas/${a.atletaId}`}
+                className="flex items-center justify-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-secondary"
+              >
+                Confirmar <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
         )
       })}
     </div>

@@ -6,47 +6,60 @@ import { and, desc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
 /**
- * Garante que exista uma mensalidade por mês para cada atleta ativo,
+ * Garante que exista uma mensalidade por mês PARA CADA TURMA do atleta ativo,
  * da data de inscrição até 3 meses à frente do mês atual (previsão de receita).
- * Funciona independentemente de o atleta ter turma (LEFT JOIN). Idempotente:
- * nunca duplica competências já existentes e nunca altera pagamentos. Deve ser
- * chamada ao abrir as telas financeiras para manter histórico e previsão completos.
+ *
+ * O desconto/bolsa do atleta é aplicado sobre o total das turmas e distribuído
+ * proporcionalmente ao valor de cada turma, de modo que a soma das parcelas do mês
+ * seja igual ao valor final com desconto. Idempotente: nunca duplica (atleta,turma,competência)
+ * já existentes e nunca altera pagamentos. Deve ser chamada ao abrir as telas financeiras.
  */
 export async function sincronizarMensalidades() {
   await db.execute(sql`
+    WITH totais AS (
+      SELECT at.atleta_id, sum(at.valor) AS total_turmas
+      FROM atleta_turmas at
+      GROUP BY at.atleta_id
+    )
     INSERT INTO mensalidades (atleta_id, turma_id, competencia, valor, data_vencimento, status)
     SELECT
       a.id,
-      a.turma_id,
+      at.turma_id,
       to_char(m, 'YYYY-MM') AS competencia,
+      -- valor da turma menos a fatia proporcional do desconto do atleta
       round(
-        CASE a.desconto_tipo
-          WHEN 'percentual' THEN a.valor_mensalidade * (1 - LEAST(GREATEST(a.desconto_valor, 0), 100) / 100.0)
-          WHEN 'valor' THEN GREATEST(0, a.valor_mensalidade - a.desconto_valor)
-          ELSE a.valor_mensalidade
-        END, 2) AS valor,
+        GREATEST(0,
+          at.valor - (
+            CASE a.desconto_tipo
+              WHEN 'percentual' THEN at.valor * LEAST(GREATEST(a.desconto_valor, 0), 100) / 100.0
+              WHEN 'valor' THEN
+                CASE WHEN tot.total_turmas > 0
+                  THEN LEAST(a.desconto_valor, tot.total_turmas) * (at.valor / tot.total_turmas)
+                  ELSE 0 END
+              ELSE 0
+            END
+          )
+        ), 2) AS valor,
       (to_char(m, 'YYYY-MM') || '-' ||
         lpad(LEAST(GREATEST(COALESCE(t.dia_vencimento, EXTRACT(DAY FROM COALESCE(a.data_inscricao, a.created_at::date))::int), 1), 28)::text, 2, '0')
       )::date AS data_vencimento,
       'pendente'
     FROM atletas a
-    LEFT JOIN turmas t ON t.id = a.turma_id
+    JOIN atleta_turmas at ON at.atleta_id = a.id
+    JOIN totais tot ON tot.atleta_id = a.id
+    LEFT JOIN turmas t ON t.id = at.turma_id
     CROSS JOIN LATERAL generate_series(
       date_trunc('month', COALESCE(a.data_inscricao, a.created_at::date)),
       date_trunc('month', now()) + interval '3 months',
       interval '1 month'
     ) AS m
     WHERE a.ativo = true
-      AND (
-        CASE a.desconto_tipo
-          WHEN 'percentual' THEN a.valor_mensalidade * (1 - LEAST(GREATEST(a.desconto_valor, 0), 100) / 100.0)
-          WHEN 'valor' THEN GREATEST(0, a.valor_mensalidade - a.desconto_valor)
-          ELSE a.valor_mensalidade
-        END
-      ) > 0
+      AND at.valor > 0
       AND NOT EXISTS (
         SELECT 1 FROM mensalidades me
-        WHERE me.atleta_id = a.id AND me.competencia = to_char(m, 'YYYY-MM')
+        WHERE me.atleta_id = a.id
+          AND me.turma_id IS NOT DISTINCT FROM at.turma_id
+          AND me.competencia = to_char(m, 'YYYY-MM')
       )
   `)
 }
@@ -57,6 +70,8 @@ export async function listMensalidades(filtro?: "todas" | "pendente" | "pago" | 
       id: mensalidades.id,
       atletaId: mensalidades.atletaId,
       atletaNome: atletas.nome,
+      atletaTelefone: atletas.telefone,
+      telefoneResponsavel: atletas.telefoneResponsavel,
       turmaNome: turmas.nome,
       competencia: mensalidades.competencia,
       valor: mensalidades.valor,
@@ -116,6 +131,8 @@ export async function inadimplenciaPorAtleta() {
     {
       atletaId: number
       atletaNome: string
+      atletaTelefone: string | null
+      telefoneResponsavel: string | null
       turmaNome: string | null
       pendentes: number
       atrasadas: number
@@ -135,6 +152,8 @@ export async function inadimplenciaPorAtleta() {
     const atual = mapa.get(r.atletaId) ?? {
       atletaId: r.atletaId,
       atletaNome: r.atletaNome ?? "—",
+      atletaTelefone: r.atletaTelefone ?? null,
+      telefoneResponsavel: r.telefoneResponsavel ?? null,
       turmaNome: r.turmaNome,
       pendentes: 0,
       atrasadas: 0,

@@ -1,5 +1,13 @@
 import { AppShell } from "@/components/gestao/app-shell"
-import { frequenciaPorAtleta, frequenciaPorCategoria, frequenciaPorTurma } from "@/app/gestao/actions/frequencia"
+import {
+  frequenciaPorAtleta,
+  frequenciaPorCategoria,
+  frequenciaPorTurma,
+  frequenciaMensalPorTurma,
+  competenciasComPresenca,
+} from "@/app/gestao/actions/frequencia"
+import { competenciaAtual } from "@/lib/gestao/format"
+import { FrequenciaMensal } from "@/components/gestao/frequencia-mensal"
 
 export const dynamic = "force-dynamic"
 
@@ -28,17 +36,30 @@ function Barra({ nome, sub, percentual, total }: { nome: string; sub?: string; p
   )
 }
 
-export default async function FrequenciaPage() {
-  const [porTurma, porCategoria, porAtleta] = await Promise.all([
+export default async function FrequenciaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string }>
+}) {
+  const { mes } = await searchParams
+  const competencia = mes || competenciaAtual()
+
+  const [porTurma, porCategoria, porAtleta, mensalPorTurma, competencias] = await Promise.all([
     frequenciaPorTurma(),
     frequenciaPorCategoria(),
     frequenciaPorAtleta(),
+    frequenciaMensalPorTurma(competencia),
+    competenciasComPresenca(),
   ])
 
   const semDados = porTurma.every((t) => t.total === 0)
 
   return (
     <AppShell title="Frequência" subtitle="Percentual de presença por turma, categoria e atleta">
+      <div className="mb-6">
+        <FrequenciaMensal dados={mensalPorTurma} competencia={competencia} competencias={competencias} />
+      </div>
+
       {semDados ? (
         <div className="rounded-2xl border border-border bg-card py-16 text-center text-muted-foreground">
           Ainda não há chamadas registradas. Faça um check-in para gerar as estatísticas de frequência.

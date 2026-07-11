@@ -43,6 +43,14 @@ export const atletas = pgTable("atletas", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 })
 
+export const atletaTurmas = pgTable("atleta_turmas", {
+  id: serial("id").primaryKey(),
+  atletaId: integer("atleta_id").notNull(),
+  turmaId: integer("turma_id").notNull(),
+  valor: numeric("valor").notNull().default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+})
+
 export const presencas = pgTable("presencas", {
   id: serial("id").primaryKey(),
   atletaId: integer("atleta_id").notNull(),

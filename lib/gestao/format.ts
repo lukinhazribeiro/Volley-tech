@@ -59,3 +59,45 @@ export function formatDateShort(d: string | Date | null | undefined) {
   const date = typeof d === "string" ? new Date(d) : d
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
 }
+
+/**
+ * Normaliza um telefone brasileiro para o formato aceito pelo link do WhatsApp
+ * (apenas dígitos, com DDI 55). Retorna null quando o número é inválido.
+ */
+export function whatsappNumero(telefone: string | null | undefined): string | null {
+  if (!telefone) return null
+  let d = telefone.replace(/\D/g, "")
+  if (d.length < 10) return null
+  // Adiciona o DDI do Brasil se ainda não houver
+  if (!d.startsWith("55")) d = `55${d}`
+  return d
+}
+
+/**
+ * Monta a URL do WhatsApp (wa.me) com a mensagem de cobrança pré-preenchida.
+ * Retorna null quando não há número válido.
+ */
+export function linkCobrancaWhatsapp(opts: {
+  telefone: string | null | undefined
+  nome: string
+  totalDevido: number
+  parcelasAtrasadas: number
+  clube?: string
+}): string | null {
+  const numero = whatsappNumero(opts.telefone)
+  if (!numero) return null
+  const clube = opts.clube ?? "o clube"
+  const linhas = [
+    `Olá, ${opts.nome}! Tudo bem?`,
+    "",
+    opts.parcelasAtrasadas > 1
+      ? `Identificamos ${opts.parcelasAtrasadas} mensalidades em atraso, totalizando ${brl(opts.totalDevido)}.`
+      : `Identificamos uma mensalidade em atraso no valor de ${brl(opts.totalDevido)}.`,
+    "",
+    "Pode nos enviar o comprovante assim que regularizar? Qualquer dúvida, estamos à disposição.",
+    "",
+    `Obrigado! — ${clube}`,
+  ]
+  const texto = encodeURIComponent(linhas.join("\n"))
+  return `https://wa.me/${numero}?text=${texto}`
+}
