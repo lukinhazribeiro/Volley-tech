@@ -8,7 +8,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
   LineChart,
   Pie,
@@ -151,64 +150,93 @@ export function AnaliseCombinada({
     )
   }
 
+  const legenda = [
+    { label: "Receita", color: "var(--color-primary)", tipo: "área" },
+    { label: "Frequência", color: "var(--color-success)", tipo: "linha" },
+    { label: "Inadimplência", color: "var(--color-destructive)", tipo: "tracejada" },
+  ]
+
   return (
-    <ResponsiveContainer width="100%" height={320} initialDimension={{ width: 700, height: 320 }}>
-      <ComposedChart data={data} margin={{ top: 10, right: 8, left: -8, bottom: 0 }}>
-        <defs>
-          <linearGradient id="recGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.95} />
-            <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.55} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-        <XAxis dataKey="mes" stroke={AXIS} tickLine={false} axisLine={false} fontSize={12} />
-        <YAxis
-          yAxisId="left"
-          stroke={AXIS}
-          tickLine={false}
-          axisLine={false}
-          fontSize={11}
-          tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
-        />
-        <YAxis
-          yAxisId="right"
-          orientation="right"
-          stroke={AXIS}
-          tickLine={false}
-          axisLine={false}
-          fontSize={11}
-          domain={[0, 100]}
-          tickFormatter={(v) => `${v}%`}
-        />
-        <Tooltip content={<CombinadoTooltip />} cursor={{ fill: "var(--color-muted)", opacity: 0.25 }} />
-        <Legend
-          verticalAlign="top"
-          height={32}
-          iconType="circle"
-          wrapperStyle={{ fontSize: 12, color: "var(--color-muted-foreground)" }}
-        />
-        <Bar yAxisId="left" dataKey="recebido" name="Receita (R$)" fill="url(#recGrad)" radius={[5, 5, 0, 0]} barSize={26} />
-        <Line
-          yAxisId="right"
-          type="monotone"
-          dataKey="frequencia"
-          name="Frequência (%)"
-          stroke="var(--color-success)"
-          strokeWidth={2.5}
-          dot={{ r: 3, fill: "var(--color-success)" }}
-        />
-        <Line
-          yAxisId="right"
-          type="monotone"
-          dataKey="inadimplencia"
-          name="Inadimplência (%)"
-          stroke="var(--color-destructive)"
-          strokeWidth={2.5}
-          strokeDasharray="5 4"
-          dot={{ r: 3, fill: "var(--color-destructive)" }}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
+    <div>
+      {/* Legenda em pills, mais legível que a legenda padrão */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {legenda.map((l) => (
+          <span
+            key={l.label}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium text-foreground"
+          >
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: l.color }} />
+            {l.label}
+          </span>
+        ))}
+      </div>
+
+      <ResponsiveContainer width="100%" height={300} initialDimension={{ width: 700, height: 300 }}>
+        <ComposedChart data={data} margin={{ top: 8, right: 12, left: -6, bottom: 0 }}>
+          <defs>
+            <linearGradient id="recArea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="4 4" stroke="var(--color-border)" strokeOpacity={0.5} vertical={false} />
+          <XAxis dataKey="mes" stroke={AXIS} tickLine={false} axisLine={false} fontSize={12} dy={6} padding={{ left: 12, right: 12 }} />
+          <YAxis
+            yAxisId="left"
+            stroke={AXIS}
+            tickLine={false}
+            axisLine={false}
+            fontSize={11}
+            width={44}
+            tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            stroke={AXIS}
+            tickLine={false}
+            axisLine={false}
+            fontSize={11}
+            width={40}
+            domain={[0, 100]}
+            tickFormatter={(v) => `${v}%`}
+          />
+          <Tooltip content={<CombinadoTooltip />} cursor={{ stroke: "var(--color-border)", strokeWidth: 1 }} />
+          <Area
+            yAxisId="left"
+            type="monotone"
+            dataKey="recebido"
+            name="Receita"
+            stroke="var(--color-primary)"
+            strokeWidth={2.5}
+            fill="url(#recArea)"
+            dot={false}
+            activeDot={{ r: 5, strokeWidth: 0 }}
+          />
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="frequencia"
+            name="Frequência"
+            stroke="var(--color-success)"
+            strokeWidth={2.5}
+            dot={{ r: 3, fill: "var(--color-success)", strokeWidth: 0 }}
+            activeDot={{ r: 5 }}
+          />
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="inadimplencia"
+            name="Inadimplência"
+            stroke="var(--color-destructive)"
+            strokeWidth={2.5}
+            strokeDasharray="5 4"
+            dot={{ r: 3, fill: "var(--color-destructive)", strokeWidth: 0 }}
+            activeDot={{ r: 5 }}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 

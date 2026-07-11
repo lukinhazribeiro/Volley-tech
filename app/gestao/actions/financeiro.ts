@@ -7,9 +7,10 @@ import { revalidatePath } from "next/cache"
 
 /**
  * Garante que exista uma mensalidade por mês para cada atleta ativo,
- * da data de inscrição até o mês atual. Idempotente: nunca duplica
- * competências já existentes e nunca altera pagamentos. Deve ser chamada
- * ao abrir as telas financeiras para manter o histórico e a previsão sempre completos.
+ * da data de inscrição até 3 meses à frente do mês atual (previsão de receita).
+ * Funciona independentemente de o atleta ter turma (LEFT JOIN). Idempotente:
+ * nunca duplica competências já existentes e nunca altera pagamentos. Deve ser
+ * chamada ao abrir as telas financeiras para manter histórico e previsão completos.
  */
 export async function sincronizarMensalidades() {
   await db.execute(sql`
@@ -32,7 +33,7 @@ export async function sincronizarMensalidades() {
     LEFT JOIN turmas t ON t.id = a.turma_id
     CROSS JOIN LATERAL generate_series(
       date_trunc('month', COALESCE(a.data_inscricao, a.created_at::date)),
-      date_trunc('month', now()),
+      date_trunc('month', now()) + interval '3 months',
       interval '1 month'
     ) AS m
     WHERE a.ativo = true

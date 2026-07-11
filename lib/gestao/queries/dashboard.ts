@@ -104,6 +104,29 @@ export async function getMensalidadesAtraso() {
   }))
 }
 
+export async function getAniversariantesDoMes() {
+  const rows = await q(sql`
+    SELECT a.nome, a.data_nascimento, c.nome AS categoria,
+      EXTRACT(DAY FROM a.data_nascimento)::int AS dia,
+      date_part('year', age(a.data_nascimento))::int AS idade
+    FROM atletas a
+    LEFT JOIN categorias c ON c.id = a.categoria_id
+    WHERE a.ativo
+      AND a.data_nascimento IS NOT NULL
+      AND EXTRACT(MONTH FROM a.data_nascimento) = EXTRACT(MONTH FROM CURRENT_DATE)
+    ORDER BY dia
+  `)
+  const hojeDia = new Date().getUTCDate()
+  return rows.map((r) => ({
+    nome: r.nome as string,
+    categoria: (r.categoria as string) ?? "-",
+    dia: Number(r.dia),
+    // idade que a pessoa completa/completou neste ano
+    idade: Number(r.idade) + (Number(r.dia) >= hojeDia ? 1 : 0),
+    ehHoje: Number(r.dia) === hojeDia,
+  }))
+}
+
 export async function getProximosTreinos() {
   const rows = await q(sql`
     SELECT nome, horario, quadra FROM turmas WHERE ativo ORDER BY horario LIMIT 4
