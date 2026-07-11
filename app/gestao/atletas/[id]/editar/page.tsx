@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { AppShell } from "@/components/gestao/app-shell"
 import { AtletaForm } from "@/components/gestao/atleta-form"
-import { getAtleta, updateAtleta } from "@/app/gestao/actions/atletas"
+import { getAtleta, getVinculosAtleta, updateAtleta } from "@/app/gestao/actions/atletas"
 import { listTurmas } from "@/app/gestao/actions/turmas"
 import { listCategorias } from "@/app/gestao/actions/categorias"
 import type { DescontoTipo } from "@/lib/gestao/format"
@@ -13,7 +13,12 @@ export const dynamic = "force-dynamic"
 export default async function EditarAtletaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const atletaId = Number(id)
-  const [data, turmas, categorias] = await Promise.all([getAtleta(atletaId), listTurmas(), listCategorias()])
+  const [data, turmas, categorias, vinculos] = await Promise.all([
+    getAtleta(atletaId),
+    listTurmas(),
+    listCategorias(),
+    getVinculosAtleta(atletaId),
+  ])
   if (!data) notFound()
 
   const a = data.atleta
@@ -55,6 +60,7 @@ export default async function EditarAtletaPage({ params }: { params: Promise<{ i
             telefoneResponsavel: a.telefoneResponsavel,
             categoriaId: a.categoriaId,
             turmaId: a.turmaId,
+            vinculos: vinculos.map((v) => ({ turmaId: v.turmaId, valor: v.valor })),
             valorMensalidade: String(a.valorMensalidade),
             descontoTipo: a.descontoTipo as DescontoTipo,
             descontoValor: String(a.descontoValor),
