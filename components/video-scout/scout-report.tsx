@@ -96,6 +96,14 @@ const COLS: { group: string; cols: Col[] }[] = [
     cols: [
       { key: "blo_t", label: "T", get: (s) => fund(s, "bloqueio").total },
       { key: "blo_p", label: "Pt", get: (s) => fund(s, "bloqueio").pontos },
+      {
+        key: "blo_pos",
+        label: "Pos",
+        get: (s) => {
+          const b = fund(s, "bloqueio")
+          return b.total - b.pontos - b.erros
+        },
+      },
       { key: "blo_e", label: "Err", get: (s) => fund(s, "bloqueio").erros },
     ],
   },
