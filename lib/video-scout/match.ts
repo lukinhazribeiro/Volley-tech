@@ -47,11 +47,14 @@ export interface MatchState {
 export const BACK_ROW: Posicao[] = ["P1", "P6", "P5"]
 
 /**
- * Posições de fundo onde o líbero pode entrar. P1 é a posição de saque:
- * o líbero NÃO pode sacar, então ele só assume o central depois que este
- * deixa o saque (rotaciona de P1 para P6). Por isso P1 fica de fora.
+ * Posições de fundo onde o líbero reveza o central. Inclui as três posições de
+ * fundo (P1, P6, P5). A regra do saque é tratada à parte em `liberoEntraNaPosicao`:
+ * o líbero NÃO pode sacar, então, enquanto a equipe está SACANDO, o central
+ * permanece na P1 para executar o saque; assim que a equipe deixa de sacar
+ * (a outra equipe passa a sacar), o líbero assume a P1 imediatamente — sem
+ * precisar esperar a próxima rotação.
  */
-export const LIBERO_POSICOES: Posicao[] = ["P6", "P5"]
+export const LIBERO_POSICOES: Posicao[] = ["P1", "P6", "P5"]
 
 const FRONT_ROW: Posicao[] = ["P4", "P3", "P2"]
 
@@ -205,21 +208,28 @@ export function isFrontRow(pos: Posicao): boolean {
 
 /**
  * Indica se a posição deve ser ocupada pelo líbero neste momento:
- * há líbero definido, a posição é de fundo permitida (P6/P5, nunca P1/saque)
- * e o atleta-base ali é um central que o líbero reveza.
+ * há líbero definido, a posição é de fundo (P1/P6/P5) e o atleta-base ali é um
+ * central que o líbero reveza.
  *
- * Como P1 (saque) fica de fora, o central que rotaciona para o saque continua
- * em quadra e saca; só ao passar para P6 é que o líbero entra automaticamente.
- * Isso garante que o líbero nunca saca e só troca o central depois do saque.
+ * Regra do saque: na P1 (posição de saque) o líbero só entra quando a equipe
+ * NÃO está sacando (`isServing = false`). Enquanto a equipe saca, o central
+ * permanece na P1 para executar o saque (o líbero não pode sacar). Assim que a
+ * outra equipe assume o saque, o líbero cobre a P1 imediatamente na recepção —
+ * sem esperar a próxima rotação, evitando o erro de coleta.
  */
-export function liberoEntraNaPosicao(team: TeamConfig, posicao: Posicao): boolean {
+export function liberoEntraNaPosicao(
+  team: TeamConfig,
+  posicao: Posicao,
+  isServing = true,
+): boolean {
   const base = team.formation[posicao]
-  return Boolean(
-    team.liberoId &&
-      LIBERO_POSICOES.includes(posicao) &&
-      base &&
-      team.liberoReplaces.includes(base),
+  const reveza = Boolean(
+    team.liberoId && LIBERO_POSICOES.includes(posicao) && base && team.liberoReplaces.includes(base),
   )
+  if (!reveza) return false
+  // Na posição de saque, o líbero só entra quando a equipe não está sacando.
+  if (posicao === "P1" && isServing) return false
+  return true
 }
 
 /**
@@ -228,10 +238,11 @@ export function liberoEntraNaPosicao(team: TeamConfig, posicao: Posicao): boolea
  */
 export function effectiveFormation(
   team: TeamConfig,
+  isServing = true,
 ): Record<Posicao, { playerId: string | null; isLibero: boolean }> {
   const out = {} as Record<Posicao, { playerId: string | null; isLibero: boolean }>
   for (const pos of POSICAO_ORDER) {
-    if (liberoEntraNaPosicao(team, pos)) {
+    if (liberoEntraNaPosicao(team, pos, isServing)) {
       out[pos] = { playerId: team.liberoId, isLibero: true }
     } else {
       out[pos] = { playerId: team.formation[pos], isLibero: false }
@@ -241,8 +252,8 @@ export function effectiveFormation(
 }
 
 /** Atleta que ocupa a posição naquele momento (líbero incluído). */
-export function onCourtPlayerId(team: TeamConfig, posicao: Posicao): string | null {
-  return liberoEntraNaPosicao(team, posicao) ? team.liberoId : team.formation[posicao]
+export function onCourtPlayerId(team: TeamConfig, posicao: Posicao, isServing = true): string | null {
+  return liberoEntraNaPosicao(team, posicao, isServing) ? team.liberoId : team.formation[posicao]
 }
 
 /**
@@ -254,8 +265,9 @@ export function resolvePlayerId(
   team: TeamConfig,
   posicao: Posicao,
   _fundamento: Fundamento,
+  isServing = true,
 ): string | null {
-  return onCourtPlayerId(team, posicao)
+  return onCourtPlayerId(team, posicao, isServing)
 }
 
 export interface RecordInput {
@@ -314,6 +326,8 @@ function ataqueZonaFromPlayer(team: TeamConfig, posicao: Posicao, playerId: stri
  * Classifica automaticamente o tipo de defesa pelo contexto do rally:
  * - após ataque do adversário → "ataque" (defesa de ataque);
  * - após toque de bloqueio da própria equipe → "recuperacao";
+ * - após ataque da PRÓPRIA equipe → "recuperacao" (a bola voltou do bloqueio/
+ *   rede e a mesma equipe recuperou);
  * - após passe/bola fácil do adversário → "volume".
  */
 function defesaTipoAuto(actions: ScoutAction[], team: TeamSide): string {
@@ -321,6 +335,7 @@ function defesaTipoAuto(actions: ScoutAction[], team: TeamSide): string {
   if (!ultima) return "volume"
   if (ultima.fundamento === "ataque" && ultima.team && ultima.team !== team) return "ataque"
   if (ultima.fundamento === "bloqueio" && ultima.team === team) return "recuperacao"
+  if (ultima.fundamento === "ataque" && ultima.team === team) return "recuperacao"
   return "volume"
 }
 
@@ -344,8 +359,15 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   // independentemente da posição clicada pelo operador.
   const posicao: Posicao = input.fundamento === "saque" ? "P1" : input.posicao
 
+  // A equipe está sacando neste momento? Isso define se o líbero entra na P1.
+  // No saque, quem executa é a própria equipe que saca. Nas demais ações, usamos
+  // a equipe que detém o saque no rally (state.servingTeam). Quando ainda não há
+  // saque definido (início do set), assumimos que o central fica na P1.
+  const teamServing = state.servingTeam === null ? null : state.servingTeam === input.team
+  const isServing = input.fundamento === "saque" ? true : teamServing ?? true
+
   // Atleta que executa a ação (formação efetiva já aplica o líbero no fundo).
-  const playerId = resolvePlayerId(team, posicao, input.fundamento)
+  const playerId = resolvePlayerId(team, posicao, input.fundamento, isServing)
 
   // Bola de segunda: o levantador ataca pela rede. Identificado pela FUNÇÃO do
   // atleta (não pela posição fixa), então vale em qualquer rotação em que o
@@ -365,7 +387,7 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
     const noRally = state.actions.filter((a) => a.rallyId === rallyId && a.team === input.team)
     const ultima = noRally[noRally.length - 1]
     if (!ultima || ultima.fundamento !== "levantamento") {
-      const setterId = onCourtPlayerId(team, team.setterPosicao)
+      const setterId = onCourtPlayerId(team, team.setterPosicao, isServing)
       novas.push({
         id: uid("act"),
         rallyId,
@@ -401,13 +423,37 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
     detalhe = input.detalhe ?? null
   }
 
+  // Regra do bloqueio: um BLOCK logo após um ataque/recepção da OUTRA equipe
+  // significa que aquela ação foi bloqueada. A ação anterior vira erro (ataque =
+  // "bloqueado"/erro de ataque; passe = erro de recepção) e o ponto vai para a
+  // equipe que bloqueou. Só vale quando o bloqueio não foi marcado como erro.
+  let blockedIdx = -1
+  if (input.fundamento === "bloqueio" && input.qualidade !== "erro") {
+    const other: TeamSide = input.team === "casa" ? "adversario" : "casa"
+    for (let i = state.actions.length - 1; i >= 0; i--) {
+      const a = state.actions[i]
+      if (a.rallyId !== rallyId) break
+      if (a.team !== other) continue
+      if (
+        (a.fundamento === "ataque" || a.fundamento === "recepcao") &&
+        a.qualidade !== "ponto" &&
+        a.qualidade !== "erro"
+      ) {
+        blockedIdx = i
+      }
+      break
+    }
+  }
+  // Quando o bloqueio anula um ataque/recepção adversário, ele é o ponto do rally.
+  const mainQualidade: Qualidade = blockedIdx >= 0 ? "ponto" : input.qualidade
+
   novas.push({
     id: uid("act"),
     rallyId,
     timestamp: ts,
     fundamento: input.fundamento,
-    resultado: qualidadeToResultado(input.qualidade),
-    qualidade: input.qualidade,
+    resultado: qualidadeToResultado(mainQualidade),
+    qualidade: mainQualidade,
     detalhe,
     playerId,
     posicao,
@@ -418,16 +464,34 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
 
   const actions = [...state.actions, ...novas]
 
+  // Marca a ação bloqueada da outra equipe como erro (contabiliza no scout do
+  // atacante/passador), sem pontuar de novo — o ponto já é do bloqueio.
+  if (blockedIdx >= 0) {
+    const alvo = actions[blockedIdx]
+    actions[blockedIdx] = {
+      ...alvo,
+      qualidade: "erro",
+      resultado: "erro",
+      detalhe: alvo.fundamento === "ataque" ? "bloqueado" : alvo.detalhe ?? null,
+    }
+  }
+
   // Pontuação por regra: ponto → equipe da ação pontua; erro → adversário pontua.
   let scoringTeam: TeamSide | null = null
-  if (input.qualidade === "ponto") {
+  if (mainQualidade === "ponto") {
     scoringTeam = input.team
-  } else if (input.qualidade === "erro") {
+  } else if (mainQualidade === "erro") {
     scoringTeam = input.team === "casa" ? "adversario" : "casa"
   }
 
   if (scoringTeam) {
     return { ...state, actions, ...applyScoring(state, scoringTeam) }
+  }
+  // Ao registrar um saque (que não encerrou o rally), marcamos quem detém o
+  // saque. Isso faz o líbero da equipe que recebe assumir a P1 imediatamente,
+  // sem esperar a próxima rotação.
+  if (input.fundamento === "saque") {
+    return { ...state, actions, servingTeam: input.team }
   }
   return { ...state, actions }
 }

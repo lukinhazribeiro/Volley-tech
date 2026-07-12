@@ -52,6 +52,7 @@ const PONTO_FUNDS: { fundamento: Fundamento; label: string }[] = [
 const ERRO_FUNDS: { fundamento: Fundamento; label: string }[] = [
   { fundamento: "saque", label: "Saque" },
   { fundamento: "recepcao", label: "Recepção" },
+  { fundamento: "levantamento", label: "Levantamento" },
   { fundamento: "ataque", label: "Ataque" },
   { fundamento: "bloqueio", label: "Bloqueio" },
   { fundamento: "defesa", label: "Defesa" },
@@ -62,6 +63,8 @@ type Pending = { kind: "fundamento"; quality: Qualidade } | null
 interface PanelTeamProps {
   team: TeamConfig
   accent: "blue" | "pink"
+  /** Se esta equipe está sacando agora (define se o líbero cobre a P1). */
+  isServing: boolean
   onRecord: (payload: RecordPayload) => void
   /** Converte a última ação positiva da equipe em ponto/erro. */
   onAmend: (quality: "ponto" | "erro") => void
@@ -74,6 +77,7 @@ interface PanelTeamProps {
 export function PanelTeam({
   team,
   accent,
+  isServing,
   onRecord,
   onAmend,
   canAmend,
@@ -89,7 +93,8 @@ export function PanelTeam({
   const accentBorder = accent === "blue" ? "border-blue-200" : "border-pink-200"
 
   // Formação efetiva: aplica a troca automática do líbero no fundo.
-  const eff = effectiveFormation(team)
+  // O estado de saque define se o líbero cobre a P1 (só quando não está sacando).
+  const eff = effectiveFormation(team, isServing)
 
   function numberAt(pos: Posicao): string {
     const p = findPlayer(team, eff[pos].playerId)
@@ -136,9 +141,21 @@ export function PanelTeam({
     setHint(null)
   }
 
+  /**
+   * Atalho: levantamento (neutro). Registra um levantamento atribuído ao
+   * levantador (posição do setter), sem abrir o submenu — rápido logo após o
+   * passe. Fica NEUTRO: se foi erro, toque ERRO; se a levantadora fez o ponto
+   * (ex.: largada de 2ª bola), toque PONTO. Caso contrário, segue o rally.
+   */
+  function handleLevantamento() {
+    onRecord({ posicao: team.setterPosicao, fundamento: "levantamento", qualidade: "positivo" })
+    setPending(null)
+    setHint("ATAQUE")
+  }
+
   // Qual atleta vai receber a ação (com líbero quando aplicável).
   function previewPlayer(): string {
-    const id = onCourtPlayerId(team, activePos)
+    const id = onCourtPlayerId(team, activePos, isServing)
     const p = findPlayer(team, id)
     if (!p) return "—"
     const isLibero = id === team.liberoId
@@ -236,6 +253,16 @@ export function PanelTeam({
             </button>
           ))}
         </div>
+
+        {/* Atalho rápido: levantamento neutro (atribuído ao levantador).
+            Depois toque ERRO (se errou) ou PONTO (se a levantadora pontuou). */}
+        <button
+          type="button"
+          onClick={handleLevantamento}
+          className="mt-2.5 flex min-h-12 w-full touch-manipulation select-none items-center justify-center rounded-xl border-2 border-indigo-300 bg-indigo-50 px-2 py-3 text-sm font-extrabold uppercase tracking-wide text-indigo-700 shadow-sm transition-all hover:bg-indigo-100 active:scale-95 active:shadow-none"
+        >
+          Levantamento
+        </button>
       </div>
 
       {/* Seletor de posição da ação + PONTO */}
