@@ -57,12 +57,22 @@ export function LoginScreen() {
     setInfo(null)
     try {
       const supabase = createClient()
+      // IMPORTANTE: sempre voltamos para o MESMO endereço em que o usuário está
+      // (domínio próprio, preview ou localhost). Só usamos a URL de
+      // desenvolvimento quando realmente estamos em localhost — caso contrário
+      // o login no domínio próprio voltaria para o endereço de dev e a sessão
+      // se perderia.
+      const isLocalhost =
+        typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+      const redirectTo =
+        isLocalhost && process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL
+          ? process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL
+          : `${window.location.origin}/auth/callback`
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/callback`,
-        },
+        options: { redirectTo },
       })
       if (error) throw error
       // Redirecionamento para o Google acontece automaticamente.
@@ -288,5 +298,9 @@ function translateError(message: string) {
   if (message.includes("User already registered")) return "Este email já está cadastrado. Faça login."
   if (message.includes("Email not confirmed")) return "Confirme seu email antes de entrar."
   if (message.includes("Password should be")) return "A senha deve ter pelo menos 6 caracteres."
+  if (/provider is not enabled|Unsupported provider|validation_failed/i.test(message))
+    return "O login com Google ainda não está ativado no Supabase. Ative em Authentication → Providers → Google."
+  if (/redirect|not allowed|url/i.test(message))
+    return "Endereço de retorno não autorizado. Adicione a URL do seu site nas Redirect URLs do Supabase (Authentication → URL Configuration)."
   return message
 }
