@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
 import { PixPayment } from "@/components/hub/pix-payment"
+import { CardPaymentForm } from "@/components/hub/card-payment"
 import { formatPrice, type AccessState } from "@/lib/subscription"
 import { Check, QrCode, CreditCard } from "lucide-react"
 
@@ -16,27 +16,7 @@ export function PaywallScreen({
   access: AccessState
   onSignOut: () => void
 }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [method, setMethod] = useState<"pix" | "mp">("pix")
-
-  const handleSubscribe = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/subscription/checkout", { method: "POST" })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Não foi possível iniciar a assinatura.")
-      if (data.init_point) {
-        window.location.href = data.init_point
-      } else {
-        throw new Error("Resposta inválida do Mercado Pago.")
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao iniciar a assinatura.")
-      setLoading(false)
-    }
-  }
 
   const expiredTrial = access.status === "expired"
 
@@ -100,27 +80,7 @@ export function PaywallScreen({
           </div>
 
           <div className="mt-4">
-            {method === "pix" ? (
-              <PixPayment />
-            ) : (
-              <>
-                {error && (
-                  <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-center text-sm text-red-600" role="alert">
-                    {error}
-                  </p>
-                )}
-                <Button
-                  onClick={handleSubscribe}
-                  disabled={loading}
-                  className="h-12 w-full bg-orange-600 text-base font-semibold text-white hover:bg-orange-700"
-                >
-                  {loading ? "Redirecionando..." : "Assinar com Mercado Pago"}
-                </Button>
-                <p className="mt-3 text-center text-xs text-slate-500">
-                  Cobrança recorrente mensal vinculada a <span className="font-medium">{email}</span>.
-                </p>
-              </>
-            )}
+            {method === "pix" ? <PixPayment /> : <CardPaymentForm email={email} />}
           </div>
         </div>
 
