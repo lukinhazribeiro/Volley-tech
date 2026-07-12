@@ -141,6 +141,16 @@ export function PanelTeam({
     setHint(null)
   }
 
+  /**
+   * Atalho: erro de levantamento. Registra direto, atribuído ao levantador
+   * (posição do setter), sem abrir o submenu — para ser rápido logo após o passe.
+   */
+  function handleErroLevantamento() {
+    onRecord({ posicao: team.setterPosicao, fundamento: "levantamento", qualidade: "erro" })
+    setPending(null)
+    setHint(null)
+  }
+
   // Qual atleta vai receber a ação (com líbero quando aplicável).
   function previewPlayer(): string {
     const id = onCourtPlayerId(team, activePos, isServing)
@@ -241,6 +251,15 @@ export function PanelTeam({
             </button>
           ))}
         </div>
+
+        {/* Atalho rápido: erro de levantamento (atribuído ao levantador) */}
+        <button
+          type="button"
+          onClick={handleErroLevantamento}
+          className="mt-2.5 flex min-h-12 w-full touch-manipulation select-none items-center justify-center rounded-xl border-2 border-purple-300 bg-purple-50 px-2 py-3 text-sm font-extrabold uppercase tracking-wide text-purple-700 shadow-sm transition-all hover:bg-purple-100 active:scale-95 active:shadow-none"
+        >
+          Erro de levantamento
+        </button>
       </div>
 
       {/* Seletor de posição da ação + PONTO */}
