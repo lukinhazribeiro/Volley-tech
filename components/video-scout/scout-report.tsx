@@ -77,7 +77,10 @@ const COLS: { group: string; cols: Col[] }[] = [
   },
   {
     group: "Lev.",
-    cols: [{ key: "lev_t", label: "T", get: (s) => fund(s, "levantamento").total }],
+    cols: [
+      { key: "lev_t", label: "T", get: (s) => fund(s, "levantamento").total },
+      { key: "lev_e", label: "Err", get: (s) => fund(s, "levantamento").erros },
+    ],
   },
   {
     group: "Ataque",

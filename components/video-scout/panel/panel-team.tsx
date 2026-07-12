@@ -142,13 +142,15 @@ export function PanelTeam({
   }
 
   /**
-   * Atalho: erro de levantamento. Registra direto, atribuído ao levantador
-   * (posição do setter), sem abrir o submenu — para ser rápido logo após o passe.
+   * Atalho: levantamento (neutro). Registra um levantamento atribuído ao
+   * levantador (posição do setter), sem abrir o submenu — rápido logo após o
+   * passe. Fica NEUTRO: se foi erro, toque ERRO; se a levantadora fez o ponto
+   * (ex.: largada de 2ª bola), toque PONTO. Caso contrário, segue o rally.
    */
-  function handleErroLevantamento() {
-    onRecord({ posicao: team.setterPosicao, fundamento: "levantamento", qualidade: "erro" })
+  function handleLevantamento() {
+    onRecord({ posicao: team.setterPosicao, fundamento: "levantamento", qualidade: "positivo" })
     setPending(null)
-    setHint(null)
+    setHint("ATAQUE")
   }
 
   // Qual atleta vai receber a ação (com líbero quando aplicável).
@@ -252,13 +254,14 @@ export function PanelTeam({
           ))}
         </div>
 
-        {/* Atalho rápido: erro de levantamento (atribuído ao levantador) */}
+        {/* Atalho rápido: levantamento neutro (atribuído ao levantador).
+            Depois toque ERRO (se errou) ou PONTO (se a levantadora pontuou). */}
         <button
           type="button"
-          onClick={handleErroLevantamento}
-          className="mt-2.5 flex min-h-12 w-full touch-manipulation select-none items-center justify-center rounded-xl border-2 border-purple-300 bg-purple-50 px-2 py-3 text-sm font-extrabold uppercase tracking-wide text-purple-700 shadow-sm transition-all hover:bg-purple-100 active:scale-95 active:shadow-none"
+          onClick={handleLevantamento}
+          className="mt-2.5 flex min-h-12 w-full touch-manipulation select-none items-center justify-center rounded-xl border-2 border-indigo-300 bg-indigo-50 px-2 py-3 text-sm font-extrabold uppercase tracking-wide text-indigo-700 shadow-sm transition-all hover:bg-indigo-100 active:scale-95 active:shadow-none"
         >
-          Erro de levantamento
+          Levantamento
         </button>
       </div>
 
