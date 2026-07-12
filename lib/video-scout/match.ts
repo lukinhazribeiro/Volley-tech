@@ -47,11 +47,13 @@ export interface MatchState {
 export const BACK_ROW: Posicao[] = ["P1", "P6", "P5"]
 
 /**
- * Posições de fundo onde o líbero pode entrar. P1 é a posição de saque:
- * o líbero NÃO pode sacar, então ele só assume o central depois que este
- * deixa o saque (rotaciona de P1 para P6). Por isso P1 fica de fora.
+ * Posições de fundo onde o líbero pode entrar: as três de fundo (P1/P6/P5).
+ * O P1 é a posição de saque e tem tratamento especial: enquanto a equipe está
+ * SACANDO, o central permanece no P1 para sacar (o líbero não pode sacar).
+ * Assim que a equipe PERDE o saque, o líbero assume o central no P1
+ * imediatamente — sem esperar a próxima rotação (ver liberoEntraNaPosicao).
  */
-export const LIBERO_POSICOES: Posicao[] = ["P6", "P5"]
+export const LIBERO_POSICOES: Posicao[] = ["P1", "P6", "P5"]
 
 const FRONT_ROW: Posicao[] = ["P4", "P3", "P2"]
 
@@ -205,33 +207,41 @@ export function isFrontRow(pos: Posicao): boolean {
 
 /**
  * Indica se a posição deve ser ocupada pelo líbero neste momento:
- * há líbero definido, a posição é de fundo permitida (P6/P5, nunca P1/saque)
- * e o atleta-base ali é um central que o líbero reveza.
+ * há líbero definido, a posição é de fundo (P1/P6/P5) e o atleta-base ali é
+ * um central que o líbero reveza.
  *
- * Como P1 (saque) fica de fora, o central que rotaciona para o saque continua
- * em quadra e saca; só ao passar para P6 é que o líbero entra automaticamente.
- * Isso garante que o líbero nunca saca e só troca o central depois do saque.
+ * Regra do P1 (posição de saque): enquanto a equipe está SACANDO, o central
+ * permanece no P1 para sacar (o líbero não pode sacar), então a troca não
+ * acontece. Quando a equipe NÃO está sacando (perdeu o saque por qualquer
+ * motivo, ou está recebendo), o líbero assume o central no P1 imediatamente —
+ * sem precisar esperar a próxima rotação. Isso corrige o erro de coleta em que
+ * o central seguia registrando ações de fundo que já eram do líbero.
  */
-export function liberoEntraNaPosicao(team: TeamConfig, posicao: Posicao): boolean {
+export function liberoEntraNaPosicao(
+  team: TeamConfig,
+  posicao: Posicao,
+  isServing = true,
+): boolean {
   const base = team.formation[posicao]
-  return Boolean(
-    team.liberoId &&
-      LIBERO_POSICOES.includes(posicao) &&
-      base &&
-      team.liberoReplaces.includes(base),
-  )
+  if (!team.liberoId || !base || !team.liberoReplaces.includes(base)) return false
+  if (!LIBERO_POSICOES.includes(posicao)) return false
+  // No P1, o líbero só entra quando a equipe NÃO está sacando.
+  if (posicao === "P1" && isServing) return false
+  return true
 }
 
 /**
  * Formação efetiva em quadra: para cada posição, o atleta que realmente está
  * jogando ali agora (aplicando a troca automática do líbero no fundo).
+ * `isServing` indica se a equipe está sacando (afeta a troca no P1).
  */
 export function effectiveFormation(
   team: TeamConfig,
+  isServing = true,
 ): Record<Posicao, { playerId: string | null; isLibero: boolean }> {
   const out = {} as Record<Posicao, { playerId: string | null; isLibero: boolean }>
   for (const pos of POSICAO_ORDER) {
-    if (liberoEntraNaPosicao(team, pos)) {
+    if (liberoEntraNaPosicao(team, pos, isServing)) {
       out[pos] = { playerId: team.liberoId, isLibero: true }
     } else {
       out[pos] = { playerId: team.formation[pos], isLibero: false }
@@ -241,8 +251,15 @@ export function effectiveFormation(
 }
 
 /** Atleta que ocupa a posição naquele momento (líbero incluído). */
-export function onCourtPlayerId(team: TeamConfig, posicao: Posicao): string | null {
-  return liberoEntraNaPosicao(team, posicao) ? team.liberoId : team.formation[posicao]
+export function onCourtPlayerId(team: TeamConfig, posicao: Posicao, isServing = true): string | null {
+  return liberoEntraNaPosicao(team, posicao, isServing) ? team.liberoId : team.formation[posicao]
+}
+
+/** Indica se a equipe detém o saque agora (regra do líbero no P1).
+ * Antes do primeiro saque (servingTeam nulo) tratamos ambas como sacando,
+ * mantendo o central no P1 até o saque definir a posse. */
+export function teamEstaSacando(state: MatchState, side: TeamSide): boolean {
+  return state.servingTeam === null || state.servingTeam === side
 }
 
 /**
