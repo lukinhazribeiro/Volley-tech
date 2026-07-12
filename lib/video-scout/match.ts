@@ -326,6 +326,8 @@ function ataqueZonaFromPlayer(team: TeamConfig, posicao: Posicao, playerId: stri
  * Classifica automaticamente o tipo de defesa pelo contexto do rally:
  * - após ataque do adversário → "ataque" (defesa de ataque);
  * - após toque de bloqueio da própria equipe → "recuperacao";
+ * - após ataque da PRÓPRIA equipe → "recuperacao" (a bola voltou do bloqueio/
+ *   rede e a mesma equipe recuperou);
  * - após passe/bola fácil do adversário → "volume".
  */
 function defesaTipoAuto(actions: ScoutAction[], team: TeamSide): string {
@@ -333,6 +335,7 @@ function defesaTipoAuto(actions: ScoutAction[], team: TeamSide): string {
   if (!ultima) return "volume"
   if (ultima.fundamento === "ataque" && ultima.team && ultima.team !== team) return "ataque"
   if (ultima.fundamento === "bloqueio" && ultima.team === team) return "recuperacao"
+  if (ultima.fundamento === "ataque" && ultima.team === team) return "recuperacao"
   return "volume"
 }
 
@@ -420,13 +423,37 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
     detalhe = input.detalhe ?? null
   }
 
+  // Regra do bloqueio: um BLOCK logo após um ataque/recepção da OUTRA equipe
+  // significa que aquela ação foi bloqueada. A ação anterior vira erro (ataque =
+  // "bloqueado"/erro de ataque; passe = erro de recepção) e o ponto vai para a
+  // equipe que bloqueou. Só vale quando o bloqueio não foi marcado como erro.
+  let blockedIdx = -1
+  if (input.fundamento === "bloqueio" && input.qualidade !== "erro") {
+    const other: TeamSide = input.team === "casa" ? "adversario" : "casa"
+    for (let i = state.actions.length - 1; i >= 0; i--) {
+      const a = state.actions[i]
+      if (a.rallyId !== rallyId) break
+      if (a.team !== other) continue
+      if (
+        (a.fundamento === "ataque" || a.fundamento === "recepcao") &&
+        a.qualidade !== "ponto" &&
+        a.qualidade !== "erro"
+      ) {
+        blockedIdx = i
+      }
+      break
+    }
+  }
+  // Quando o bloqueio anula um ataque/recepção adversário, ele é o ponto do rally.
+  const mainQualidade: Qualidade = blockedIdx >= 0 ? "ponto" : input.qualidade
+
   novas.push({
     id: uid("act"),
     rallyId,
     timestamp: ts,
     fundamento: input.fundamento,
-    resultado: qualidadeToResultado(input.qualidade),
-    qualidade: input.qualidade,
+    resultado: qualidadeToResultado(mainQualidade),
+    qualidade: mainQualidade,
     detalhe,
     playerId,
     posicao,
@@ -437,11 +464,23 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
 
   const actions = [...state.actions, ...novas]
 
+  // Marca a ação bloqueada da outra equipe como erro (contabiliza no scout do
+  // atacante/passador), sem pontuar de novo — o ponto já é do bloqueio.
+  if (blockedIdx >= 0) {
+    const alvo = actions[blockedIdx]
+    actions[blockedIdx] = {
+      ...alvo,
+      qualidade: "erro",
+      resultado: "erro",
+      detalhe: alvo.fundamento === "ataque" ? "bloqueado" : alvo.detalhe ?? null,
+    }
+  }
+
   // Pontuação por regra: ponto → equipe da ação pontua; erro → adversário pontua.
   let scoringTeam: TeamSide | null = null
-  if (input.qualidade === "ponto") {
+  if (mainQualidade === "ponto") {
     scoringTeam = input.team
-  } else if (input.qualidade === "erro") {
+  } else if (mainQualidade === "erro") {
     scoringTeam = input.team === "casa" ? "adversario" : "casa"
   }
 

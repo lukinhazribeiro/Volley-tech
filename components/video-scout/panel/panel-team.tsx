@@ -52,6 +52,7 @@ const PONTO_FUNDS: { fundamento: Fundamento; label: string }[] = [
 const ERRO_FUNDS: { fundamento: Fundamento; label: string }[] = [
   { fundamento: "saque", label: "Saque" },
   { fundamento: "recepcao", label: "Recepção" },
+  { fundamento: "levantamento", label: "Levantamento" },
   { fundamento: "ataque", label: "Ataque" },
   { fundamento: "bloqueio", label: "Bloqueio" },
   { fundamento: "defesa", label: "Defesa" },
