@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Sparkles, Check, Loader2, ShieldCheck } from "lucide-react"
+import { Sparkles, Check, ShieldCheck, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { PaymentOptions } from "@/components/hub/payment-options"
 import {
   resolveAccess,
   resolveAccessFromCreatedAt,
@@ -16,8 +17,8 @@ import {
 export function TrialBanner() {
   const [access, setAccess] = useState<AccessState | null>(null)
   const [free, setFree] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [email, setEmail] = useState("")
+  const [showOptions, setShowOptions] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -26,6 +27,8 @@ export function TrialBanner() {
     supabase.auth.getUser().then(async ({ data }) => {
       const user = data.user
       if (!user || !mounted) return
+
+      setEmail(user.email ?? "")
 
       if (isFreeAccessEmail(user.email)) {
         setFree(true)
@@ -49,24 +52,6 @@ export function TrialBanner() {
       mounted = false
     }
   }, [])
-
-  const handleSubscribe = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/subscription/checkout", { method: "POST" })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Não foi possível iniciar a assinatura.")
-      if (data.init_point) {
-        window.location.href = data.init_point
-      } else {
-        throw new Error("Resposta inválida do Mercado Pago.")
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao iniciar a assinatura.")
-      setLoading(false)
-    }
-  }
 
   // E-mails isentos ou assinantes ativos não veem o convite de assinatura.
   if (free) return null
@@ -117,20 +102,41 @@ export function TrialBanner() {
             <span className="text-sm text-[var(--hub-muted)]">/mês</span>
           </div>
           <button
-            onClick={handleSubscribe}
-            disabled={loading}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--hub-accent)] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            onClick={() => setShowOptions(true)}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--hub-accent)] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {loading ? "Redirecionando..." : "Assinar plano mensal"}
+            Assinar plano mensal
           </button>
-          {error && (
-            <p className="text-center text-xs text-red-500" role="alert">
-              {error}
-            </p>
-          )}
         </div>
       </div>
+
+      {/* Modal com escolha de forma de pagamento (Pix ou Cartão) */}
+      {showOptions && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Escolha a forma de pagamento"
+          onClick={() => setShowOptions(false)}
+        >
+          <div
+            className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">Escolha como pagar</h3>
+              <button
+                onClick={() => setShowOptions(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <PaymentOptions email={email} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
