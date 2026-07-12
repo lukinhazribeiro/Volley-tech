@@ -423,12 +423,14 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
     detalhe = input.detalhe ?? null
   }
 
-  // Regra do bloqueio: um BLOCK logo após um ataque/recepção da OUTRA equipe
-  // significa que aquela ação foi bloqueada. A ação anterior vira erro (ataque =
-  // "bloqueado"/erro de ataque; passe = erro de recepção) e o ponto vai para a
-  // equipe que bloqueou. Só vale quando o bloqueio não foi marcado como erro.
+  // Regra do bloqueio:
+  // - Bloqueio de PONTO: o ataque/recepção adversário anterior foi bloqueado;
+  //   aquela ação vira erro (ataque = "bloqueado"; passe = erro de recepção) e o
+  //   ponto vai para quem bloqueou.
+  // - Bloqueio POSITIVO (a minha defesa recuperou, o rally segue): NÃO conta erro
+  //   do adversário — é apenas uma ação positiva de bloqueio, sem pontuar.
   let blockedIdx = -1
-  if (input.fundamento === "bloqueio" && input.qualidade !== "erro") {
+  if (input.fundamento === "bloqueio" && input.qualidade === "ponto") {
     const other: TeamSide = input.team === "casa" ? "adversario" : "casa"
     for (let i = state.actions.length - 1; i >= 0; i--) {
       const a = state.actions[i]
@@ -444,8 +446,7 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
       break
     }
   }
-  // Quando o bloqueio anula um ataque/recepção adversário, ele é o ponto do rally.
-  const mainQualidade: Qualidade = blockedIdx >= 0 ? "ponto" : input.qualidade
+  const mainQualidade: Qualidade = input.qualidade
 
   novas.push({
     id: uid("act"),
@@ -520,6 +521,31 @@ export function amendLastQuality(
 
   const actions = [...state.actions]
   actions[idx] = { ...acao, qualidade: quality, resultado: qualidadeToResultado(quality) }
+
+  // Se o que virou PONTO foi um bloqueio, o ataque/recepção adversário do mesmo
+  // rally foi bloqueado: marca aquela ação como erro (ataque = "bloqueado";
+  // passe = erro de recepção), sem pontuar de novo — o ponto já é do bloqueio.
+  if (acao.fundamento === "bloqueio" && quality === "ponto") {
+    const other: TeamSide = side === "casa" ? "adversario" : "casa"
+    for (let i = idx - 1; i >= 0; i--) {
+      const a = actions[i]
+      if (a.rallyId !== acao.rallyId) break
+      if (a.team !== other) continue
+      if (
+        (a.fundamento === "ataque" || a.fundamento === "recepcao") &&
+        a.qualidade !== "ponto" &&
+        a.qualidade !== "erro"
+      ) {
+        actions[i] = {
+          ...a,
+          qualidade: "erro",
+          resultado: "erro",
+          detalhe: a.fundamento === "ataque" ? "bloqueado" : a.detalhe ?? null,
+        }
+      }
+      break
+    }
+  }
 
   const scoringTeam: TeamSide =
     quality === "ponto" ? side : side === "casa" ? "adversario" : "casa"
