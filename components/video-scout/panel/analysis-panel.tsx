@@ -261,6 +261,7 @@ export function AnalysisPanel() {
             <PanelTeam
               team={match.teamA}
               accent="blue"
+              isServing={match.servingTeam === null ? true : match.servingTeam === "casa"}
               onRecord={(p) => handleRecord("casa", p)}
               onAmend={(q) => handleAmend("casa", q)}
               canAmend={canAmend.casa}
@@ -373,6 +374,7 @@ export function AnalysisPanel() {
             <PanelTeam
               team={match.teamB}
               accent="pink"
+              isServing={match.servingTeam === null ? true : match.servingTeam === "adversario"}
               onRecord={(p) => handleRecord("adversario", p)}
               onAmend={(q) => handleAmend("adversario", q)}
               canAmend={canAmend.adversario}

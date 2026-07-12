@@ -62,6 +62,8 @@ type Pending = { kind: "fundamento"; quality: Qualidade } | null
 interface PanelTeamProps {
   team: TeamConfig
   accent: "blue" | "pink"
+  /** Se esta equipe está sacando agora (define se o líbero cobre a P1). */
+  isServing: boolean
   onRecord: (payload: RecordPayload) => void
   /** Converte a última ação positiva da equipe em ponto/erro. */
   onAmend: (quality: "ponto" | "erro") => void
@@ -74,6 +76,7 @@ interface PanelTeamProps {
 export function PanelTeam({
   team,
   accent,
+  isServing,
   onRecord,
   onAmend,
   canAmend,
@@ -89,7 +92,8 @@ export function PanelTeam({
   const accentBorder = accent === "blue" ? "border-blue-200" : "border-pink-200"
 
   // Formação efetiva: aplica a troca automática do líbero no fundo.
-  const eff = effectiveFormation(team)
+  // O estado de saque define se o líbero cobre a P1 (só quando não está sacando).
+  const eff = effectiveFormation(team, isServing)
 
   function numberAt(pos: Posicao): string {
     const p = findPlayer(team, eff[pos].playerId)
@@ -138,7 +142,7 @@ export function PanelTeam({
 
   // Qual atleta vai receber a ação (com líbero quando aplicável).
   function previewPlayer(): string {
-    const id = onCourtPlayerId(team, activePos)
+    const id = onCourtPlayerId(team, activePos, isServing)
     const p = findPlayer(team, id)
     if (!p) return "—"
     const isLibero = id === team.liberoId
