@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, History, Link2, Menu, Plus, Sparkles, Upload, X } from "lucide-react"
+import { ArrowLeft, History, Link2, Menu, Plus, Sparkles, Upload, Users, X } from "lucide-react"
 import type { Posicao, ScoutAction, TeamSide } from "@/lib/video-scout/types"
 import {
   amendLastQuality,
@@ -31,7 +31,7 @@ import { PanelActions } from "./panel-actions"
 import { PanelStatsBar } from "./panel-stats-bar"
 import { HistoryDialog, SubstitutionDialog, TeamSetupDialog } from "./panel-dialogs"
 
-type View = "painel" | "relatorio" | "ia"
+type View = "painel" | "relatorio" | "ia" | "equipes"
 
 export function AnalysisPanel() {
   const [match, setMatch] = useState<MatchState>(() => createMatch())
@@ -189,6 +189,53 @@ export function AnalysisPanel() {
     )
   }
 
+  if (view === "equipes") {
+    const equipesSetupTeam: TeamConfig | null =
+      setupTarget === "casa" ? match.teamA : setupTarget === "adversario" ? match.teamB : null
+
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800">
+        <div className="mx-auto max-w-5xl px-4 py-6">
+          {/* Cabeçalho */}
+          <header className="mb-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-600">
+                <Users className="h-5 w-5 text-white" aria-hidden="true" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold leading-tight text-slate-800">Equipes</h1>
+                <p className="text-xs text-slate-500">
+                  Crie as equipes, ajuste os nomes e adicione os jogadores antes de coletar
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setView("painel")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            >
+              <ArrowLeft className="h-4 w-4 text-orange-600" aria-hidden="true" />
+              Ir para o painel
+            </button>
+          </header>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <TeamCard team={match.teamA} accent="blue" onEdit={() => setSetupTarget("casa")} />
+            <TeamCard team={match.teamB} accent="pink" onEdit={() => setSetupTarget("adversario")} />
+          </div>
+        </div>
+
+        {setupTarget && equipesSetupTeam && (
+          <TeamSetupDialog
+            team={equipesSetupTeam}
+            onChange={(patch) => setMatch((prev) => updateTeam(prev, setupTarget, patch))}
+            onClose={() => setSetupTarget(null)}
+          />
+        )}
+      </div>
+    )
+  }
+
   const subTeam: TeamConfig | null =
     subTarget?.side === "casa"
       ? match.teamA
@@ -233,6 +280,14 @@ export function AnalysisPanel() {
             <h1 className="text-lg font-bold tracking-wide text-slate-800">PAINEL DE ANÁLISE</h1>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setView("equipes")}
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Users className="h-4 w-4 text-orange-600" aria-hidden="true" />
+              Equipes
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -414,6 +469,59 @@ export function AnalysisPanel() {
           onClose={() => setShowHistory(false)}
         />
       )}
+    </div>
+  )
+}
+
+function TeamCard({
+  team,
+  accent,
+  onEdit,
+}: {
+  team: TeamConfig
+  accent: "blue" | "pink"
+  onEdit: () => void
+}) {
+  const accentBar = accent === "blue" ? "bg-blue-500" : "bg-pink-500"
+  const accentText = accent === "blue" ? "text-blue-600" : "text-pink-600"
+  const players = [...team.players].sort((a, b) => a.number - b.number)
+
+  return (
+    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-2">
+        <span className={`h-6 w-1.5 rounded-full ${accentBar}`} aria-hidden="true" />
+        <div className="min-w-0">
+          <h2 className={`truncate text-base font-bold uppercase tracking-wide ${accentText}`}>
+            {team.name}
+          </h2>
+          <p className="text-xs text-slate-500">{players.length} atletas no elenco</p>
+        </div>
+      </div>
+
+      {/* Elenco em chips (número + nome) */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {players.map((p) => (
+          <span
+            key={p.id}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
+          >
+            <span className={`font-bold ${accentText}`}>{p.number}</span>
+            <span className="max-w-[8rem] truncate">{p.name}</span>
+            {p.id === team.liberoId && (
+              <span className="rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700">L</span>
+            )}
+          </span>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={onEdit}
+        className="mt-auto flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700 active:scale-[0.98]"
+      >
+        <Users className="h-4 w-4" aria-hidden="true" />
+        Editar equipe e adicionar jogadores
+      </button>
     </div>
   )
 }
