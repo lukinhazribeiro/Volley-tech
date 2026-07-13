@@ -140,7 +140,8 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
   // bloqueio, ataque, levantamento... tudo que não é erro).
   const totTP = stats.reduce((acc, s) => acc + (s.total - s.erros), 0)
   const totTE = stats.reduce((acc, s) => acc + s.erros, 0)
-  const totTGP = teamPts === 0 ? 0 : Math.round((totTP / teamPts) * 100)
+  // A soma das participações de todos os atletas equivale a 100% dos pontos.
+  const totTGP = teamPts === 0 ? 0 : 100
 
   const accent = TEAM_STYLE[team].hex
 
@@ -210,7 +211,9 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
           <tbody>
             {stats.map((s, idx) => {
               const tp = s.total - s.erros
-              const tgp = teamPts === 0 ? 0 : Math.round((tp / teamPts) * 100)
+              // TGP = participação do atleta nos PONTOS da equipe. Usa os pontos
+              // do atleta sobre o total de pontos do time, então a soma dá 100%.
+              const tgp = teamPts === 0 ? 0 : Math.round((s.pontos / teamPts) * 100)
               return (
                 <tr
                   key={s.player.id}
@@ -338,7 +341,7 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
     const rows = summary.jogadores.map((s) => {
       const tp = s.total - s.erros
       const teamPts = teamPtsMap[s.player.team]
-      const tgp = teamPts === 0 ? 0 : Math.round((tp / teamPts) * 100)
+      const tgp = teamPts === 0 ? 0 : Math.round((s.pontos / teamPts) * 100)
       return [
         TEAM_LABEL[s.player.team],
         s.player.number,
@@ -456,8 +459,8 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
               Planilha por equipe
             </h2>
             <p className="mt-0.5 text-xs text-slate-400">
-              TP = ações certas (tudo exceto erros) · TE = total de erros · TGP = participação do atleta nos pontos da
-              equipe
+              TP = ações certas (tudo exceto erros) · TE = total de erros · TGP = % dos pontos da equipe feitos pelo
+              atleta (a soma de todos = 100%)
             </p>
           </div>
           <button
