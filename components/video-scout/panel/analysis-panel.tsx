@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, History, Link2, Menu, Plus, Sparkles, Upload, X } from "lucide-react"
+import { ArrowLeft, History, Link2, Menu, Plus, Sparkles, Upload, Users, X } from "lucide-react"
 import type { Posicao, ScoutAction, TeamSide } from "@/lib/video-scout/types"
 import {
   amendLastQuality,
@@ -30,8 +30,9 @@ import { PanelTeam, type RecordPayload } from "./panel-team"
 import { PanelActions } from "./panel-actions"
 import { PanelStatsBar } from "./panel-stats-bar"
 import { HistoryDialog, SubstitutionDialog, TeamSetupDialog } from "./panel-dialogs"
+import { TeamsSetupView } from "./teams-setup-view"
 
-type View = "painel" | "relatorio" | "ia"
+type View = "painel" | "equipes" | "relatorio" | "ia"
 
 export function AnalysisPanel() {
   const [match, setMatch] = useState<MatchState>(() => createMatch())
@@ -230,7 +231,30 @@ export function AnalysisPanel() {
             >
               <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
-            <h1 className="text-lg font-bold tracking-wide text-slate-800">PAINEL DE ANÁLISE</h1>
+            <h1 className="hidden text-lg font-bold tracking-wide text-slate-800 lg:block">
+              PAINEL DE ANÁLISE
+            </h1>
+            <div className="ml-1 flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => setView("painel")}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                  view === "painel" ? "bg-white text-orange-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Partida
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("equipes")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                  view === "equipes" ? "bg-white text-orange-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Users className="h-4 w-4" aria-hidden="true" />
+                Equipes
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -255,6 +279,17 @@ export function AnalysisPanel() {
           </div>
         </header>
 
+        {view === "equipes" && (
+          <TeamsSetupView
+            teamA={match.teamA}
+            teamB={match.teamB}
+            onChangeTeam={(side, patch) => setMatch((prev) => updateTeam(prev, side, patch))}
+            onOpenAdvanced={(side) => setSetupTarget(side)}
+            onStart={() => setView("painel")}
+          />
+        )}
+
+        {view === "painel" && (
         <main className="flex flex-1 flex-col gap-4 p-4">
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.1fr_1fr]">
             {/* Equipe A */}
@@ -385,6 +420,7 @@ export function AnalysisPanel() {
 
           <PanelStatsBar {...stats} onReport={() => setView("relatorio")} />
         </main>
+        )}
       </div>
 
       {subTarget && subTeam && (
