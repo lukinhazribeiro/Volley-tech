@@ -88,6 +88,14 @@ const COLS: { group: string; cols: Col[] }[] = [
     cols: [
       { key: "atk_t", label: "T", get: (s) => fund(s, "ataque").total },
       { key: "atk_p", label: "Pt", get: (s) => fund(s, "ataque").pontos },
+      {
+        key: "atk_pos",
+        label: "Pos",
+        get: (s) => {
+          const a = fund(s, "ataque")
+          return a.total - a.pontos - a.erros
+        },
+      },
       { key: "atk_e", label: "Err", get: (s) => fund(s, "ataque").erros },
     ],
   },
@@ -109,7 +117,12 @@ const COLS: { group: string; cols: Col[] }[] = [
   },
   {
     group: "Defesa",
-    cols: [{ key: "def_t", label: "T", get: (s) => fund(s, "defesa").total }],
+    cols: [
+      { key: "def_t", label: "T", get: (s) => fund(s, "defesa").total },
+      { key: "def_atk", label: "Atq", get: (s) => s.defesaPorTipo.ataque },
+      { key: "def_vol", label: "Vol", get: (s) => s.defesaPorTipo.volume },
+      { key: "def_rec", label: "Rec", get: (s) => s.defesaPorTipo.recuperacao },
+    ],
   },
 ]
 

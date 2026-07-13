@@ -174,6 +174,8 @@ export interface PlayerStat {
   pontos: number
   erros: number
   porFundamento: Record<Fundamento, { total: number; pontos: number; erros: number }>
+  /** Defesas separadas por tipo: defesa de ataque, passe de volume e recuperação. */
+  defesaPorTipo: Record<DefesaTipo, number>
   eficienciaAtaque: number
   eficienciaSaque: number
   /** Aproveitamento de recepção (% de recepções sem erro). */
@@ -216,6 +218,7 @@ export function computeSummary(
       pontos: number
       erros: number
       porFundamento: Record<Fundamento, { total: number; pontos: number; erros: number }>
+      defesaPorTipo: Record<DefesaTipo, number>
     }
   >()
 
@@ -225,6 +228,7 @@ export function computeSummary(
       pontos: 0,
       erros: 0,
       porFundamento: emptyFundamentoMap(),
+      defesaPorTipo: { ataque: 0, volume: 0, recuperacao: 0 },
     })
   }
 
@@ -249,6 +253,12 @@ export function computeSummary(
       const pa = playerAgg.get(a.playerId)!
       pa.total += 1
       pa.porFundamento[a.fundamento].total += 1
+      if (a.fundamento === "defesa") {
+        const tipo = (a.detalhe as DefesaTipo) ?? "volume"
+        if (tipo === "ataque" || tipo === "volume" || tipo === "recuperacao") {
+          pa.defesaPorTipo[tipo] += 1
+        }
+      }
       if (isPonto) {
         pa.pontos += 1
         pa.porFundamento[a.fundamento].pontos += 1
@@ -284,6 +294,7 @@ export function computeSummary(
         pontos: pa.pontos,
         erros: pa.erros,
         porFundamento: pa.porFundamento,
+        defesaPorTipo: pa.defesaPorTipo,
         eficienciaAtaque: efficiency(atk.pontos, atk.erros, atk.total),
         eficienciaSaque: efficiency(saque.pontos, saque.erros, saque.total),
         recepcaoPositiva:
