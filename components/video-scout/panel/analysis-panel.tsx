@@ -18,7 +18,7 @@ import {
   Users,
   X,
 } from "lucide-react"
-import type { Posicao, ScoutAction, TeamSide } from "@/lib/video-scout/types"
+import { ROLE_LABEL, type Posicao, type ScoutAction, type TeamSide } from "@/lib/video-scout/types"
 import {
   amendLastQuality,
   createMatch,
@@ -614,20 +614,43 @@ function TeamCard({
           </span>
         </div>
 
-        {/* Elenco em chips (número + nome) */}
-        <div className="mb-5 flex flex-wrap gap-1.5">
-          {players.map((p) => (
-            <span
-              key={p.id}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
-            >
-              <span className={`font-bold ${accentText}`}>{p.number}</span>
-              <span className="max-w-[8rem] truncate">{p.name}</span>
-              {p.id === team.liberoId && (
-                <span className="rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700">L</span>
-              )}
+        {/* Elenco em formato de lista (número · nome · função) */}
+        <div className="mb-5 overflow-hidden rounded-xl border border-slate-200">
+          <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
+            <span className="w-8 text-center text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              Nº
             </span>
-          ))}
+            <span className="flex-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              Atleta
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Função</span>
+          </div>
+          <div className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
+            {players.map((p) => {
+              const isLibero = p.id === team.liberoId
+              return (
+                <div key={p.id} className="flex items-center gap-3 px-3 py-2">
+                  <span
+                    className={`flex h-7 w-8 shrink-0 items-center justify-center rounded-md text-sm font-bold tabular-nums ${accentSoft}`}
+                  >
+                    {p.number}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">
+                    {p.name}
+                  </span>
+                  {isLibero ? (
+                    <span className="shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                      Líbero
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[11px] font-medium text-slate-400">
+                      {p.role ? ROLE_LABEL[p.role] : "—"}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         <div className="mt-auto flex gap-2">
