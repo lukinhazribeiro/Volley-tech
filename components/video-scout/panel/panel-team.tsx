@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeftRight, Shield, X } from "lucide-react"
+import { ArrowLeftRight, Users, X } from "lucide-react"
 import {
   type Fundamento,
   type Posicao,
@@ -201,20 +201,25 @@ export function PanelTeam({
   return (
     <section className="flex flex-col gap-5 rounded-xl border border-orange-100 bg-white p-4 shadow-sm">
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`h-5 w-1 rounded-full ${accentBar}`} />
-          <h2 className={`text-sm font-bold uppercase tracking-wide ${accentText}`}>
-            {team.name}
-          </h2>
-        </div>
+      <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={onOpenLibero}
-          className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-slate-50"
+          title="Editar nome, jogadores e funções"
         >
-          <Shield className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
-          Líbero
+          <span className={`h-5 w-1 shrink-0 rounded-full ${accentBar}`} />
+          <h2 className={`truncate text-sm font-bold uppercase tracking-wide ${accentText}`}>
+            {team.name}
+          </h2>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenLibero}
+          className="flex shrink-0 items-center gap-1.5 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-100"
+        >
+          <Users className="h-3.5 w-3.5" aria-hidden="true" />
+          Editar equipe
         </button>
       </div>
 
