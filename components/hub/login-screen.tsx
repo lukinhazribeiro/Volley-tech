@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Eye, EyeOff, Mail, Lock, Gift, ArrowUpRight } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, Gift, ArrowUpRight, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
 import { createClient } from "@/lib/supabase/client"
@@ -13,6 +13,7 @@ export function LoginScreen() {
   const [mode, setMode] = useState<Mode>("signin")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,9 +21,21 @@ export function LoginScreen() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
     setInfo(null)
+
+    if (mode === "signup") {
+      if (password.length < 6) {
+        setError("A senha deve ter pelo menos 6 caracteres.")
+        return
+      }
+      if (password !== confirmPassword) {
+        setError("As senhas não coincidem.")
+        return
+      }
+    }
+
+    setLoading(true)
     try {
       const supabase = createClient()
 
@@ -47,37 +60,6 @@ export function LoginScreen() {
       // onAuthStateChange no AuthGate cuida do redirecionamento.
     } catch (err) {
       setError(translateError(err instanceof Error ? err.message : "Não foi possível continuar."))
-      setLoading(false)
-    }
-  }
-
-  const handleGoogle = async () => {
-    setLoading(true)
-    setError(null)
-    setInfo(null)
-    try {
-      const supabase = createClient()
-      // IMPORTANTE: sempre voltamos para o MESMO endereço em que o usuário está
-      // (domínio próprio, preview ou localhost). Só usamos a URL de
-      // desenvolvimento quando realmente estamos em localhost — caso contrário
-      // o login no domínio próprio voltaria para o endereço de dev e a sessão
-      // se perderia.
-      const isLocalhost =
-        typeof window !== "undefined" &&
-        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-      const redirectTo =
-        isLocalhost && process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL
-          ? process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL
-          : `${window.location.origin}/auth/callback`
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo },
-      })
-      if (error) throw error
-      // Redirecionamento para o Google acontece automaticamente.
-    } catch (err) {
-      setError(translateError(err instanceof Error ? err.message : "Não foi possível continuar com o Google."))
       setLoading(false)
     }
   }
@@ -151,41 +133,38 @@ export function LoginScreen() {
 
             <div className="w-full rounded-3xl border border-white/10 bg-neutral-900/60 p-7 shadow-2xl sm:p-8">
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Bem-vindo ao <span className="text-orange-500">VolleyTech</span>
+              {mode === "signin" ? (
+                <>
+                  Bem-vindo ao <span className="text-orange-500">VolleyTech</span>
+                </>
+              ) : (
+                <>
+                  Crie sua <span className="text-orange-500">conta grátis</span>
+                </>
+              )}
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-neutral-400 text-pretty">
-              A plataforma inteligente para análise de desempenho no voleibol.
+              {mode === "signin"
+                ? "Entre para acessar sua análise de desempenho no voleibol."
+                : `Comece agora com ${TRIAL_DAYS} dias grátis. Sem cartão para testar.`}
             </p>
 
-            <button
-              type="button"
-              onClick={handleGoogle}
-              disabled={loading}
-              className="mt-6 flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-neutral-900 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"
-                />
-                <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"
-                />
-              </svg>
-              Continuar com Google
-            </button>
+            {mode === "signup" && (
+              <ul className="mt-6 space-y-2.5 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
+                {[
+                  `${TRIAL_DAYS} dias de teste gratuito`,
+                  "Scout por vídeo e relatórios completos",
+                  "Gestão de atletas, turmas e financeiro",
+                ].map((benefit) => (
+                  <li key={benefit} className="flex items-center gap-2.5 text-sm text-neutral-200">
+                    <Check className="h-4 w-4 shrink-0 text-orange-500" aria-hidden="true" />
+                    {benefit}
+                  </li>
+                ))}
+              </ul>
+            )}
 
-            <div className="my-6 flex items-center gap-4">
-              <span className="h-px flex-1 bg-white/10" />
-              <span className="text-xs text-neutral-500">ou</span>
-              <span className="h-px flex-1 bg-white/10" />
-            </div>
+            <div className="mt-6" />
 
             {error && (
               <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-center text-sm text-red-400" role="alert">
@@ -255,6 +234,31 @@ export function LoginScreen() {
                 </div>
               </div>
 
+              {mode === "signup" && (
+                <div className="space-y-1.5">
+                  <label htmlFor="confirmPassword" className="text-sm font-semibold text-neutral-200">
+                    Confirmar senha
+                  </label>
+                  <div className="relative">
+                    <Lock
+                      className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500"
+                      aria-hidden="true"
+                    />
+                    <input
+                      id="confirmPassword"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="h-12 w-full rounded-xl border border-white/10 bg-neutral-950/60 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                      placeholder="Repita a senha"
+                    />
+                  </div>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 disabled={loading}
@@ -273,6 +277,7 @@ export function LoginScreen() {
                   setMode(mode === "signin" ? "signup" : "signin")
                   setError(null)
                   setInfo(null)
+                  setConfirmPassword("")
                 }}
                 className="font-semibold text-orange-500 hover:underline"
               >
@@ -298,9 +303,5 @@ function translateError(message: string) {
   if (message.includes("User already registered")) return "Este email já está cadastrado. Faça login."
   if (message.includes("Email not confirmed")) return "Confirme seu email antes de entrar."
   if (message.includes("Password should be")) return "A senha deve ter pelo menos 6 caracteres."
-  if (/provider is not enabled|Unsupported provider|validation_failed/i.test(message))
-    return "O login com Google ainda não está ativado no Supabase. Ative em Authentication → Providers → Google."
-  if (/redirect|not allowed|url/i.test(message))
-    return "Endereço de retorno não autorizado. Adicione a URL do seu site nas Redirect URLs do Supabase (Authentication → URL Configuration)."
   return message
 }
