@@ -2,7 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, History, Link2, Menu, Plus, Sparkles, Upload, Users, X } from "lucide-react"
+import {
+  ArrowLeft,
+  BookmarkPlus,
+  Check,
+  Download,
+  History,
+  Link2,
+  Menu,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2,
+  Upload,
+  Users,
+  X,
+} from "lucide-react"
 import type { Posicao, ScoutAction, TeamSide } from "@/lib/video-scout/types"
 import {
   amendLastQuality,
@@ -22,6 +37,13 @@ import {
   saveToHistory,
   type MatchHistoryEntry,
 } from "@/lib/video-scout/history"
+import {
+  deletePreset,
+  loadPresets,
+  presetToTeam,
+  savePreset,
+  type TeamPreset,
+} from "@/lib/video-scout/team-presets"
 import { VideoPlayer, parseYouTubeId, type VideoPlayerHandle } from "../video-player"
 import { ScoutReport } from "../scout-report"
 import { VideoScoutModule } from "../video-scout-module"
@@ -55,8 +77,34 @@ export function AnalysisPanel() {
   const [showHistory, setShowHistory] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Biblioteca de equipes salvas (persistida em localStorage).
+  const [presets, setPresets] = useState<TeamPreset[]>([])
+  const [savedFlash, setSavedFlash] = useState<TeamSide | null>(null)
+
   useEffect(() => {
     setHistory(loadHistory())
+    setPresets(loadPresets())
+  }, [])
+
+  const handleSaveTeamPreset = useCallback((side: TeamSide) => {
+    setMatch((prev) => {
+      const team = side === "casa" ? prev.teamA : prev.teamB
+      setPresets(savePreset(team.name, team))
+      return prev
+    })
+    setSavedFlash(side)
+    setTimeout(() => setSavedFlash(null), 1800)
+  }, [])
+
+  const handleLoadPreset = useCallback((preset: TeamPreset, side: TeamSide) => {
+    setMatch((prev) => {
+      const { side: _s, ...patch } = presetToTeam(preset, side)
+      return updateTeam(prev, side, patch)
+    })
+  }, [])
+
+  const handleDeletePreset = useCallback((id: string) => {
+    setPresets(deletePreset(id))
   }, [])
 
   const clearVideo = useCallback(() => {
@@ -219,10 +267,67 @@ export function AnalysisPanel() {
             </button>
           </header>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <TeamCard team={match.teamA} accent="blue" onEdit={() => setSetupTarget("casa")} />
-            <TeamCard team={match.teamB} accent="pink" onEdit={() => setSetupTarget("adversario")} />
-          </div>
+          {/* Equipes em quadra */}
+          <section className="mb-8">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipes em quadra</h2>
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <TeamCard
+                team={match.teamA}
+                accent="blue"
+                saved={savedFlash === "casa"}
+                onEdit={() => setSetupTarget("casa")}
+                onSave={() => handleSaveTeamPreset("casa")}
+              />
+              <TeamCard
+                team={match.teamB}
+                accent="pink"
+                saved={savedFlash === "adversario"}
+                onEdit={() => setSetupTarget("adversario")}
+                onSave={() => handleSaveTeamPreset("adversario")}
+              />
+            </div>
+          </section>
+
+          {/* Biblioteca de equipes salvas */}
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Minhas equipes salvas
+              </h2>
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                {presets.length}
+              </span>
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            {presets.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                  <BookmarkPlus className="h-6 w-6 text-slate-400" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium text-slate-600">Nenhuma equipe salva ainda</p>
+                <p className="mx-auto mt-1 max-w-sm text-xs text-slate-400 text-pretty">
+                  Configure uma equipe acima e toque em &quot;Salvar modelo&quot; para reutilizá-la
+                  instantaneamente em qualquer partida.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {presets.map((preset) => (
+                  <PresetCard
+                    key={preset.id}
+                    preset={preset}
+                    onLoadA={() => handleLoadPreset(preset, "casa")}
+                    onLoadB={() => handleLoadPreset(preset, "adversario")}
+                    onDelete={() => handleDeletePreset(preset.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
         {setupTarget && equipesSetupTeam && (
@@ -476,52 +581,158 @@ export function AnalysisPanel() {
 function TeamCard({
   team,
   accent,
+  saved,
   onEdit,
+  onSave,
 }: {
   team: TeamConfig
   accent: "blue" | "pink"
+  saved: boolean
   onEdit: () => void
+  onSave: () => void
 }) {
   const accentBar = accent === "blue" ? "bg-blue-500" : "bg-pink-500"
   const accentText = accent === "blue" ? "text-blue-600" : "text-pink-600"
+  const accentSoft = accent === "blue" ? "bg-blue-50 text-blue-700" : "bg-pink-50 text-pink-700"
   const players = [...team.players].sort((a, b) => a.number - b.number)
 
   return (
-    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <span className={`h-6 w-1.5 rounded-full ${accentBar}`} aria-hidden="true" />
-        <div className="min-w-0">
-          <h2 className={`truncate text-base font-bold uppercase tracking-wide ${accentText}`}>
-            {team.name}
-          </h2>
-          <p className="text-xs text-slate-500">{players.length} atletas no elenco</p>
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* Faixa superior com a cor da equipe */}
+      <div className={`h-1.5 w-full ${accentBar}`} aria-hidden="true" />
+
+      <div className="flex flex-1 flex-col p-5">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className={`truncate text-base font-bold uppercase tracking-wide ${accentText}`}>
+              {team.name}
+            </h3>
+            <p className="text-xs text-slate-500">{players.length} atletas no elenco</p>
+          </div>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${accentSoft}`}>
+            {accent === "blue" ? "Equipe A" : "Equipe B"}
+          </span>
+        </div>
+
+        {/* Elenco em chips (número + nome) */}
+        <div className="mb-5 flex flex-wrap gap-1.5">
+          {players.map((p) => (
+            <span
+              key={p.id}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
+            >
+              <span className={`font-bold ${accentText}`}>{p.number}</span>
+              <span className="max-w-[8rem] truncate">{p.name}</span>
+              {p.id === team.liberoId && (
+                <span className="rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700">L</span>
+              )}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-auto flex gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700 active:scale-[0.98]"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Editar equipe
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            className={`flex shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition active:scale-[0.98] ${
+              saved
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            {saved ? <Check className="h-4 w-4" aria-hidden="true" /> : <BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+            {saved ? "Salvo!" : "Salvar modelo"}
+          </button>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Elenco em chips (número + nome) */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {players.map((p) => (
-          <span
-            key={p.id}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
-          >
-            <span className={`font-bold ${accentText}`}>{p.number}</span>
-            <span className="max-w-[8rem] truncate">{p.name}</span>
-            {p.id === team.liberoId && (
-              <span className="rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700">L</span>
-            )}
-          </span>
-        ))}
+function PresetCard({
+  preset,
+  onLoadA,
+  onLoadB,
+  onDelete,
+}: {
+  preset: TeamPreset
+  onLoadA: () => void
+  onLoadB: () => void
+  onDelete: () => void
+}) {
+  const players = [...preset.team.players].sort((a, b) => a.number - b.number)
+  const savedDate = new Date(preset.savedAt).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+
+  return (
+    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-bold text-slate-800">{preset.name}</h3>
+          <p className="text-[11px] text-slate-400">
+            {players.length} atletas · salvo em {savedDate}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+          aria-label={`Excluir equipe ${preset.name}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
       </div>
 
-      <button
-        type="button"
-        onClick={onEdit}
-        className="mt-auto flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700 active:scale-[0.98]"
-      >
-        <Users className="h-4 w-4" aria-hidden="true" />
-        Editar equipe e adicionar jogadores
-      </button>
+      {/* Prévia dos números do elenco */}
+      <div className="mb-4 flex flex-wrap gap-1">
+        {players.slice(0, 10).map((p) => (
+          <span
+            key={p.id}
+            className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-slate-100 px-1.5 text-[11px] font-bold text-slate-600"
+          >
+            {p.number}
+          </span>
+        ))}
+        {players.length > 10 && (
+          <span className="inline-flex h-6 items-center px-1 text-[11px] font-medium text-slate-400">
+            +{players.length - 10}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-auto">
+        <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          <Download className="h-3 w-3" aria-hidden="true" />
+          Usar agora em
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onLoadA}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
+          >
+            Equipe A
+          </button>
+          <button
+            type="button"
+            onClick={onLoadB}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 py-2 text-xs font-bold text-pink-700 transition hover:bg-pink-100 active:scale-[0.98]"
+          >
+            Equipe B
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
