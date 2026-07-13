@@ -91,42 +91,42 @@ function uid(prefix: string) {
 }
 
 /**
- * Cria uma equipe padrão no sistema 5x1, com os atletas posicionados de forma
- * válida (centrais opostos entre si, levantador na P1):
- *  P1 = levantador, P2 = central 1, P3 = ponteiro 1,
- *  P4 = oposto,     P5 = central 2, P6 = ponteiro 2.
- * Assim sempre há exatamente um central no fundo, substituível pelo líbero.
+ * Cria uma equipe padrão no sistema 5x1 com os atletas numerados de 1 a 14 em
+ * sequência (fáceis de editar depois). Os 6 primeiros entram em quadra numa
+ * formação válida (centrais opostos entre si, levantador na P1):
+ *  #1 = P1 levantador, #2 = P2 central, #3 = P3 ponteiro,
+ *  #4 = P4 oposto,     #5 = P5 central, #6 = P6 ponteiro.
+ * #7 é o líbero e #8 a #14 são reservas. Assim sempre há exatamente um central
+ * no fundo, substituível pelo líbero, e a numeração fica limpa (1..14).
  */
 export function createTeam(side: TeamSide, name: string): TeamConfig {
   const base: { num: number; pos: Posicao; role: PlayerRole }[] = [
     { num: 1, pos: "P1", role: "levantador" },
-    { num: 7, pos: "P2", role: "central" },
-    { num: 12, pos: "P3", role: "ponteiro" },
-    { num: 5, pos: "P4", role: "oposto" },
-    { num: 10, pos: "P5", role: "central" },
-    { num: 14, pos: "P6", role: "ponteiro" },
+    { num: 2, pos: "P2", role: "central" },
+    { num: 3, pos: "P3", role: "ponteiro" },
+    { num: 4, pos: "P4", role: "oposto" },
+    { num: 5, pos: "P5", role: "central" },
+    { num: 6, pos: "P6", role: "ponteiro" },
   ]
   const players: Player[] = base.map((b) => ({
     id: uid("pl"),
     number: b.num,
-    name: `${b.role === "levantador" ? "Levantador" : b.role === "oposto" ? "Oposto" : b.role === "central" ? "Central" : "Ponteiro"} ${b.num}`,
+    name: `Atleta ${b.num}`,
     team: side,
     posicao: b.pos,
     role: b.role,
   }))
   const libero: Player = {
     id: uid("pl"),
-    number: 13,
-    name: "Líbero",
+    number: 7,
+    name: "Atleta 7",
     team: side,
     posicao: null,
     role: "libero",
   }
-  // Completa o elenco para que todos os números de 1 a 14 fiquem disponíveis.
-  const usados = new Set<number>([...base.map((b) => b.num), libero.number])
+  // Reservas numeradas em sequência de 8 a 14, mantendo o elenco de 1 a 14.
   const reservas: Player[] = []
-  for (let n = 1; n <= 14; n++) {
-    if (usados.has(n)) continue
+  for (let n = 8; n <= 14; n++) {
     reservas.push({
       id: uid("pl"),
       number: n,
