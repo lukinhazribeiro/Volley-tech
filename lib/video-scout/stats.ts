@@ -172,6 +172,8 @@ export interface PlayerStat {
   player: Player
   total: number
   pontos: number
+  /** Ações positivas (perfeito/positivo) que não são ponto nem erro. */
+  positivas: number
   erros: number
   porFundamento: Record<Fundamento, { total: number; pontos: number; erros: number }>
   /** Defesas separadas por tipo: defesa de ataque, passe de volume e recuperação. */
@@ -216,6 +218,7 @@ export function computeSummary(
     {
       total: number
       pontos: number
+      positivas: number
       erros: number
       porFundamento: Record<Fundamento, { total: number; pontos: number; erros: number }>
       defesaPorTipo: Record<DefesaTipo, number>
@@ -226,6 +229,7 @@ export function computeSummary(
     playerAgg.set(p.id, {
       total: 0,
       pontos: 0,
+      positivas: 0,
       erros: 0,
       porFundamento: emptyFundamentoMap(),
       defesaPorTipo: { ataque: 0, volume: 0, recuperacao: 0 },
@@ -262,10 +266,12 @@ export function computeSummary(
       if (isPonto) {
         pa.pontos += 1
         pa.porFundamento[a.fundamento].pontos += 1
-      }
-      if (isErro) {
+      } else if (isErro) {
         pa.erros += 1
         pa.porFundamento[a.fundamento].erros += 1
+      } else {
+        // Nem ponto nem erro = ação positiva (perfeito/positivo → continuidade).
+        pa.positivas += 1
       }
     }
   }
@@ -292,6 +298,7 @@ export function computeSummary(
         player,
         total: pa.total,
         pontos: pa.pontos,
+        positivas: pa.positivas,
         erros: pa.erros,
         porFundamento: pa.porFundamento,
         defesaPorTipo: pa.defesaPorTipo,
