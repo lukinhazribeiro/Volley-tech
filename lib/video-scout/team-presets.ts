@@ -51,6 +51,23 @@ export function savePreset(name: string, team: TeamConfig): TeamPreset[] {
   return next
 }
 
+/** Atualiza um modelo já existente (edição na biblioteca). */
+export function updatePreset(id: string, team: TeamConfig): TeamPreset[] {
+  const { side: _side, ...rest } = team
+  const next = loadPresets().map((e) =>
+    e.id === id
+      ? {
+          ...e,
+          name: (team.name || e.name).trim(),
+          savedAt: Date.now(),
+          team: JSON.parse(JSON.stringify(rest)) as Omit<TeamConfig, "side">,
+        }
+      : e,
+  )
+  persist(next)
+  return next
+}
+
 /** Remove um modelo salvo. */
 export function deletePreset(id: string): TeamPreset[] {
   const next = loadPresets().filter((e) => e.id !== id)
