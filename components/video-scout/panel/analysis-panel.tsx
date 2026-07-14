@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft,
+  ArrowRight,
   BookmarkPlus,
   Check,
+  Download,
   History,
   Link2,
   Menu,
@@ -84,8 +86,8 @@ export function AnalysisPanel() {
   // Editor de equipe da biblioteca: cópia de trabalho + id (null = nova equipe).
   const [editorTeam, setEditorTeam] = useState<TeamConfig | null>(null)
   const [editorId, setEditorId] = useState<string | null>(null)
-  // Confirmação visual ao carregar uma equipe salva em quadra.
-  const [loadedFlash, setLoadedFlash] = useState<TeamSide | null>(null)
+  // Confirmação ao carregar uma equipe salva em quadra (banner + destaque).
+  const [loadedInfo, setLoadedInfo] = useState<{ side: TeamSide; name: string } | null>(null)
 
   useEffect(() => {
     setHistory(loadHistory())
@@ -123,8 +125,7 @@ export function AnalysisPanel() {
       const { side: _s, ...patch } = presetToTeam(preset, side)
       return updateTeam(prev, side, patch)
     })
-    setLoadedFlash(side)
-    setTimeout(() => setLoadedFlash(null), 1800)
+    setLoadedInfo({ side, name: preset.name })
   }, [])
 
   const handleDeletePreset = useCallback((id: string) => {
@@ -291,6 +292,30 @@ export function AnalysisPanel() {
             </button>
           </header>
 
+          {/* Confirmação de equipe carregada */}
+          {loadedInfo && (
+            <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500">
+                <Check className="h-4 w-4 text-white" aria-hidden="true" />
+              </span>
+              <p className="min-w-0 flex-1 text-sm text-emerald-800">
+                <span className="font-bold">{loadedInfo.name}</span> carregada como{" "}
+                <span className="font-bold">
+                  {loadedInfo.side === "casa" ? "Equipe A" : "Equipe B"}
+                </span>
+                . Já pode coletar no painel.
+              </p>
+              <button
+                type="button"
+                onClick={() => setView("painel")}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
+              >
+                Ir para o painel
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+
           {/* Em quadra nesta partida */}
           <section className="mb-8">
             <div className="mb-3 flex items-center gap-2">
@@ -304,14 +329,14 @@ export function AnalysisPanel() {
                 team={match.teamA}
                 accent="blue"
                 label="Equipe A"
-                loaded={loadedFlash === "casa"}
+                loaded={loadedInfo?.side === "casa"}
                 onEdit={() => setSetupTarget("casa")}
               />
               <CourtTeamRow
                 team={match.teamB}
                 accent="pink"
                 label="Equipe B"
-                loaded={loadedFlash === "adversario"}
+                loaded={loadedInfo?.side === "adversario"}
                 onEdit={() => setSetupTarget("adversario")}
               />
             </div>
@@ -722,22 +747,21 @@ function SavedTeamRow({
 
       {/* Ações de uso */}
       <div className="flex items-center gap-1.5">
-        <span className="hidden text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:inline">
-          Usar em
-        </span>
         <button
           type="button"
           onClick={onUseA}
-          className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
+          className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
         >
-          A
+          <Download className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="hidden sm:inline">Usar como </span>A
         </button>
         <button
           type="button"
           onClick={onUseB}
-          className="rounded-lg border border-pink-200 bg-pink-50 px-2.5 py-1.5 text-xs font-bold text-pink-700 transition hover:bg-pink-100 active:scale-[0.98]"
+          className="flex items-center gap-1 rounded-lg border border-pink-200 bg-pink-50 px-3 py-1.5 text-xs font-bold text-pink-700 transition hover:bg-pink-100 active:scale-[0.98]"
         >
-          B
+          <Download className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="hidden sm:inline">Usar como </span>B
         </button>
         <span className="mx-1 h-6 w-px bg-slate-200" aria-hidden="true" />
         <button
