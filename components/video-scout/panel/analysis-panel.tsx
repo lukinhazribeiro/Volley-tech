@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   BookmarkPlus,
   Check,
-  Download,
   History,
   Link2,
   Menu,
@@ -18,10 +17,12 @@ import {
   Users,
   X,
 } from "lucide-react"
-import { ROLE_LABEL, type Posicao, type ScoutAction, type TeamSide } from "@/lib/video-scout/types"
+import type { Player, Posicao, ScoutAction, TeamSide } from "@/lib/video-scout/types"
 import {
   amendLastQuality,
+  applyTeamPatch,
   createMatch,
+  createTeam,
   quickStats,
   recordAction,
   substitute,
@@ -42,6 +43,7 @@ import {
   loadPresets,
   presetToTeam,
   savePreset,
+  updatePreset,
   type TeamPreset,
 } from "@/lib/video-scout/team-presets"
 import { VideoPlayer, parseYouTubeId, type VideoPlayerHandle } from "../video-player"
@@ -79,28 +81,50 @@ export function AnalysisPanel() {
 
   // Biblioteca de equipes salvas (persistida em localStorage).
   const [presets, setPresets] = useState<TeamPreset[]>([])
-  const [savedFlash, setSavedFlash] = useState<TeamSide | null>(null)
+  // Editor de equipe da biblioteca: cópia de trabalho + id (null = nova equipe).
+  const [editorTeam, setEditorTeam] = useState<TeamConfig | null>(null)
+  const [editorId, setEditorId] = useState<string | null>(null)
+  // Confirmação visual ao carregar uma equipe salva em quadra.
+  const [loadedFlash, setLoadedFlash] = useState<TeamSide | null>(null)
 
   useEffect(() => {
     setHistory(loadHistory())
     setPresets(loadPresets())
   }, [])
 
-  const handleSaveTeamPreset = useCallback((side: TeamSide) => {
-    setMatch((prev) => {
-      const team = side === "casa" ? prev.teamA : prev.teamB
-      setPresets(savePreset(team.name, team))
-      return prev
-    })
-    setSavedFlash(side)
-    setTimeout(() => setSavedFlash(null), 1800)
+  // Abre o editor para criar uma equipe nova (do zero).
+  const openNewTeam = useCallback(() => {
+    setEditorTeam(createTeam("casa", "Nova equipe"))
+    setEditorId(null)
   }, [])
+
+  // Abre o editor para uma equipe já salva.
+  const openEditPreset = useCallback((preset: TeamPreset) => {
+    setEditorTeam(presetToTeam(preset, "casa"))
+    setEditorId(preset.id)
+  }, [])
+
+  // Aplica alterações à cópia de trabalho do editor.
+  const patchEditor = useCallback((patch: Partial<TeamConfig>) => {
+    setEditorTeam((prev) => (prev ? applyTeamPatch(prev, patch) : prev))
+  }, [])
+
+  // Fecha o editor salvando na biblioteca (cria nova ou atualiza a existente).
+  const closeEditor = useCallback(() => {
+    if (editorTeam) {
+      setPresets(editorId ? updatePreset(editorId, editorTeam) : savePreset(editorTeam.name, editorTeam))
+    }
+    setEditorTeam(null)
+    setEditorId(null)
+  }, [editorTeam, editorId])
 
   const handleLoadPreset = useCallback((preset: TeamPreset, side: TeamSide) => {
     setMatch((prev) => {
       const { side: _s, ...patch } = presetToTeam(preset, side)
       return updateTeam(prev, side, patch)
     })
+    setLoadedFlash(side)
+    setTimeout(() => setLoadedFlash(null), 1800)
   }, [])
 
   const handleDeletePreset = useCallback((id: string) => {
@@ -243,7 +267,7 @@ export function AnalysisPanel() {
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800">
-        <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="mx-auto max-w-4xl px-4 py-6">
           {/* Cabeçalho */}
           <header className="mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -251,9 +275,9 @@ export function AnalysisPanel() {
                 <Users className="h-5 w-5 text-white" aria-hidden="true" />
               </div>
               <div>
-                <h1 className="text-lg font-bold leading-tight text-slate-800">Equipes</h1>
+                <h1 className="text-lg font-bold leading-tight text-slate-800">Minhas equipes</h1>
                 <p className="text-xs text-slate-500">
-                  Crie as equipes, ajuste os nomes e adicione os jogadores antes de coletar
+                  Cadastre cada equipe uma vez e reutilize em qualquer partida
                 </p>
               </div>
             </div>
@@ -267,26 +291,28 @@ export function AnalysisPanel() {
             </button>
           </header>
 
-          {/* Equipes em quadra */}
+          {/* Em quadra nesta partida */}
           <section className="mb-8">
             <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Equipes em quadra</h2>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Em quadra nesta partida
+              </h2>
               <span className="h-px flex-1 bg-slate-200" />
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <TeamCard
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <CourtTeamRow
                 team={match.teamA}
                 accent="blue"
-                saved={savedFlash === "casa"}
+                label="Equipe A"
+                loaded={loadedFlash === "casa"}
                 onEdit={() => setSetupTarget("casa")}
-                onSave={() => handleSaveTeamPreset("casa")}
               />
-              <TeamCard
+              <CourtTeamRow
                 team={match.teamB}
                 accent="pink"
-                saved={savedFlash === "adversario"}
+                label="Equipe B"
+                loaded={loadedFlash === "adversario"}
                 onEdit={() => setSetupTarget("adversario")}
-                onSave={() => handleSaveTeamPreset("adversario")}
               />
             </div>
           </section>
@@ -295,12 +321,20 @@ export function AnalysisPanel() {
           <section>
             <div className="mb-3 flex items-center gap-2">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Minhas equipes salvas
+                Equipes salvas
               </h2>
               <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">
                 {presets.length}
               </span>
               <span className="h-px flex-1 bg-slate-200" />
+              <button
+                type="button"
+                onClick={openNewTeam}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-700 active:scale-[0.98]"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Criar nova equipe
+              </button>
             </div>
 
             {presets.length === 0 ? (
@@ -308,20 +342,22 @@ export function AnalysisPanel() {
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
                   <BookmarkPlus className="h-6 w-6 text-slate-400" aria-hidden="true" />
                 </div>
-                <p className="text-sm font-medium text-slate-600">Nenhuma equipe salva ainda</p>
+                <p className="text-sm font-medium text-slate-600">Nenhuma equipe cadastrada ainda</p>
                 <p className="mx-auto mt-1 max-w-sm text-xs text-slate-400 text-pretty">
-                  Configure uma equipe acima e toque em &quot;Salvar modelo&quot; para reutilizá-la
-                  instantaneamente em qualquer partida.
+                  Toque em &quot;Criar nova equipe&quot; para montar seu elenco (nomes, números e
+                  funções). Depois é só escolher usar como Equipe A ou B em qualquer partida.
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {presets.map((preset) => (
-                  <PresetCard
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {presets.map((preset, i) => (
+                  <SavedTeamRow
                     key={preset.id}
                     preset={preset}
-                    onLoadA={() => handleLoadPreset(preset, "casa")}
-                    onLoadB={() => handleLoadPreset(preset, "adversario")}
+                    isFirst={i === 0}
+                    onUseA={() => handleLoadPreset(preset, "casa")}
+                    onUseB={() => handleLoadPreset(preset, "adversario")}
+                    onEdit={() => openEditPreset(preset)}
                     onDelete={() => handleDeletePreset(preset.id)}
                   />
                 ))}
@@ -330,6 +366,17 @@ export function AnalysisPanel() {
           </section>
         </div>
 
+        {/* Editor da biblioteca (equipe isolada) */}
+        {editorTeam && (
+          <TeamSetupDialog
+            team={editorTeam}
+            title={editorId ? "Editar equipe" : "Nova equipe"}
+            onChange={patchEditor}
+            onClose={closeEditor}
+          />
+        )}
+
+        {/* Editor das equipes em quadra */}
         {setupTarget && equipesSetupTeam && (
           <TeamSetupDialog
             team={equipesSetupTeam}
@@ -578,183 +625,137 @@ export function AnalysisPanel() {
   )
 }
 
-function TeamCard({
+/** Resumo curto do elenco: "14 atletas · 2 centrais · líbero". */
+function rosterSummary(players: Player[], hasLibero: boolean): string {
+  const parts = [`${players.length} atletas`]
+  const centrais = players.filter((p) => p.role === "central").length
+  if (centrais > 0) parts.push(`${centrais} ${centrais === 1 ? "central" : "centrais"}`)
+  if (hasLibero) parts.push("líbero")
+  return parts.join(" · ")
+}
+
+/** Linha compacta de uma das equipes em quadra (Equipe A / Equipe B). */
+function CourtTeamRow({
   team,
   accent,
-  saved,
+  label,
+  loaded,
   onEdit,
-  onSave,
 }: {
   team: TeamConfig
   accent: "blue" | "pink"
-  saved: boolean
+  label: string
+  loaded: boolean
   onEdit: () => void
-  onSave: () => void
 }) {
   const accentBar = accent === "blue" ? "bg-blue-500" : "bg-pink-500"
-  const accentText = accent === "blue" ? "text-blue-600" : "text-pink-600"
   const accentSoft = accent === "blue" ? "bg-blue-50 text-blue-700" : "bg-pink-50 text-pink-700"
-  const players = [...team.players].sort((a, b) => a.number - b.number)
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {/* Faixa superior com a cor da equipe */}
-      <div className={`h-1.5 w-full ${accentBar}`} aria-hidden="true" />
-
-      <div className="flex flex-1 flex-col p-5">
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className={`truncate text-base font-bold uppercase tracking-wide ${accentText}`}>
-              {team.name}
-            </h3>
-            <p className="text-xs text-slate-500">{players.length} atletas no elenco</p>
-          </div>
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${accentSoft}`}>
-            {accent === "blue" ? "Equipe A" : "Equipe B"}
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <span className={`h-10 w-1.5 shrink-0 rounded-full ${accentBar}`} aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${accentSoft}`}>
+            {label}
           </span>
-        </div>
-
-        {/* Elenco em formato de lista (número · nome · função) */}
-        <div className="mb-5 overflow-hidden rounded-xl border border-slate-200">
-          <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
-            <span className="w-8 text-center text-[10px] font-bold uppercase tracking-wide text-slate-400">
-              Nº
+          {loaded && (
+            <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-600">
+              <Check className="h-3 w-3" aria-hidden="true" /> carregada
             </span>
-            <span className="flex-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-              Atleta
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Função</span>
-          </div>
-          <div className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
-            {players.map((p) => {
-              const isLibero = p.id === team.liberoId
-              return (
-                <div key={p.id} className="flex items-center gap-3 px-3 py-2">
-                  <span
-                    className={`flex h-7 w-8 shrink-0 items-center justify-center rounded-md text-sm font-bold tabular-nums ${accentSoft}`}
-                  >
-                    {p.number}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">
-                    {p.name}
-                  </span>
-                  {isLibero ? (
-                    <span className="shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
-                      Líbero
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-[11px] font-medium text-slate-400">
-                      {p.role ? ROLE_LABEL[p.role] : "—"}
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          )}
         </div>
-
-        <div className="mt-auto flex gap-2">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700 active:scale-[0.98]"
-          >
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-            Editar equipe
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            className={`flex shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition active:scale-[0.98] ${
-              saved
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            {saved ? <Check className="h-4 w-4" aria-hidden="true" /> : <BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
-            {saved ? "Salvo!" : "Salvar modelo"}
-          </button>
-        </div>
+        <p className="mt-0.5 truncate text-sm font-bold text-slate-800">{team.name}</p>
+        <p className="truncate text-[11px] text-slate-400">
+          {rosterSummary(team.players, Boolean(team.liberoId))}
+        </p>
       </div>
+      <button
+        type="button"
+        onClick={onEdit}
+        className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+      >
+        <Pencil className="h-3.5 w-3.5 text-orange-600" aria-hidden="true" />
+        Editar
+      </button>
     </div>
   )
 }
 
-function PresetCard({
+/** Linha de uma equipe salva na biblioteca, com ações de uso/edição/exclusão. */
+function SavedTeamRow({
   preset,
-  onLoadA,
-  onLoadB,
+  isFirst,
+  onUseA,
+  onUseB,
+  onEdit,
   onDelete,
 }: {
   preset: TeamPreset
-  onLoadA: () => void
-  onLoadB: () => void
+  isFirst: boolean
+  onUseA: () => void
+  onUseB: () => void
+  onEdit: () => void
   onDelete: () => void
 }) {
-  const players = [...preset.team.players].sort((a, b) => a.number - b.number)
-  const savedDate = new Date(preset.savedAt).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
+  const players = preset.team.players
+  const initials = preset.name.trim().slice(0, 2).toUpperCase() || "EQ"
 
   return (
-    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-bold text-slate-800">{preset.name}</h3>
-          <p className="text-[11px] text-slate-400">
-            {players.length} atletas · salvo em {savedDate}
-          </p>
-        </div>
+    <div
+      className={`flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap ${
+        isFirst ? "" : "border-t border-slate-100"
+      }`}
+    >
+      {/* Avatar com iniciais */}
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-sm font-bold text-orange-700">
+        {initials}
+      </span>
+
+      {/* Identificação */}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold text-slate-800">{preset.name}</p>
+        <p className="truncate text-[11px] text-slate-400">
+          {rosterSummary(players, Boolean(preset.team.liberoId))}
+        </p>
+      </div>
+
+      {/* Ações de uso */}
+      <div className="flex items-center gap-1.5">
+        <span className="hidden text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:inline">
+          Usar em
+        </span>
+        <button
+          type="button"
+          onClick={onUseA}
+          className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
+        >
+          A
+        </button>
+        <button
+          type="button"
+          onClick={onUseB}
+          className="rounded-lg border border-pink-200 bg-pink-50 px-2.5 py-1.5 text-xs font-bold text-pink-700 transition hover:bg-pink-100 active:scale-[0.98]"
+        >
+          B
+        </button>
+        <span className="mx-1 h-6 w-px bg-slate-200" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50"
+          aria-label={`Editar ${preset.name}`}
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
         <button
           type="button"
           onClick={onDelete}
-          className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
-          aria-label={`Excluir equipe ${preset.name}`}
+          className="rounded-lg border border-slate-200 bg-white p-2 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+          aria-label={`Excluir ${preset.name}`}
         >
           <Trash2 className="h-4 w-4" />
         </button>
-      </div>
-
-      {/* Prévia dos números do elenco */}
-      <div className="mb-4 flex flex-wrap gap-1">
-        {players.slice(0, 10).map((p) => (
-          <span
-            key={p.id}
-            className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-slate-100 px-1.5 text-[11px] font-bold text-slate-600"
-          >
-            {p.number}
-          </span>
-        ))}
-        {players.length > 10 && (
-          <span className="inline-flex h-6 items-center px-1 text-[11px] font-medium text-slate-400">
-            +{players.length - 10}
-          </span>
-        )}
-      </div>
-
-      <div className="mt-auto">
-        <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-          <Download className="h-3 w-3" aria-hidden="true" />
-          Usar agora em
-        </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onLoadA}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100 active:scale-[0.98]"
-          >
-            Equipe A
-          </button>
-          <button
-            type="button"
-            onClick={onLoadB}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 py-2 text-xs font-bold text-pink-700 transition hover:bg-pink-100 active:scale-[0.98]"
-          >
-            Equipe B
-          </button>
-        </div>
       </div>
     </div>
   )

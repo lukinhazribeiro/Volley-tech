@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { BookmarkPlus, Download, FileBarChart, Plus, Shield, Trash2, X } from "lucide-react"
+import { useState } from "react"
+import { FileBarChart, Plus, Shield, Trash2, X } from "lucide-react"
 import {
   POSICAO_ORDER,
   ROLE_LABEL,
@@ -11,13 +11,6 @@ import {
 } from "@/lib/video-scout/types"
 import { BACK_ROW, type TeamConfig } from "@/lib/video-scout/match"
 import type { MatchHistoryEntry } from "@/lib/video-scout/history"
-import {
-  deletePreset,
-  loadPresets,
-  presetToTeam,
-  savePreset,
-  type TeamPreset,
-} from "@/lib/video-scout/team-presets"
 
 const ROLE_OPTIONS: { value: NonNullable<PlayerRole>; label: string }[] = [
   { value: "levantador", label: ROLE_LABEL.levantador },
@@ -202,35 +195,12 @@ interface TeamSetupDialogProps {
   team: TeamConfig
   onChange: (patch: Partial<TeamConfig>) => void
   onClose: () => void
+  /** Título do cabeçalho (ex.: "Nova equipe" ou "Editar equipe"). */
+  title?: string
 }
 
-export function TeamSetupDialog({ team, onChange, onClose }: TeamSetupDialogProps) {
-  const [tab, setTab] = useState<"funcoes" | "libero" | "elenco" | "modelos">("funcoes")
-  const [presets, setPresets] = useState<TeamPreset[]>([])
-  const [presetName, setPresetName] = useState("")
-  const [savedFlash, setSavedFlash] = useState(false)
-
-  useEffect(() => {
-    if (tab === "modelos") setPresets(loadPresets())
-  }, [tab])
-
-  function handleSavePreset() {
-    setPresets(savePreset(presetName, team))
-    setPresetName("")
-    setSavedFlash(true)
-    setTimeout(() => setSavedFlash(false), 1800)
-  }
-
-  function handleLoadPreset(preset: TeamPreset) {
-    // Aplica elenco, formação, líbero e levantador do modelo à equipe atual.
-    const { side: _side, ...patch } = presetToTeam(preset, team.side)
-    onChange(patch)
-    onClose()
-  }
-
-  function handleDeletePreset(id: string) {
-    setPresets(deletePreset(id))
-  }
+export function TeamSetupDialog({ team, onChange, onClose, title }: TeamSetupDialogProps) {
+  const [tab, setTab] = useState<"funcoes" | "libero" | "elenco">("elenco")
 
   const naoLiberos = team.players.filter((p) => p.id !== team.liberoId)
 
@@ -285,7 +255,7 @@ export function TeamSetupDialog({ team, onChange, onClose }: TeamSetupDialogProp
   return (
     <Overlay onClose={onClose}>
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-base font-semibold text-slate-800">Configuração da equipe</h3>
+        <h3 className="text-base font-semibold text-slate-800">{title ?? "Configuração da equipe"}</h3>
         <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
           <X className="h-5 w-5" />
         </button>
@@ -315,9 +285,6 @@ export function TeamSetupDialog({ team, onChange, onClose }: TeamSetupDialogProp
         </button>
         <button type="button" onClick={() => setTab("elenco")} className={tabClass(tab === "elenco")}>
           Elenco & Números
-        </button>
-        <button type="button" onClick={() => setTab("modelos")} className={tabClass(tab === "modelos")}>
-          Modelos salvos
         </button>
       </div>
 
@@ -501,74 +468,6 @@ export function TeamSetupDialog({ team, onChange, onClose }: TeamSetupDialogProp
           >
             <Plus className="h-4 w-4" /> Adicionar atleta
           </button>
-        </div>
-      )}
-
-      {tab === "modelos" && (
-        <div className="space-y-4">
-          <p className="text-[11px] text-slate-400">
-            Salve esta equipe (elenco, números, funções, líbero e levantador) para reaproveitar em
-            partidas futuras sem reconfigurar tudo de novo.
-          </p>
-
-          {/* Salvar equipe atual como modelo */}
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              placeholder={`Nome do modelo (ex.: ${team.name})`}
-              className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-orange-400 focus:outline-none"
-              aria-label="Nome do modelo"
-            />
-            <button
-              type="button"
-              onClick={handleSavePreset}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-700"
-            >
-              <BookmarkPlus className="h-4 w-4" /> Salvar
-            </button>
-          </div>
-          {savedFlash && <p className="text-[11px] font-medium text-emerald-600">Modelo salvo!</p>}
-
-          {/* Lista de modelos salvos */}
-          {presets.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-xs text-slate-400">
-              Nenhum modelo salvo ainda.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {presets.map((preset) => (
-                <div
-                  key={preset.id}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-slate-800">{preset.name}</p>
-                    <p className="text-[11px] text-slate-400">
-                      {preset.team.players.length} atletas
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadPreset(preset)}
-                    className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    <Download className="h-3.5 w-3.5 text-orange-600" aria-hidden="true" />
-                    Usar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePreset(preset.id)}
-                    className="shrink-0 text-slate-400 hover:text-red-500"
-                    aria-label={`Excluir modelo ${preset.name}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </Overlay>

@@ -599,6 +599,15 @@ function syncRolesDerived(team: TeamConfig): TeamConfig {
   }
 }
 
+/**
+ * Aplica um patch a UMA equipe isolada (fora de um jogo). Recalcula os campos
+ * derivados quando o elenco muda. Usado para editar equipes na biblioteca.
+ */
+export function applyTeamPatch(team: TeamConfig, patch: Partial<TeamConfig>): TeamConfig {
+  const merged = { ...team, ...patch }
+  return patch.players ? syncRolesDerived(merged) : merged
+}
+
 /** Atualiza a configuração de uma equipe (formação, líbero, elenco, funções). */
 export function updateTeam(
   state: MatchState,
@@ -607,10 +616,7 @@ export function updateTeam(
 ): MatchState {
   const key = side === "casa" ? "teamA" : "teamB"
   const team = getTeam(state, side)
-  const merged = { ...team, ...patch }
-  // Se mexeu nos atletas (funções), recalcula líbero/centrais/levantador.
-  const next = patch.players ? syncRolesDerived(merged) : merged
-  return { ...state, [key]: next }
+  return { ...state, [key]: applyTeamPatch(team, patch) }
 }
 
 /**
