@@ -44,7 +44,7 @@ function StatCard({
   )
 }
 
-// Cor do TGP (% de participação do atleta nos pontos da equipe).
+// Cor do TGP (% de importância do atleta = seu TP sobre o TP total da equipe).
 function tgpColor(value: number) {
   if (value >= 20) return "text-emerald-600"
   if (value >= 10) return "text-amber-600"
@@ -134,14 +134,13 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
   FLAT_COLS.forEach((c) => {
     colTotals[c.key] = stats.reduce((acc, s) => acc + c.get(s), 0)
   })
-  // Pontos conquistados pela equipe (base do TGP = % de participação nos pontos).
-  const teamPts = stats.reduce((acc, s) => acc + s.pontos, 0)
-  // TP = todas as ações do atleta EXCETO os erros (saque, ace, passe, defesa,
-  // bloqueio, ataque, levantamento... tudo que não é erro).
+  // TP = todas as ações de ponto e positivas do atleta (tudo EXCETO os erros:
+  // saque, ace, passe, defesa, bloqueio, ataque, levantamento...).
   const totTP = stats.reduce((acc, s) => acc + (s.total - s.erros), 0)
   const totTE = stats.reduce((acc, s) => acc + s.erros, 0)
-  // A soma das participações de todos os atletas equivale a 100% dos pontos.
-  const totTGP = teamPts === 0 ? 0 : 100
+  // TGP = importância do atleta = seu TP sobre o TP total da equipe. A soma das
+  // participações de todos os atletas equivale a 100%.
+  const totTGP = totTP === 0 ? 0 : 100
 
   const accent = TEAM_STYLE[team].hex
 
@@ -211,9 +210,9 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
           <tbody>
             {stats.map((s, idx) => {
               const tp = s.total - s.erros
-              // TGP = participação do atleta nos PONTOS da equipe. Usa os pontos
-              // do atleta sobre o total de pontos do time, então a soma dá 100%.
-              const tgp = teamPts === 0 ? 0 : Math.round((s.pontos / teamPts) * 100)
+              // TGP = importância do atleta = seu TP sobre o TP total da equipe,
+              // então a soma de todos os atletas dá 100%.
+              const tgp = totTP === 0 ? 0 : Math.round((tp / totTP) * 100)
               return (
                 <tr
                   key={s.player.id}
@@ -333,15 +332,15 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
       "TE",
       "TGP_%",
     ]
-    // Pontos por equipe (base do TGP) para o cálculo da % de participação.
-    const teamPtsMap: Record<TeamSide, number> = { casa: 0, adversario: 0 }
+    // TP total por equipe (base do TGP) para o cálculo da % de importância.
+    const teamTPMap: Record<TeamSide, number> = { casa: 0, adversario: 0 }
     summary.jogadores.forEach((s) => {
-      teamPtsMap[s.player.team] += s.pontos
+      teamTPMap[s.player.team] += s.total - s.erros
     })
     const rows = summary.jogadores.map((s) => {
       const tp = s.total - s.erros
-      const teamPts = teamPtsMap[s.player.team]
-      const tgp = teamPts === 0 ? 0 : Math.round((s.pontos / teamPts) * 100)
+      const teamTP = teamTPMap[s.player.team]
+      const tgp = teamTP === 0 ? 0 : Math.round((tp / teamTP) * 100)
       return [
         TEAM_LABEL[s.player.team],
         s.player.number,
@@ -459,8 +458,8 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
               Planilha por equipe
             </h2>
             <p className="mt-0.5 text-xs text-slate-400">
-              TP = ações certas (tudo exceto erros) · TE = total de erros · TGP = % dos pontos da equipe feitos pelo
-              atleta (a soma de todos = 100%)
+              TP = ações de ponto e positivas do atleta (tudo exceto erros) · TE = total de erros · TGP =
+              importância do atleta = seu TP sobre o TP total da equipe (a soma de todos = 100%)
             </p>
           </div>
           <button
