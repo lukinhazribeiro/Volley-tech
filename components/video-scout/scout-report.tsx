@@ -134,9 +134,9 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
   FLAT_COLS.forEach((c) => {
     colTotals[c.key] = stats.reduce((acc, s) => acc + c.get(s), 0)
   })
-  // TP = todas as ações de ponto e positivas do atleta (tudo EXCETO os erros:
-  // saque, ace, passe, defesa, bloqueio, ataque, levantamento...).
-  const totTP = stats.reduce((acc, s) => acc + (s.total - s.erros), 0)
+  // TP = todas as ações de ponto e positivas do atleta (pontos + positivas:
+  // saque, ace, passe, defesa, bloqueio, ataque, levantamento... exceto erros).
+  const totTP = stats.reduce((acc, s) => acc + (s.pontos + s.positivas), 0)
   const totTE = stats.reduce((acc, s) => acc + s.erros, 0)
   // TGP = importância do atleta = seu TP sobre o TP total da equipe. A soma das
   // participações de todos os atletas equivale a 100%.
@@ -209,7 +209,7 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
           </thead>
           <tbody>
             {stats.map((s, idx) => {
-              const tp = s.total - s.erros
+              const tp = s.pontos + s.positivas
               // TGP = importância do atleta = seu TP sobre o TP total da equipe,
               // então a soma de todos os atletas dá 100%.
               const tgp = totTP === 0 ? 0 : Math.round((tp / totTP) * 100)
@@ -335,10 +335,10 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
     // TP total por equipe (base do TGP) para o cálculo da % de importância.
     const teamTPMap: Record<TeamSide, number> = { casa: 0, adversario: 0 }
     summary.jogadores.forEach((s) => {
-      teamTPMap[s.player.team] += s.total - s.erros
+      teamTPMap[s.player.team] += s.pontos + s.positivas
     })
     const rows = summary.jogadores.map((s) => {
-      const tp = s.total - s.erros
+      const tp = s.pontos + s.positivas
       const teamTP = teamTPMap[s.player.team]
       const tgp = teamTP === 0 ? 0 : Math.round((tp / teamTP) * 100)
       return [
