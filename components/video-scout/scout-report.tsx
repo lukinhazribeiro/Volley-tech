@@ -140,9 +140,9 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
   const totTE = stats.reduce((acc, s) => acc + s.erros, 0)
   // Pontos conquistados pela equipe = base (divisor) do TGP.
   const teamPts = stats.reduce((acc, s) => acc + s.pontos, 0)
-  // TGP = TP do atleta sobre os PONTOS da equipe. Mede a importância real:
-  // um atleta que defende/passa muito pode ter TP próximo a 100% dos pontos.
-  const totTGP = teamPts === 0 ? 0 : Math.round((totTP / teamPts) * 100)
+  // A linha de RESULTADO GERAL é a referência do jogo inteiro = 100%. Cada
+  // atleta é mostrado como seu TP sobre esses pontos da equipe (valor variável).
+  const totTGP = teamPts === 0 ? 0 : 100
 
   const accent = TEAM_STYLE[team].hex
 
@@ -461,8 +461,8 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
             </h2>
             <p className="mt-0.5 text-xs text-slate-400">
               TP = ações de ponto e positivas do atleta (tudo exceto erros) · TE = total de erros · TGP =
-              importância do atleta = seu TP dividido pelos pontos da equipe (quanto mais perto de 100%,
-              mais decisivo)
+              TP do atleta dividido pelos pontos da equipe (o RESULTADO GERAL = 100%; quanto mais perto de
+              100%, mais decisivo o atleta)
             </p>
           </div>
           <button
