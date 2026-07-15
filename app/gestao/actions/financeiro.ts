@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/gestao/db"
 import { atletas, mensalidades, turmas } from "@/lib/gestao/db/schema"
+import { getGestaoUserId } from "@/lib/gestao/auth"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
@@ -15,14 +16,17 @@ import { revalidatePath } from "next/cache"
  * já existentes e nunca altera pagamentos. Deve ser chamada ao abrir as telas financeiras.
  */
 export async function sincronizarMensalidades() {
+  const userId = await getGestaoUserId()
   await db.execute(sql`
     WITH totais AS (
       SELECT at.atleta_id, sum(at.valor) AS total_turmas
       FROM atleta_turmas at
+      WHERE at.user_id = ${userId}
       GROUP BY at.atleta_id
     )
-    INSERT INTO mensalidades (atleta_id, turma_id, competencia, valor, data_vencimento, status)
+    INSERT INTO mensalidades (user_id, atleta_id, turma_id, competencia, valor, data_vencimento, status)
     SELECT
+      a.user_id,
       a.id,
       at.turma_id,
       to_char(m, 'YYYY-MM') AS competencia,
@@ -54,6 +58,7 @@ export async function sincronizarMensalidades() {
       interval '1 month'
     ) AS m
     WHERE a.ativo = true
+      AND a.user_id = ${userId}
       AND at.valor > 0
       AND NOT EXISTS (
         SELECT 1 FROM mensalidades me
@@ -65,6 +70,7 @@ export async function sincronizarMensalidades() {
 }
 
 export async function listMensalidades(filtro?: "todas" | "pendente" | "pago" | "atrasado") {
+  const userId = await getGestaoUserId()
   const rows = await db
     .select({
       id: mensalidades.id,
@@ -83,6 +89,7 @@ export async function listMensalidades(filtro?: "todas" | "pendente" | "pago" | 
     .from(mensalidades)
     .leftJoin(atletas, eq(mensalidades.atletaId, atletas.id))
     .leftJoin(turmas, eq(mensalidades.turmaId, turmas.id))
+    .where(eq(mensalidades.userId, userId))
     .orderBy(desc(mensalidades.dataVencimento))
 
   const hoje = new Date().toISOString().slice(0, 10)
@@ -99,11 +106,12 @@ export async function listMensalidades(filtro?: "todas" | "pendente" | "pago" | 
 }
 
 export async function registrarPagamento(id: number) {
+  const userId = await getGestaoUserId()
   const hoje = new Date().toISOString().slice(0, 10)
   await db
     .update(mensalidades)
     .set({ status: "pago", dataPagamento: hoje })
-    .where(eq(mensalidades.id, id))
+    .where(and(eq(mensalidades.id, id), eq(mensalidades.userId, userId)))
   revalidatePath("/gestao/financeiro")
   revalidatePath("/gestao/pagamentos")
   revalidatePath("/gestao")
@@ -111,10 +119,11 @@ export async function registrarPagamento(id: number) {
 }
 
 export async function reabrirMensalidade(id: number) {
+  const userId = await getGestaoUserId()
   await db
     .update(mensalidades)
     .set({ status: "pendente", dataPagamento: null })
-    .where(eq(mensalidades.id, id))
+    .where(and(eq(mensalidades.id, id), eq(mensalidades.userId, userId)))
   revalidatePath("/gestao/financeiro")
   revalidatePath("/gestao/pagamentos")
   revalidatePath("/gestao")
@@ -181,6 +190,7 @@ export async function inadimplenciaPorAtleta() {
 }
 
 export async function resumoFinanceiro() {
+  const userId = await getGestaoUserId()
   const [row] = await db
     .select({
       recebido: sql<number>`coalesce(sum(case when ${mensalidades.status} = 'pago' then ${mensalidades.valor} else 0 end), 0)`,
@@ -189,6 +199,7 @@ export async function resumoFinanceiro() {
       pagos: sql<number>`sum(case when ${mensalidades.status} = 'pago' then 1 else 0 end)`,
     })
     .from(mensalidades)
+    .where(eq(mensalidades.userId, userId))
 
   return {
     recebido: Number(row?.recebido ?? 0),

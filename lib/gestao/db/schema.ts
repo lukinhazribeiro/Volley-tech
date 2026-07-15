@@ -1,7 +1,8 @@
-import { pgTable, serial, text, boolean, integer, numeric, timestamp, date } from "drizzle-orm/pg-core"
+import { pgTable, serial, text, boolean, integer, numeric, timestamp, date, uuid } from "drizzle-orm/pg-core"
 
 export const categorias = pgTable("categorias", {
   id: serial("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   nome: text("nome").notNull(),
   descricao: text("descricao"),
   ativo: boolean("ativo").notNull().default(true),
@@ -10,6 +11,7 @@ export const categorias = pgTable("categorias", {
 
 export const turmas = pgTable("turmas", {
   id: serial("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   nome: text("nome").notNull(),
   categoriaId: integer("categoria_id"),
   professor: text("professor"),
@@ -24,6 +26,7 @@ export const turmas = pgTable("turmas", {
 
 export const atletas = pgTable("atletas", {
   id: serial("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   nome: text("nome").notNull(),
   cpf: text("cpf"),
   telefone: text("telefone"),
@@ -45,6 +48,7 @@ export const atletas = pgTable("atletas", {
 
 export const atletaTurmas = pgTable("atleta_turmas", {
   id: serial("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   atletaId: integer("atleta_id").notNull(),
   turmaId: integer("turma_id").notNull(),
   valor: numeric("valor").notNull().default("0"),
@@ -53,6 +57,7 @@ export const atletaTurmas = pgTable("atleta_turmas", {
 
 export const presencas = pgTable("presencas", {
   id: serial("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   atletaId: integer("atleta_id").notNull(),
   turmaId: integer("turma_id"),
   data: date("data").notNull(),
@@ -63,6 +68,7 @@ export const presencas = pgTable("presencas", {
 
 export const mensalidades = pgTable("mensalidades", {
   id: serial("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   atletaId: integer("atleta_id").notNull(),
   turmaId: integer("turma_id"),
   competencia: text("competencia").notNull(),

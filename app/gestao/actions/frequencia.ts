@@ -2,7 +2,8 @@
 
 import { db } from "@/lib/gestao/db"
 import { atletas, categorias, presencas, turmas } from "@/lib/gestao/db/schema"
-import { eq, sql } from "drizzle-orm"
+import { getGestaoUserId } from "@/lib/gestao/auth"
+import { and, eq, sql } from "drizzle-orm"
 
 const PRESENTE = sql`case when ${presencas.status} in ('presente','atrasado') then 1 else 0 end`
 
@@ -12,6 +13,7 @@ const PRESENTE = sql`case when ${presencas.status} in ('presente','atrasado') th
  * detalhamento por atleta. Também traz a evolução dos últimos 6 meses por turma.
  */
 export async function frequenciaMensalPorTurma(competencia: string) {
+  const userId = await getGestaoUserId()
   // Resumo do mês por turma
   const resumo = await db
     .select({
@@ -25,7 +27,7 @@ export async function frequenciaMensalPorTurma(competencia: string) {
       presencas,
       sql`${presencas.turmaId} = ${turmas.id} and to_char(${presencas.data}, 'YYYY-MM') = ${competencia}`,
     )
-    .where(eq(turmas.ativo, true))
+    .where(and(eq(turmas.ativo, true), eq(turmas.userId, userId)))
     .groupBy(turmas.id, turmas.nome)
     .orderBy(turmas.nome)
 
@@ -40,7 +42,7 @@ export async function frequenciaMensalPorTurma(competencia: string) {
     })
     .from(presencas)
     .innerJoin(atletas, eq(atletas.id, presencas.atletaId))
-    .where(sql`to_char(${presencas.data}, 'YYYY-MM') = ${competencia}`)
+    .where(and(sql`to_char(${presencas.data}, 'YYYY-MM') = ${competencia}`, eq(presencas.userId, userId)))
     .groupBy(presencas.turmaId, atletas.id, atletas.nome)
     .orderBy(atletas.nome)
 
@@ -53,7 +55,12 @@ export async function frequenciaMensalPorTurma(competencia: string) {
       presentes: sql<number>`coalesce(sum(${PRESENTE}), 0)`,
     })
     .from(presencas)
-    .where(sql`${presencas.data} >= (date_trunc('month', now()) - interval '5 months')`)
+    .where(
+      and(
+        sql`${presencas.data} >= (date_trunc('month', now()) - interval '5 months')`,
+        eq(presencas.userId, userId),
+      ),
+    )
     .groupBy(presencas.turmaId, sql`to_char(${presencas.data}, 'YYYY-MM')`)
 
   const detPorTurma = new Map<number, { atletaNome: string; total: number; presentes: number; percentual: number }[]>()
@@ -94,15 +101,18 @@ export async function frequenciaMensalPorTurma(competencia: string) {
 
 /** Lista as competências (AAAA-MM) que possuem presenças registradas, mais recente primeiro. */
 export async function competenciasComPresenca() {
+  const userId = await getGestaoUserId()
   const rows = await db
     .select({ competencia: sql<string>`to_char(${presencas.data}, 'YYYY-MM')` })
     .from(presencas)
+    .where(eq(presencas.userId, userId))
     .groupBy(sql`to_char(${presencas.data}, 'YYYY-MM')`)
     .orderBy(sql`to_char(${presencas.data}, 'YYYY-MM') desc`)
   return rows.map((r) => r.competencia)
 }
 
 export async function frequenciaPorTurma() {
+  const userId = await getGestaoUserId()
   const rows = await db
     .select({
       turmaId: turmas.id,
@@ -112,7 +122,7 @@ export async function frequenciaPorTurma() {
     })
     .from(turmas)
     .leftJoin(presencas, eq(presencas.turmaId, turmas.id))
-    .where(eq(turmas.ativo, true))
+    .where(and(eq(turmas.ativo, true), eq(turmas.userId, userId)))
     .groupBy(turmas.id, turmas.nome)
     .orderBy(turmas.nome)
 
@@ -125,6 +135,7 @@ export async function frequenciaPorTurma() {
 }
 
 export async function frequenciaPorCategoria() {
+  const userId = await getGestaoUserId()
   const rows = await db
     .select({
       categoriaNome: categorias.nome,
@@ -134,6 +145,7 @@ export async function frequenciaPorCategoria() {
     .from(categorias)
     .leftJoin(atletas, eq(atletas.categoriaId, categorias.id))
     .leftJoin(presencas, eq(presencas.atletaId, atletas.id))
+    .where(eq(categorias.userId, userId))
     .groupBy(categorias.id, categorias.nome)
     .orderBy(categorias.nome)
 
@@ -146,6 +158,7 @@ export async function frequenciaPorCategoria() {
 }
 
 export async function frequenciaPorAtleta() {
+  const userId = await getGestaoUserId()
   const rows = await db
     .select({
       atletaId: atletas.id,
@@ -157,7 +170,7 @@ export async function frequenciaPorAtleta() {
     .from(atletas)
     .leftJoin(presencas, eq(presencas.atletaId, atletas.id))
     .leftJoin(turmas, eq(atletas.turmaId, turmas.id))
-    .where(eq(atletas.ativo, true))
+    .where(and(eq(atletas.ativo, true), eq(atletas.userId, userId)))
     .groupBy(atletas.id, atletas.nome, turmas.nome)
     .orderBy(atletas.nome)
 
