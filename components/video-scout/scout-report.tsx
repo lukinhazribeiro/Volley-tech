@@ -18,9 +18,6 @@ interface ScoutReportProps {
   actions: ScoutAction[]
   players: Player[]
   onBackToValidation: () => void
-  /** Nomes para rotular o alternador de equipes (padrão: Equipe A / Equipe B). */
-  teamAName?: string
-  teamBName?: string
 }
 
 function StatCard({
@@ -285,13 +282,7 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
   )
 }
 
-export function ScoutReport({
-  actions,
-  players,
-  onBackToValidation,
-  teamAName = "Equipe A",
-  teamBName = "Equipe B",
-}: ScoutReportProps) {
+export function ScoutReport({ actions, players, onBackToValidation }: ScoutReportProps) {
   const [athleteFilter, setAthleteFilter] = useState<string>("todos")
   const [fundamentoFilter, setFundamentoFilter] = useState<Fundamento | "todos">("todos")
   const [teamFilter, setTeamFilter] = useState<TeamSide | "todos">("todos")
@@ -386,37 +377,16 @@ export function ScoutReport({
           Voltar para validação
         </button>
         <div className="flex flex-wrap gap-2">
-          {/* Alternador de equipe: basta clicar para trocar a tela do relatório. */}
-          <div
-            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1"
-            role="group"
-            aria-label="Equipe exibida no relatório"
+          <select
+            value={teamFilter}
+            onChange={(e) => setTeamFilter(e.target.value as TeamSide | "todos")}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-orange-400"
+            aria-label="Filtrar por equipe"
           >
-            {(
-              [
-                { key: "todos", label: "Ambas" },
-                { key: "casa", label: teamAName },
-                { key: "adversario", label: teamBName },
-              ] as { key: TeamSide | "todos"; label: string }[]
-            ).map((opt) => {
-              const active = teamFilter === opt.key
-              return (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setTeamFilter(opt.key)}
-                  aria-pressed={active}
-                  className={`max-w-[10rem] truncate rounded-md px-3 py-1.5 text-sm font-semibold transition ${
-                    active
-                      ? "bg-orange-600 text-white shadow-sm"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
+            <option value="todos">Ambas as equipes</option>
+            <option value="casa">Casa</option>
+            <option value="adversario">Adversário</option>
+          </select>
           <select
             value={fundamentoFilter}
             onChange={(e) => setFundamentoFilter(e.target.value as Fundamento | "todos")}

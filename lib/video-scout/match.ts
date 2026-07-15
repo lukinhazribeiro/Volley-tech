@@ -30,14 +30,6 @@ export interface TeamConfig {
   setterPosicao: Posicao
 }
 
-/** Um set já encerrado dentro da mesma partida (guardado separadamente). */
-export interface FinishedSet {
-  set: number
-  scoreA: number
-  scoreB: number
-  actions: ScoutAction[]
-}
-
 export interface MatchState {
   teamA: TeamConfig
   teamB: TeamConfig
@@ -49,12 +41,6 @@ export interface MatchState {
   currentRally: number
   /** Equipe que está sacando no momento (define a rotação por sideout). */
   servingTeam: TeamSide | null
-  /**
-   * Sets já encerrados desta partida (2 a 5 sets). Cada set fica guardado de
-   * forma isolada — usado para o relatório por set e para salvar cada set
-   * separadamente no histórico. Pode ser undefined em partidas antigas.
-   */
-  finishedSets?: FinishedSet[]
 }
 
 /** Posições de fundo de quadra. */
@@ -178,33 +164,6 @@ export function createMatch(): MatchState {
     scoreA: 0,
     scoreB: 0,
     set: 1,
-    currentRally: 1,
-    servingTeam: null,
-    finishedSets: [],
-  }
-}
-
-/**
- * Encerra o set atual: guarda o set (placar + ações) em `finishedSets` e começa
- * o próximo com placar zerado, mantendo os elencos/equipes. O saque e o rally
- * são reiniciados. As equipes permanecem como estão (o operador ajusta a
- * formação inicial do novo set se quiser).
- */
-export function endSet(state: MatchState): MatchState {
-  const finished = state.finishedSets ?? []
-  const snapshot: FinishedSet = {
-    set: state.set,
-    scoreA: state.scoreA,
-    scoreB: state.scoreB,
-    actions: state.actions,
-  }
-  return {
-    ...state,
-    finishedSets: [...finished, snapshot],
-    actions: [],
-    scoreA: 0,
-    scoreB: 0,
-    set: state.set + 1,
     currentRally: 1,
     servingTeam: null,
   }
