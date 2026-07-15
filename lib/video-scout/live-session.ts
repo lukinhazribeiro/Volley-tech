@@ -32,8 +32,10 @@ interface LiveRow {
   match: MatchState
 }
 
-// Considera "ao vivo" apenas transmissões atualizadas nos últimos 30s.
-const STALE_MS = 30_000
+// Considera "ao vivo" transmissões atualizadas recentemente. O dispositivo que
+// coleta reenvia um "heartbeat" a cada ~15s (mesmo parado, ex.: tempo técnico),
+// então usamos uma janela folgada de 45s para não derrubar a transmissão.
+const STALE_MS = 45_000
 
 const DEVICE_ID_KEY = "volleytech_device_id_v1"
 const DEVICE_LABEL_KEY = "volleytech_device_label_v1"

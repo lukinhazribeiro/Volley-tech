@@ -3,7 +3,7 @@
 // sincronizada em tempo real entre sessões abertas simultaneamente.
 
 import { createClient } from "@/lib/supabase/client"
-import type { MatchState } from "./match"
+import type { FinishedSet, MatchState } from "./match"
 
 export interface MatchHistoryEntry {
   id: string
@@ -77,6 +77,59 @@ export async function saveToHistory(match: MatchState): Promise<MatchHistoryEntr
     // Clona para desacoplar totalmente da partida em andamento.
     match: JSON.parse(JSON.stringify(match)) as MatchState,
   })
+  return loadHistory()
+}
+
+/**
+ * Salva CADA set da partida como uma entrada separada no histórico. Inclui os
+ * sets já encerrados (`finishedSets`) e o set atual (se tiver dados). Cada
+ * entrada guarda um snapshot isolado daquele set (placar e ações próprios),
+ * permitindo abrir o relatório de qualquer set individualmente. Uma partida de
+ * 2 sets gera 2 entradas; uma de 5 sets, 5 entradas.
+ */
+export async function saveSetsToHistory(match: MatchState): Promise<MatchHistoryEntry[]> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return loadHistory()
+
+  const finished = match.finishedSets ?? []
+  const sets: FinishedSet[] = [...finished]
+  // Inclui o set atual (em andamento) apenas se tiver algo registrado.
+  if (match.actions.length > 0 || match.scoreA > 0 || match.scoreB > 0) {
+    sets.push({
+      set: match.set,
+      scoreA: match.scoreA,
+      scoreB: match.scoreB,
+      actions: match.actions,
+    })
+  }
+  if (sets.length === 0) return loadHistory()
+
+  const rows = sets.map((s) => {
+    // Snapshot isolado daquele set: mesmas equipes, mas placar/ações do set.
+    const snapshot: MatchState = {
+      ...match,
+      set: s.set,
+      scoreA: s.scoreA,
+      scoreB: s.scoreB,
+      actions: s.actions,
+      currentRally: 1,
+      servingTeam: null,
+      finishedSets: [],
+    }
+    return {
+      user_id: user.id,
+      team_a_name: match.teamA.name,
+      team_b_name: match.teamB.name,
+      score_a: s.scoreA,
+      score_b: s.scoreB,
+      total_acoes: s.actions.length,
+      match: JSON.parse(JSON.stringify(snapshot)) as MatchState,
+    }
+  })
+  await supabase.from("vs_match_history").insert(rows)
   return loadHistory()
 }
 

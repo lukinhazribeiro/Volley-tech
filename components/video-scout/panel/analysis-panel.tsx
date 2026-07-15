@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -136,9 +136,16 @@ export function AnalysisPanel() {
     }
   }, [])
 
+  // Referência sempre atualizada da partida (usada pelo heartbeat sem recriar o
+  // intervalo a cada ação).
+  const matchRef = useRef(match)
+  useEffect(() => {
+    matchRef.current = match
+  }, [match])
+
   // Publica a partida em andamento ao vivo (sempre transmitir). Debounce para
   // não gerar escrita a cada clique; encerra a transmissão quando a partida
-  // está vazia (recém-criada) e ao sair da tela.
+  // está vazia (recém-criada).
   useEffect(() => {
     const t = window.setTimeout(() => {
       if (hasData(match)) publishLive(match)
@@ -147,6 +154,17 @@ export function AnalysisPanel() {
     return () => window.clearTimeout(t)
   }, [match])
 
+  // Heartbeat: reenvia a transmissão a cada 15s mesmo sem novas ações. Assim a
+  // transmissão NÃO cai durante tempos técnicos/pausas (quando a coleta para),
+  // mantendo o relatório ao vivo disponível no outro dispositivo.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (hasData(matchRef.current)) publishLive(matchRef.current)
+    }, 15_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  // Encerra a transmissão deste dispositivo ao sair da tela.
   useEffect(() => {
     return () => {
       clearLive()
@@ -316,6 +334,8 @@ export function AnalysisPanel() {
           <ScoutReport
             actions={watchedSession.match.actions}
             players={livePlayers}
+            teamAName={watchedSession.teamAName}
+            teamBName={watchedSession.teamBName}
             onBackToValidation={() => setWatchingDeviceId(null)}
           />
         </div>
@@ -402,6 +422,8 @@ export function AnalysisPanel() {
           <ScoutReport
             actions={reportActions}
             players={allPlayers}
+            teamAName={match.teamA.name}
+            teamBName={match.teamB.name}
             onBackToValidation={() => setView("painel")}
           />
         </div>
