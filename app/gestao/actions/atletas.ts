@@ -175,7 +175,7 @@ export async function createAtleta(formData: FormData) {
 
   const [novo] = await db
     .insert(atletas)
-    .values({ ...data, userId })
+    .values({ ...data, userId, ativo: true })
     .returning({ id: atletas.id })
   await salvarVinculos(userId, novo.id, vinculos)
 
