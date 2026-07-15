@@ -67,7 +67,7 @@ export default async function TurmasPage() {
                   <p className="text-lg font-extrabold text-primary">{brl(t.valorMensalidade)}</p>
                   <p className="text-[11px] text-muted-foreground">Venc. dia {t.diaVencimento} · {t.totalAtletas} atletas</p>
                 </div>
-                <TurmaCardActions id={t.id} ativo={t.ativo} />
+                <TurmaCardActions id={t.id} ativo={t.ativo} nome={t.nome} />
               </div>
             </div>
           ))}
