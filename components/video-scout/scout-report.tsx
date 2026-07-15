@@ -18,6 +18,9 @@ interface ScoutReportProps {
   actions: ScoutAction[]
   players: Player[]
   onBackToValidation: () => void
+  /** Nomes reais das equipes para os botões de troca (Equipe A / Equipe B). */
+  teamAName?: string
+  teamBName?: string
 }
 
 function StatCard({
@@ -282,7 +285,13 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
   )
 }
 
-export function ScoutReport({ actions, players, onBackToValidation }: ScoutReportProps) {
+export function ScoutReport({
+  actions,
+  players,
+  onBackToValidation,
+  teamAName,
+  teamBName,
+}: ScoutReportProps) {
   const [athleteFilter, setAthleteFilter] = useState<string>("todos")
   const [fundamentoFilter, setFundamentoFilter] = useState<Fundamento | "todos">("todos")
   const [teamFilter, setTeamFilter] = useState<TeamSide | "todos">("todos")
@@ -377,16 +386,38 @@ export function ScoutReport({ actions, players, onBackToValidation }: ScoutRepor
           Voltar para validação
         </button>
         <div className="flex flex-wrap gap-2">
-          <select
-            value={teamFilter}
-            onChange={(e) => setTeamFilter(e.target.value as TeamSide | "todos")}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-orange-400"
-            aria-label="Filtrar por equipe"
+          {/* Troca de equipe só com um clique (aba), sem abrir menu de seleção. */}
+          <div
+            className="flex gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1"
+            role="tablist"
+            aria-label="Equipe exibida no relatório"
           >
-            <option value="todos">Ambas as equipes</option>
-            <option value="casa">Casa</option>
-            <option value="adversario">Adversário</option>
-          </select>
+            {(
+              [
+                { value: "todos", label: "Ambas" },
+                { value: "casa", label: teamAName || TEAM_LABEL.casa },
+                { value: "adversario", label: teamBName || TEAM_LABEL.adversario },
+              ] as { value: TeamSide | "todos"; label: string }[]
+            ).map((opt) => {
+              const active = teamFilter === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTeamFilter(opt.value)}
+                  className={`max-w-[10rem] truncate rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                    active
+                      ? "bg-orange-600 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white hover:text-slate-800"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
           <select
             value={fundamentoFilter}
             onChange={(e) => setFundamentoFilter(e.target.value as Fundamento | "todos")}

@@ -157,7 +157,7 @@ export function HistoryDialog({ entries, onOpen, onDelete, onClose }: HistoryDia
                   {e.teamAName} <span className="text-slate-400">vs</span> {e.teamBName}
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  {formatDate(e.savedAt)} · {e.totalAcoes} ações
+                  Set {e.match.set} · {formatDate(e.savedAt)} · {e.totalAcoes} ações
                 </p>
               </div>
               <span className="shrink-0 text-sm font-bold tabular-nums text-slate-700">
