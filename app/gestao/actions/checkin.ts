@@ -1,9 +1,9 @@
 "use server"
 
 import { db } from "@/lib/gestao/db"
-import { atletas, presencas, turmas } from "@/lib/gestao/db/schema"
+import { atletas, atletaTurmas, presencas, turmas } from "@/lib/gestao/db/schema"
 import { getGestaoUserId } from "@/lib/gestao/auth"
-import { and, eq } from "drizzle-orm"
+import { and, eq, inArray, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
 export type StatusPresenca = "presente" | "atrasado" | "ausente" | "justificada"
@@ -51,10 +51,24 @@ export async function getTurmasParaChamada() {
 
 export async function getChamada(turmaId: number, data: string) {
   const userId = await getGestaoUserId()
+
+  // Atletas vinculados à turma. O vínculo principal é a tabela N:N atleta_turmas;
+  // mantemos o fallback para o campo legado atletas.turma_id (turma principal).
+  const vinculados = db
+    .select({ atletaId: atletaTurmas.atletaId })
+    .from(atletaTurmas)
+    .where(and(eq(atletaTurmas.turmaId, turmaId), eq(atletaTurmas.userId, userId)))
+
   const alunos = await db
     .select({ id: atletas.id, nome: atletas.nome, fotoUrl: atletas.fotoUrl })
     .from(atletas)
-    .where(and(eq(atletas.turmaId, turmaId), eq(atletas.ativo, true), eq(atletas.userId, userId)))
+    .where(
+      and(
+        eq(atletas.ativo, true),
+        eq(atletas.userId, userId),
+        or(eq(atletas.turmaId, turmaId), inArray(atletas.id, vinculados)),
+      ),
+    )
     .orderBy(atletas.nome)
 
   const registros = await db
