@@ -3,6 +3,7 @@
 import { db } from "@/lib/gestao/db"
 import { atletas, turmas, categorias, mensalidades, presencas, atletaTurmas } from "@/lib/gestao/db/schema"
 import { calcularMensalidade, competenciaAtual, type DescontoTipo } from "@/lib/gestao/format"
+import { getGestaoUserId } from "@/lib/gestao/auth"
 import { and, asc, desc, eq, ilike, or, sql, gte } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
@@ -11,7 +12,16 @@ import { sincronizarMensalidades } from "./financeiro"
 export type VinculoTurma = { turmaId: number; valor: number }
 
 export async function listAtletas(search?: string) {
-  const base = db
+  const userId = await getGestaoUserId()
+  const term = search?.trim() ? `%${search.trim()}%` : null
+  const where = term
+    ? and(
+        eq(atletas.userId, userId),
+        or(ilike(atletas.nome, term), ilike(atletas.cpf, term), ilike(atletas.telefone, term)),
+      )
+    : eq(atletas.userId, userId)
+
+  return db
     .select({
       id: atletas.id,
       nome: atletas.nome,
@@ -30,22 +40,12 @@ export async function listAtletas(search?: string) {
     .from(atletas)
     .leftJoin(categorias, eq(categorias.id, atletas.categoriaId))
     .leftJoin(turmas, eq(turmas.id, atletas.turmaId))
+    .where(where)
     .orderBy(asc(atletas.nome))
-
-  if (search && search.trim()) {
-    const term = `%${search.trim()}%`
-    return base.where(
-      or(
-        ilike(atletas.nome, term),
-        ilike(atletas.cpf, term),
-        ilike(atletas.telefone, term),
-      ),
-    )
-  }
-  return base
 }
 
 export async function getAtleta(id: number) {
+  const userId = await getGestaoUserId()
   const [a] = await db
     .select({
       atleta: atletas,
@@ -57,11 +57,12 @@ export async function getAtleta(id: number) {
     .from(atletas)
     .leftJoin(categorias, eq(categorias.id, atletas.categoriaId))
     .leftJoin(turmas, eq(turmas.id, atletas.turmaId))
-    .where(eq(atletas.id, id))
+    .where(and(eq(atletas.id, id), eq(atletas.userId, userId)))
   return a ?? null
 }
 
 export async function getVinculosAtleta(id: number) {
+  const userId = await getGestaoUserId()
   const rows = await db
     .select({
       turmaId: atletaTurmas.turmaId,
@@ -71,7 +72,7 @@ export async function getVinculosAtleta(id: number) {
     })
     .from(atletaTurmas)
     .leftJoin(turmas, eq(turmas.id, atletaTurmas.turmaId))
-    .where(eq(atletaTurmas.atletaId, id))
+    .where(and(eq(atletaTurmas.atletaId, id), eq(atletaTurmas.userId, userId)))
   return rows.map((r) => ({
     turmaId: r.turmaId,
     valor: Number(r.valor),
@@ -81,16 +82,17 @@ export async function getVinculosAtleta(id: number) {
 }
 
 export async function getHistoricoAtleta(id: number) {
+  const userId = await getGestaoUserId()
   const fichas = await db
     .select()
     .from(mensalidades)
-    .where(eq(mensalidades.atletaId, id))
+    .where(and(eq(mensalidades.atletaId, id), eq(mensalidades.userId, userId)))
     .orderBy(desc(mensalidades.competencia))
 
   const chamadas = await db
     .select()
     .from(presencas)
-    .where(eq(presencas.atletaId, id))
+    .where(and(eq(presencas.atletaId, id), eq(presencas.userId, userId)))
     .orderBy(desc(presencas.data))
     .limit(30)
 
@@ -100,7 +102,7 @@ export async function getHistoricoAtleta(id: number) {
       presentes: sql<number>`count(*) filter (where ${presencas.status} in ('presente','atrasado'))`,
     })
     .from(presencas)
-    .where(eq(presencas.atletaId, id))
+    .where(and(eq(presencas.atletaId, id), eq(presencas.userId, userId)))
 
   const total = Number(freq?.total ?? 0)
   const presentes = Number(freq?.presentes ?? 0)
@@ -154,22 +156,28 @@ function parseAtleta(formData: FormData, vinculos: VinculoTurma[]) {
 }
 
 /** Substitui os vínculos de turma do atleta pela lista informada. */
-async function salvarVinculos(atletaId: number, vinculos: VinculoTurma[]) {
-  await db.delete(atletaTurmas).where(eq(atletaTurmas.atletaId, atletaId))
+async function salvarVinculos(userId: string, atletaId: number, vinculos: VinculoTurma[]) {
+  await db
+    .delete(atletaTurmas)
+    .where(and(eq(atletaTurmas.atletaId, atletaId), eq(atletaTurmas.userId, userId)))
   if (vinculos.length > 0) {
     await db.insert(atletaTurmas).values(
-      vinculos.map((v) => ({ atletaId, turmaId: v.turmaId, valor: String(v.valor) })),
+      vinculos.map((v) => ({ userId, atletaId, turmaId: v.turmaId, valor: String(v.valor) })),
     )
   }
 }
 
 /** Cria o atleta, grava os vínculos de turma e gera as mensalidades (uma por turma). */
 export async function createAtleta(formData: FormData) {
+  const userId = await getGestaoUserId()
   const vinculos = parseVinculos(formData)
   const data = parseAtleta(formData, vinculos)
 
-  const [novo] = await db.insert(atletas).values(data).returning({ id: atletas.id })
-  await salvarVinculos(novo.id, vinculos)
+  const [novo] = await db
+    .insert(atletas)
+    .values({ ...data, userId })
+    .returning({ id: atletas.id })
+  await salvarVinculos(userId, novo.id, vinculos)
 
   // A geração das parcelas (uma por turma, com desconto proporcional, do mês de
   // inscrição até 3 meses à frente) é centralizada na sincronização.
@@ -183,13 +191,14 @@ export async function createAtleta(formData: FormData) {
 }
 
 export async function updateAtleta(id: number, formData: FormData) {
+  const userId = await getGestaoUserId()
   const vinculos = parseVinculos(formData)
   const data = parseAtleta(formData, vinculos)
-  await db.update(atletas).set(data).where(eq(atletas.id, id))
-  await salvarVinculos(id, vinculos)
+  await db.update(atletas).set(data).where(and(eq(atletas.id, id), eq(atletas.userId, userId)))
+  await salvarVinculos(userId, id, vinculos)
 
   // Recalcula as parcelas pendentes (competência atual em diante) conforme os vínculos.
-  await recalcularMensalidadesPendentes(id)
+  await recalcularMensalidadesPendentes(userId, id)
 
   revalidatePath("/gestao/atletas")
   revalidatePath(`/gestao/atletas/${id}`)
@@ -204,12 +213,13 @@ export async function updateAtleta(id: number, formData: FormData) {
  * valores de turma e o desconto atuais. Remove as pendentes e deixa a
  * sincronização recriá-las corretamente por turma (com desconto proporcional).
  */
-async function recalcularMensalidadesPendentes(atletaId: number) {
+async function recalcularMensalidadesPendentes(userId: string, atletaId: number) {
   const compAtual = competenciaAtual()
   await db
     .delete(mensalidades)
     .where(
       and(
+        eq(mensalidades.userId, userId),
         eq(mensalidades.atletaId, atletaId),
         eq(mensalidades.status, "pendente"),
         gte(mensalidades.competencia, compAtual),
@@ -220,7 +230,8 @@ async function recalcularMensalidadesPendentes(atletaId: number) {
 
 /** Inativa/reativa preservando todo o histórico financeiro e de frequência. */
 export async function toggleAtletaAtivo(id: number, ativo: boolean) {
-  await db.update(atletas).set({ ativo }).where(eq(atletas.id, id))
+  const userId = await getGestaoUserId()
+  await db.update(atletas).set({ ativo }).where(and(eq(atletas.id, id), eq(atletas.userId, userId)))
   revalidatePath("/gestao/atletas")
   revalidatePath(`/gestao/atletas/${id}`)
   revalidatePath("/gestao")

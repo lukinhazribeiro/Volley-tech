@@ -1,4 +1,5 @@
 import { db } from "@/lib/gestao/db"
+import { getGestaoUserId } from "@/lib/gestao/auth"
 import { sql } from "drizzle-orm"
 
 type Row = Record<string, any>
@@ -10,17 +11,18 @@ async function q<T = Row>(query: ReturnType<typeof sql>): Promise<T[]> {
 }
 
 export async function getIndicadores() {
+  const userId = await getGestaoUserId()
   const rows = await q(sql`
     SELECT
-      (SELECT count(*) FROM atletas) AS total_atletas,
-      (SELECT count(*) FROM atletas WHERE ativo) AS ativos,
-      (SELECT count(*) FROM atletas WHERE NOT ativo) AS inativos,
-      (SELECT count(*) FROM presencas WHERE data = CURRENT_DATE AND status IN ('presente','atrasado')) AS presencas_hoje,
-      (SELECT count(*) FROM presencas WHERE data = CURRENT_DATE) AS chamadas_hoje,
-      (SELECT count(*) FROM presencas WHERE data = CURRENT_DATE AND status IN ('ausente','justificada')) AS ausencias_hoje,
-      (SELECT coalesce(sum(valor),0) FROM mensalidades WHERE competencia = to_char(CURRENT_DATE,'YYYY-MM') AND status='pago') AS receita_recebida,
-      (SELECT coalesce(sum(valor),0) FROM mensalidades WHERE competencia = to_char(CURRENT_DATE,'YYYY-MM') AND status IN ('pendente','atrasado')) AS receita_pendente,
-      (SELECT coalesce(sum(valor),0) FROM mensalidades WHERE competencia = to_char(CURRENT_DATE,'YYYY-MM')) AS receita_prevista
+      (SELECT count(*) FROM atletas WHERE user_id = ${userId}) AS total_atletas,
+      (SELECT count(*) FROM atletas WHERE user_id = ${userId} AND ativo) AS ativos,
+      (SELECT count(*) FROM atletas WHERE user_id = ${userId} AND NOT ativo) AS inativos,
+      (SELECT count(*) FROM presencas WHERE user_id = ${userId} AND data = CURRENT_DATE AND status IN ('presente','atrasado')) AS presencas_hoje,
+      (SELECT count(*) FROM presencas WHERE user_id = ${userId} AND data = CURRENT_DATE) AS chamadas_hoje,
+      (SELECT count(*) FROM presencas WHERE user_id = ${userId} AND data = CURRENT_DATE AND status IN ('ausente','justificada')) AS ausencias_hoje,
+      (SELECT coalesce(sum(valor),0) FROM mensalidades WHERE user_id = ${userId} AND competencia = to_char(CURRENT_DATE,'YYYY-MM') AND status='pago') AS receita_recebida,
+      (SELECT coalesce(sum(valor),0) FROM mensalidades WHERE user_id = ${userId} AND competencia = to_char(CURRENT_DATE,'YYYY-MM') AND status IN ('pendente','atrasado')) AS receita_pendente,
+      (SELECT coalesce(sum(valor),0) FROM mensalidades WHERE user_id = ${userId} AND competencia = to_char(CURRENT_DATE,'YYYY-MM')) AS receita_prevista
   `)
   const r = rows[0]
   const total = Number(r.total_atletas)
@@ -44,6 +46,7 @@ export async function getIndicadores() {
 }
 
 export async function getPresencasSemana() {
+  const userId = await getGestaoUserId()
   const rows = await q(sql`
     WITH dias AS (
       SELECT generate_series(CURRENT_DATE - INTERVAL '6 day', CURRENT_DATE, INTERVAL '1 day')::date AS dia
@@ -53,7 +56,7 @@ export async function getPresencasSemana() {
       coalesce(count(p.id) FILTER (WHERE p.status IN ('presente','atrasado')), 0) AS presentes,
       coalesce(count(p.id), 0) AS total
     FROM dias d
-    LEFT JOIN presencas p ON p.data = d.dia
+    LEFT JOIN presencas p ON p.data = d.dia AND p.user_id = ${userId}
     GROUP BY d.dia
     ORDER BY d.dia
   `)
@@ -70,13 +73,14 @@ export async function getPresencasSemana() {
 }
 
 export async function getFrequenciaPorTurma() {
+  const userId = await getGestaoUserId()
   const rows = await q(sql`
     SELECT
       t.nome,
       coalesce(round(100.0 * count(p.id) FILTER (WHERE p.status IN ('presente','atrasado')) / NULLIF(count(p.id),0)), 0) AS percentual
     FROM turmas t
-    LEFT JOIN presencas p ON p.turma_id = t.id
-    WHERE t.ativo
+    LEFT JOIN presencas p ON p.turma_id = t.id AND p.user_id = ${userId}
+    WHERE t.ativo AND t.user_id = ${userId}
     GROUP BY t.id, t.nome
     ORDER BY percentual DESC
     LIMIT 6
@@ -85,13 +89,14 @@ export async function getFrequenciaPorTurma() {
 }
 
 export async function getMensalidadesAtraso() {
+  const userId = await getGestaoUserId()
   const rows = await q(sql`
     SELECT a.nome, t.nome AS turma, m.valor, m.data_vencimento,
       (CURRENT_DATE - m.data_vencimento) AS dias_atraso
     FROM mensalidades m
     JOIN atletas a ON a.id = m.atleta_id
     LEFT JOIN turmas t ON t.id = m.turma_id
-    WHERE m.status IN ('atrasado','pendente') AND m.data_vencimento < CURRENT_DATE
+    WHERE m.user_id = ${userId} AND m.status IN ('atrasado','pendente') AND m.data_vencimento < CURRENT_DATE
     ORDER BY dias_atraso DESC
     LIMIT 6
   `)
@@ -105,13 +110,15 @@ export async function getMensalidadesAtraso() {
 }
 
 export async function getAniversariantesDoMes() {
+  const userId = await getGestaoUserId()
   const rows = await q(sql`
     SELECT a.nome, a.data_nascimento, c.nome AS categoria,
       EXTRACT(DAY FROM a.data_nascimento)::int AS dia,
       date_part('year', age(a.data_nascimento))::int AS idade
     FROM atletas a
     LEFT JOIN categorias c ON c.id = a.categoria_id
-    WHERE a.ativo
+    WHERE a.user_id = ${userId}
+      AND a.ativo
       AND a.data_nascimento IS NOT NULL
       AND EXTRACT(MONTH FROM a.data_nascimento) = EXTRACT(MONTH FROM CURRENT_DATE)
     ORDER BY dia
@@ -128,8 +135,9 @@ export async function getAniversariantesDoMes() {
 }
 
 export async function getProximosTreinos() {
+  const userId = await getGestaoUserId()
   const rows = await q(sql`
-    SELECT nome, horario, quadra FROM turmas WHERE ativo ORDER BY horario LIMIT 4
+    SELECT nome, horario, quadra FROM turmas WHERE ativo AND user_id = ${userId} ORDER BY horario LIMIT 4
   `)
   return rows.map((r) => ({
     nome: r.nome as string,
@@ -139,10 +147,12 @@ export async function getProximosTreinos() {
 }
 
 export async function getAtletasPorCategoria() {
+  const userId = await getGestaoUserId()
   const rows = await q(sql`
     SELECT c.nome, count(a.id) AS total
     FROM categorias c
-    LEFT JOIN atletas a ON a.categoria_id = c.id
+    LEFT JOIN atletas a ON a.categoria_id = c.id AND a.user_id = ${userId}
+    WHERE c.user_id = ${userId}
     GROUP BY c.id, c.nome
     ORDER BY c.id
   `)
@@ -150,12 +160,14 @@ export async function getAtletasPorCategoria() {
 }
 
 export async function getSerieMensal() {
+  const userId = await getGestaoUserId()
   // Receita, frequência e inadimplência por competência (últimos 6 meses de dados)
   const receita = await q(sql`
     SELECT competencia,
       coalesce(sum(valor) FILTER (WHERE status='pago'),0) AS recebido,
       coalesce(round(100.0 * sum(valor) FILTER (WHERE status IN ('pendente','atrasado')) / NULLIF(sum(valor),0)),0) AS inadimplencia
     FROM mensalidades
+    WHERE user_id = ${userId}
     GROUP BY competencia
     ORDER BY competencia
   `)
@@ -163,6 +175,7 @@ export async function getSerieMensal() {
     SELECT to_char(data,'YYYY-MM') AS mes,
       coalesce(round(100.0 * count(*) FILTER (WHERE status IN ('presente','atrasado')) / NULLIF(count(*),0)),0) AS percentual
     FROM presencas
+    WHERE user_id = ${userId}
     GROUP BY mes
     ORDER BY mes
   `)
