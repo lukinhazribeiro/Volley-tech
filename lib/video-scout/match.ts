@@ -169,6 +169,23 @@ export function createMatch(): MatchState {
   }
 }
 
+/**
+ * Encerra o set atual e prepara o próximo: mantém as equipes (elenco, formação,
+ * líbero) e zera placar, ações, rally e saque, incrementando o número do set.
+ * O set encerrado deve ser salvo no histórico ANTES de chamar esta função.
+ */
+export function nextSet(state: MatchState): MatchState {
+  return {
+    ...state,
+    actions: [],
+    scoreA: 0,
+    scoreB: 0,
+    set: state.set + 1,
+    currentRally: 1,
+    servingTeam: null,
+  }
+}
+
 /** Aplica a pontuação e a rotação por sideout, retornando o novo estado parcial. */
 function applyScoring(
   state: MatchState,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -8,6 +8,7 @@ import {
   BookmarkPlus,
   Check,
   Download,
+  Flag,
   History,
   Menu,
   Pencil,
@@ -22,6 +23,7 @@ import {
   applyTeamPatch,
   createMatch,
   createTeam,
+  nextSet,
   quickStats,
   recordAction,
   substitute,
@@ -136,6 +138,10 @@ export function AnalysisPanel() {
     }
   }, [])
 
+  // Referência sempre atualizada da partida (para o heartbeat abaixo).
+  const matchRef = useRef(match)
+  matchRef.current = match
+
   // Publica a partida em andamento ao vivo (sempre transmitir). Debounce para
   // não gerar escrita a cada clique; encerra a transmissão quando a partida
   // está vazia (recém-criada) e ao sair da tela.
@@ -146,6 +152,15 @@ export function AnalysisPanel() {
     }, 600)
     return () => window.clearTimeout(t)
   }, [match])
+
+  // Heartbeat: reenvia a partida a cada 15s mesmo SEM mudanças, para a
+  // transmissão não cair durante os tempos técnicos (quando a coleta para).
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (hasData(matchRef.current)) publishLive(matchRef.current)
+    }, 15_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -247,6 +262,23 @@ export function AnalysisPanel() {
     setView("painel")
   }
 
+  // Encerra o set atual: salva o set no histórico (separadamente) e avança para
+  // o próximo, mantendo as equipes. Suporta jogos de 2 a 5 sets.
+  async function endSet() {
+    if (!hasData(match)) return
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Encerrar o Set ${match.set}? O set será salvo no histórico e um novo set começará com o placar zerado.`,
+      )
+    ) {
+      return
+    }
+    setHistory(await saveToHistory(match))
+    setMatch((prev) => nextSet(prev))
+    setView("painel")
+  }
+
   async function openHistoryEntry(entry: MatchHistoryEntry) {
     await archiveCurrent()
     setMatch(entry.match)
@@ -316,6 +348,8 @@ export function AnalysisPanel() {
           <ScoutReport
             actions={watchedSession.match.actions}
             players={livePlayers}
+            teamAName={watchedSession.match.teamA.name}
+            teamBName={watchedSession.match.teamB.name}
             onBackToValidation={() => setWatchingDeviceId(null)}
           />
         </div>
@@ -402,6 +436,8 @@ export function AnalysisPanel() {
           <ScoutReport
             actions={reportActions}
             players={allPlayers}
+            teamAName={match.teamA.name}
+            teamBName={match.teamB.name}
             onBackToValidation={() => setView("painel")}
           />
         </div>
@@ -697,6 +733,17 @@ export function AnalysisPanel() {
                       <span className="text-[10px] font-medium text-slate-400">saque</span>
                     )}
                   </div>
+                </div>
+                <div className="mt-3 flex justify-center border-t border-slate-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={endSet}
+                    disabled={!hasData(match)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-1.5 text-xs font-bold uppercase tracking-wide text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+                    Encerrar Set {match.set}
+                  </button>
                 </div>
               </div>
 
