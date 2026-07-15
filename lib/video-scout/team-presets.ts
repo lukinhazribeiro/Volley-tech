@@ -1,7 +1,9 @@
-// Modelos de equipe salvos localmente (localStorage) para agilizar o setup.
-// Guardam o elenco, funções, líbero e levantador de uma equipe para reaproveitar
-// em partidas futuras, sem precisar reconfigurar tudo de novo.
+// Modelos de equipe salvos na nuvem (Supabase), atrelados à conta do usuário.
+// Ficam disponíveis em qualquer dispositivo e sincronizam em tempo real entre
+// sessões abertas ao mesmo tempo. Guardam elenco, funções, líbero e levantador
+// de uma equipe para reaproveitar em partidas futuras sem reconfigurar tudo.
 
+import { createClient } from "@/lib/supabase/client"
 import type { Player, Posicao, TeamSide } from "./types"
 import { POSICAO_ORDER } from "./types"
 import type { TeamConfig } from "./match"
@@ -14,65 +16,137 @@ export interface TeamPreset {
   team: Omit<TeamConfig, "side">
 }
 
-const KEY = "volleytech_team_presets_v1"
+interface PresetRow {
+  id: string
+  name: string
+  team: Omit<TeamConfig, "side">
+  saved_at: string
+}
 
-/** Lê os modelos salvos (mais recentes primeiro). */
-export function loadPresets(): TeamPreset[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = window.localStorage.getItem(KEY)
-    const list = raw ? (JSON.parse(raw) as TeamPreset[]) : []
-    return Array.isArray(list) ? list : []
-  } catch {
-    return []
+function rowToPreset(row: PresetRow): TeamPreset {
+  return {
+    id: row.id,
+    name: row.name,
+    team: row.team,
+    savedAt: new Date(row.saved_at).getTime(),
   }
 }
 
-function persist(list: TeamPreset[]) {
-  if (typeof window === "undefined") return
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(list.slice(0, 30)))
-  } catch {
-    // Ignora estouro de cota silenciosamente.
-  }
+/** Lê os modelos salvos na conta (mais recentes primeiro). */
+export async function loadPresets(): Promise<TeamPreset[]> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data, error } = await supabase
+    .from("vs_team_presets")
+    .select("id, name, team, saved_at")
+    .order("saved_at", { ascending: false })
+
+  if (error || !data) return []
+  return data.map((r) => rowToPreset(r as PresetRow))
 }
 
 /** Salva a equipe atual como um novo modelo e retorna a lista atualizada. */
-export function savePreset(name: string, team: TeamConfig): TeamPreset[] {
+export async function savePreset(name: string, team: TeamConfig): Promise<TeamPreset[]> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return loadPresets()
+
   const { side: _side, ...rest } = team
-  const entry: TeamPreset = {
-    id: `tp_${Date.now().toString(36)}`,
-    savedAt: Date.now(),
-    name: name.trim() || team.name,
+  await supabase.from("vs_team_presets").insert({
+    user_id: user.id,
+    name: (name.trim() || team.name).trim(),
     team: JSON.parse(JSON.stringify(rest)) as Omit<TeamConfig, "side">,
-  }
-  const next = [entry, ...loadPresets()]
-  persist(next)
-  return next
+  })
+  return loadPresets()
 }
 
 /** Atualiza um modelo já existente (edição na biblioteca). */
-export function updatePreset(id: string, team: TeamConfig): TeamPreset[] {
+export async function updatePreset(id: string, team: TeamConfig): Promise<TeamPreset[]> {
+  const supabase = createClient()
   const { side: _side, ...rest } = team
-  const next = loadPresets().map((e) =>
-    e.id === id
-      ? {
-          ...e,
-          name: (team.name || e.name).trim(),
-          savedAt: Date.now(),
-          team: JSON.parse(JSON.stringify(rest)) as Omit<TeamConfig, "side">,
-        }
-      : e,
-  )
-  persist(next)
-  return next
+  await supabase
+    .from("vs_team_presets")
+    .update({
+      name: (team.name || "Equipe").trim(),
+      team: JSON.parse(JSON.stringify(rest)) as Omit<TeamConfig, "side">,
+      saved_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+  return loadPresets()
 }
 
 /** Remove um modelo salvo. */
-export function deletePreset(id: string): TeamPreset[] {
-  const next = loadPresets().filter((e) => e.id !== id)
-  persist(next)
-  return next
+export async function deletePreset(id: string): Promise<TeamPreset[]> {
+  const supabase = createClient()
+  await supabase.from("vs_team_presets").delete().eq("id", id)
+  return loadPresets()
+}
+
+/** Reage a mudanças (em qualquer dispositivo) chamando o callback. */
+export function subscribeToPresets(onChange: () => void): () => void {
+  const supabase = createClient()
+  const channel = supabase
+    .channel("vs_team_presets_changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "vs_team_presets" }, () => onChange())
+    .subscribe()
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+const LEGACY_KEY = "volleytech_team_presets_v1"
+const MIGRATED_KEY = "volleytech_team_presets_migrated_v1"
+
+/**
+ * Migra (uma única vez por dispositivo) as equipes salvas no localStorage antigo
+ * para a conta na nuvem. Retorna true se migrou algo.
+ */
+export async function migrateLocalPresets(): Promise<boolean> {
+  if (typeof window === "undefined") return false
+  if (window.localStorage.getItem(MIGRATED_KEY)) return false
+
+  const raw = window.localStorage.getItem(LEGACY_KEY)
+  if (!raw) {
+    window.localStorage.setItem(MIGRATED_KEY, "1")
+    return false
+  }
+
+  let legacy: TeamPreset[] = []
+  try {
+    const parsed = JSON.parse(raw)
+    legacy = Array.isArray(parsed) ? parsed : []
+  } catch {
+    legacy = []
+  }
+  if (legacy.length === 0) {
+    window.localStorage.setItem(MIGRATED_KEY, "1")
+    return false
+  }
+
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return false
+
+  const rows = legacy.map((p) => ({
+    user_id: user.id,
+    name: p.name,
+    team: p.team,
+    saved_at: new Date(p.savedAt || Date.now()).toISOString(),
+  }))
+  const { error } = await supabase.from("vs_team_presets").insert(rows)
+  if (error) return false
+
+  window.localStorage.setItem(MIGRATED_KEY, "1")
+  window.localStorage.removeItem(LEGACY_KEY)
+  return true
 }
 
 /**

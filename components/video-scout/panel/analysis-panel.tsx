@@ -33,14 +33,18 @@ import {
   deleteFromHistory,
   hasData,
   loadHistory,
+  migrateLocalHistory,
   saveToHistory,
+  subscribeToHistory,
   type MatchHistoryEntry,
 } from "@/lib/video-scout/history"
 import {
   deletePreset,
   loadPresets,
+  migrateLocalPresets,
   presetToTeam,
   savePreset,
+  subscribeToPresets,
   updatePreset,
   type TeamPreset,
 } from "@/lib/video-scout/team-presets"
@@ -75,8 +79,35 @@ export function AnalysisPanel() {
   const [loadedInfo, setLoadedInfo] = useState<{ side: TeamSide; name: string } | null>(null)
 
   useEffect(() => {
-    setHistory(loadHistory())
-    setPresets(loadPresets())
+    let active = true
+
+    async function init() {
+      // Migra dados antigos do dispositivo (localStorage) para a conta uma vez.
+      await Promise.all([migrateLocalPresets(), migrateLocalHistory()])
+      const [hist, pres] = await Promise.all([loadHistory(), loadPresets()])
+      if (!active) return
+      setHistory(hist)
+      setPresets(pres)
+    }
+    init()
+
+    // Sincronização em tempo real entre dispositivos/sessões simultâneas.
+    const unsubPresets = subscribeToPresets(() => {
+      loadPresets().then((p) => {
+        if (active) setPresets(p)
+      })
+    })
+    const unsubHistory = subscribeToHistory(() => {
+      loadHistory().then((h) => {
+        if (active) setHistory(h)
+      })
+    })
+
+    return () => {
+      active = false
+      unsubPresets()
+      unsubHistory()
+    }
   }, [])
 
   // Abre o editor para criar uma equipe nova (do zero).
@@ -97,12 +128,15 @@ export function AnalysisPanel() {
   }, [])
 
   // Fecha o editor salvando na biblioteca (cria nova ou atualiza a existente).
-  const closeEditor = useCallback(() => {
-    if (editorTeam) {
-      setPresets(editorId ? updatePreset(editorId, editorTeam) : savePreset(editorTeam.name, editorTeam))
-    }
+  const closeEditor = useCallback(async () => {
+    const team = editorTeam
+    const id = editorId
     setEditorTeam(null)
     setEditorId(null)
+    if (team) {
+      const next = id ? await updatePreset(id, team) : await savePreset(team.name, team)
+      setPresets(next)
+    }
   }, [editorTeam, editorId])
 
   const handleLoadPreset = useCallback((preset: TeamPreset, side: TeamSide) => {
@@ -113,8 +147,8 @@ export function AnalysisPanel() {
     setLoadedInfo({ side, name: preset.name })
   }, [])
 
-  const handleDeletePreset = useCallback((id: string) => {
-    setPresets(deletePreset(id))
+  const handleDeletePreset = useCallback(async (id: string) => {
+    setPresets(await deletePreset(id))
   }, [])
 
   const stats = useMemo(() => quickStats(match), [match])
@@ -156,29 +190,29 @@ export function AnalysisPanel() {
 
   const handleUndo = useCallback(() => setMatch((prev) => undoLast(prev)), [])
 
-  const archiveCurrent = useCallback(() => {
+  const archiveCurrent = useCallback(async () => {
     if (hasData(match)) {
-      setHistory(saveToHistory(match))
+      setHistory(await saveToHistory(match))
       return true
     }
     return false
   }, [match])
 
-  function newMatch() {
-    archiveCurrent()
+  async function newMatch() {
+    await archiveCurrent()
     setMatch(createMatch())
     setView("painel")
   }
 
-  function openHistoryEntry(entry: MatchHistoryEntry) {
-    archiveCurrent()
+  async function openHistoryEntry(entry: MatchHistoryEntry) {
+    await archiveCurrent()
     setMatch(entry.match)
     setShowHistory(false)
     setView("relatorio")
   }
 
-  function removeHistoryEntry(id: string) {
-    setHistory(deleteFromHistory(id))
+  async function removeHistoryEntry(id: string) {
+    setHistory(await deleteFromHistory(id))
   }
 
   const allPlayers = useMemo(
@@ -408,8 +442,8 @@ export function AnalysisPanel() {
             <button
               type="button"
               onClick={() => {
-                setHistory(loadHistory())
                 setShowHistory(true)
+                loadHistory().then(setHistory)
               }}
               className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
