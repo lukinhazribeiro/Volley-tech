@@ -12,6 +12,7 @@ import {
   Menu,
   Pencil,
   Plus,
+  Radio,
   Trash2,
   Users,
 } from "lucide-react"
@@ -48,6 +49,13 @@ import {
   updatePreset,
   type TeamPreset,
 } from "@/lib/video-scout/team-presets"
+import {
+  clearLive,
+  loadLiveSessions,
+  publishLive,
+  subscribeToLive,
+  type LiveSession,
+} from "@/lib/video-scout/live-session"
 import { ScoutReport } from "../scout-report"
 import { PanelSidebar } from "./panel-sidebar"
 import { PanelTeam, type RecordPayload } from "./panel-team"
@@ -55,11 +63,16 @@ import { PanelActions } from "./panel-actions"
 import { PanelStatsBar } from "./panel-stats-bar"
 import { HistoryDialog, SubstitutionDialog, TeamSetupDialog } from "./panel-dialogs"
 
-type View = "painel" | "relatorio" | "equipes"
+type View = "painel" | "relatorio" | "equipes" | "ao_vivo"
 
 export function AnalysisPanel() {
   const [match, setMatch] = useState<MatchState>(() => createMatch())
   const [view, setView] = useState<View>("painel")
+
+  // Transmissões ao vivo de OUTROS dispositivos da mesma conta.
+  const [liveSessions, setLiveSessions] = useState<LiveSession[]>([])
+  // Dispositivo cuja coleta estamos assistindo ao vivo (null = nenhum).
+  const [watchingDeviceId, setWatchingDeviceId] = useState<string | null>(null)
 
   // Diálogos.
   const [subTarget, setSubTarget] = useState<{ side: TeamSide; pos: Posicao } | null>(null)
@@ -103,10 +116,40 @@ export function AnalysisPanel() {
       })
     })
 
+    // Transmissões ao vivo: carrega, assina mudanças e revalida periodicamente
+    // (para descartar sessões que ficaram paradas / offline).
+    const refreshLive = () => {
+      loadLiveSessions().then((s) => {
+        if (active) setLiveSessions(s)
+      })
+    }
+    refreshLive()
+    const unsubLive = subscribeToLive(refreshLive)
+    const liveInterval = window.setInterval(refreshLive, 12_000)
+
     return () => {
       active = false
       unsubPresets()
       unsubHistory()
+      unsubLive()
+      window.clearInterval(liveInterval)
+    }
+  }, [])
+
+  // Publica a partida em andamento ao vivo (sempre transmitir). Debounce para
+  // não gerar escrita a cada clique; encerra a transmissão quando a partida
+  // está vazia (recém-criada) e ao sair da tela.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (hasData(match)) publishLive(match)
+      else clearLive()
+    }, 600)
+    return () => window.clearTimeout(t)
+  }, [match])
+
+  useEffect(() => {
+    return () => {
+      clearLive()
     }
   }, [])
 
@@ -221,6 +264,136 @@ export function AnalysisPanel() {
   )
 
   const reportActions: ScoutAction[] = match.actions
+
+  // Sessão ao vivo atualmente assistida (derivada da lista em tempo real).
+  const watchedSession = watchingDeviceId
+    ? liveSessions.find((s) => s.deviceId === watchingDeviceId) ?? null
+    : null
+
+  // Assistindo a coleta de outro dispositivo ao vivo.
+  if (watchingDeviceId) {
+    if (!watchedSession) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center text-slate-700">
+          <Radio className="h-10 w-10 text-slate-300" aria-hidden="true" />
+          <p className="max-w-sm text-balance text-sm">
+            A transmissão ao vivo foi encerrada ou o outro dispositivo ficou sem conexão.
+          </p>
+          <button
+            type="button"
+            onClick={() => setWatchingDeviceId(null)}
+            className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+          >
+            Voltar
+          </button>
+        </div>
+      )
+    }
+    const livePlayers = [...watchedSession.match.teamA.players, ...watchedSession.match.teamB.players]
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800">
+        <div className="mx-auto max-w-6xl px-4 py-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+              </span>
+              <p className="text-sm font-semibold text-red-700">
+                AO VIVO · {watchedSession.deviceLabel} · {watchedSession.teamAName} {watchedSession.scoreA}
+                {" × "}
+                {watchedSession.scoreB} {watchedSession.teamBName}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWatchingDeviceId(null)}
+              className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+            >
+              Sair da transmissão
+            </button>
+          </div>
+          <ScoutReport
+            actions={watchedSession.match.actions}
+            players={livePlayers}
+            onBackToValidation={() => setWatchingDeviceId(null)}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Lista de transmissões ao vivo disponíveis (escolher qual assistir).
+  if (view === "ao_vivo") {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-800">
+        <div className="mx-auto max-w-3xl px-4 py-6">
+          <header className="mb-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600">
+                <Radio className="h-5 w-5 text-white" aria-hidden="true" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-slate-800">Coletas ao vivo</h1>
+                <p className="text-xs text-slate-500">
+                  Acompanhe em tempo real a coleta feita em outro dispositivo da sua conta.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setView("painel")}
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-4 w-4 text-orange-600" aria-hidden="true" />
+              Voltar
+            </button>
+          </header>
+
+          {liveSessions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+              <Radio className="h-9 w-9 text-slate-300" aria-hidden="true" />
+              <p className="max-w-sm text-balance text-sm text-slate-500">
+                Nenhuma coleta ao vivo no momento. Quando outro dispositivo logado na sua conta começar a
+                registrar uma partida, ela aparecerá aqui automaticamente.
+              </p>
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {liveSessions.map((s) => (
+                <li key={s.deviceId}>
+                  <button
+                    type="button"
+                    onClick={() => setWatchingDeviceId(s.deviceId)}
+                    className="flex w-full items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-red-300 hover:bg-red-50/40"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-800">
+                          {s.teamAName} {s.scoreA} × {s.scoreB} {s.teamBName}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">
+                          {s.deviceLabel} · Set {s.setNum} · {s.match.actions.length} ações
+                        </p>
+                      </div>
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">
+                      Assistir
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   if (view === "relatorio") {
     return (
@@ -431,6 +604,22 @@ export function AnalysisPanel() {
             <h1 className="text-lg font-bold tracking-wide text-slate-800">PAINEL DE ANÁLISE</h1>
           </div>
           <div className="flex items-center gap-2">
+            {liveSessions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setView("ao_vivo")}
+                className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+              >
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                </span>
+                Ao vivo
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold text-white">
+                  {liveSessions.length}
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setView("equipes")}
