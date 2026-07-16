@@ -42,7 +42,7 @@ const apps = [
     image: "/images/hub-summary-game.jpg",
   },
   {
-    title: "Scout Video",
+    title: "Scout View IA",
     subtitle: "Análise por vídeo",
     description: "Painel de análise com vídeo e leitura por IA para gerar o scout direto das imagens da partida.",
     href: "/scout-video",
