@@ -44,7 +44,7 @@ const apps = [
   {
     title: "Scout View IA",
     subtitle: "Análise por vídeo",
-    description: "Painel de análise com vídeo e leitura por IA para gerar o scout direto das imagens da partida.",
+    description: "Scout com auxílio de IA, mudando com poucos cliques a leitura, registre sua equipe e adversária, defina numeração e posição, coloque a forma.",
     href: "/scout-video",
     icon: Video,
     status: "On-line",
