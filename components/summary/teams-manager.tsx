@@ -35,8 +35,18 @@ export function TeamsManager({ onBack }: { onBack: () => void }) {
   const [editor, setEditor] = useState<EditorState>({ mode: "list" })
   const [cloneTarget, setCloneTarget] = useState<SavedTeam | null>(null)
   const [cloneName, setCloneName] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
-  const refresh = () => setTeams(getTeams())
+  const refresh = async () => {
+    try {
+      setTeams(await getTeams())
+    } catch (err) {
+      console.error("[v0] Erro ao carregar equipes:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
   useEffect(() => {
     refresh()
   }, [])
@@ -71,21 +81,32 @@ export function TeamsManager({ onBack }: { onBack: () => void }) {
   const validPlayers = rows.filter((r) => r.name.trim() !== "" && r.number > 0)
   const canSave = name.trim() !== "" && validPlayers.length > 0
 
-  const handleSave = () => {
-    if (!canSave) return
-    if (editor.mode === "edit") {
-      updateTeam(editor.team.id, { name, players: rows })
-    } else {
-      saveTeam({ name, players: rows })
+  const handleSave = async () => {
+    if (!canSave || saving) return
+    setSaving(true)
+    try {
+      if (editor.mode === "edit") {
+        await updateTeam(editor.team.id, { name, players: rows })
+      } else {
+        await saveTeam({ name, players: rows })
+      }
+      await refresh()
+      setEditor({ mode: "list" })
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível salvar a equipe.")
+    } finally {
+      setSaving(false)
     }
-    refresh()
-    setEditor({ mode: "list" })
   }
 
-  const handleDelete = (team: SavedTeam) => {
+  const handleDelete = async (team: SavedTeam) => {
     if (!confirm(`Excluir a equipe "${team.name}"? Esta ação não pode ser desfeita.`)) return
-    deleteTeam(team.id)
-    refresh()
+    try {
+      await deleteTeam(team.id)
+      await refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível excluir a equipe.")
+    }
   }
 
   const openClone = (team: SavedTeam) => {
@@ -93,11 +114,15 @@ export function TeamsManager({ onBack }: { onBack: () => void }) {
     setCloneName(`${team.name} (cópia)`)
   }
 
-  const confirmClone = () => {
+  const confirmClone = async () => {
     if (!cloneTarget) return
-    cloneTeam(cloneTarget.id, cloneName)
-    setCloneTarget(null)
-    refresh()
+    try {
+      await cloneTeam(cloneTarget.id, cloneName)
+      setCloneTarget(null)
+      await refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível clonar a equipe.")
+    }
   }
 
   // ===================== LISTA =====================
@@ -118,7 +143,13 @@ export function TeamsManager({ onBack }: { onBack: () => void }) {
           </Button>
         </div>
 
-        {teams.length === 0 ? (
+        {loading ? (
+          <Card className="border-2 border-dashed border-slate-200">
+            <CardContent className="p-12 text-center">
+              <p className="text-slate-500 font-medium">Carregando equipes...</p>
+            </CardContent>
+          </Card>
+        ) : teams.length === 0 ? (
           <Card className="border-2 border-dashed border-slate-200">
             <CardContent className="p-12 text-center">
               <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
@@ -286,9 +317,13 @@ export function TeamsManager({ onBack }: { onBack: () => void }) {
             <Button variant="outline" onClick={() => setEditor({ mode: "list" })}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={!canSave} className="bg-orange-600 hover:bg-orange-700 text-white">
+            <Button
+              onClick={handleSave}
+              disabled={!canSave || saving}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
               <Save className="w-4 h-4 mr-1" />
-              Salvar Equipe
+              {saving ? "Salvando..." : "Salvar Equipe"}
             </Button>
           </div>
         </CardContent>

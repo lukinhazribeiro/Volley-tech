@@ -1,5 +1,8 @@
-// Store local (localStorage) para Equipes pré-cadastradas e Competições.
-// Mantém o padrão offline da Summary Game (assim como summary_saved_matches).
+// Store da Summary Game persistido no Supabase, escopado por conta (RLS por auth.uid()).
+// Substitui o antigo armazenamento em localStorage: agora os dados salvam na conta
+// e sincronizam entre aparelhos, sem misturar dados de contas diferentes.
+
+import { createClient } from "@/lib/supabase/client"
 
 export type RosterPlayer = {
   number: number
@@ -23,77 +26,24 @@ export type Competition = {
   createdAt: string
 }
 
-const TEAMS_KEY = "summary_teams"
-const COMPETITIONS_KEY = "summary_competitions"
-
-function uid(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+// Registro de súmula salva. `data` guarda o objeto completo do jogo (times, sets, etc.).
+export type SavedMatchRecord = {
+  id: string
+  competitionId: string | null
+  championshipName: string
+  winnerName: string
+  scoreline: string
+  date: string
+  data: Record<string, unknown>
 }
 
-function read<T>(key: string): T[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T[]) : []
-  } catch {
-    return []
-  }
-}
-
-function write<T>(key: string, value: T[]): void {
-  if (typeof window === "undefined") return
-  localStorage.setItem(key, JSON.stringify(value))
-}
-
-/* ------------------------------- Equipes ------------------------------- */
-
-export function getTeams(): SavedTeam[] {
-  return read<SavedTeam>(TEAMS_KEY).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-}
-
-export function getTeam(id: string): SavedTeam | undefined {
-  return read<SavedTeam>(TEAMS_KEY).find((t) => t.id === id)
-}
-
-export function saveTeam(input: { name: string; players: RosterPlayer[] }): SavedTeam {
-  const teams = read<SavedTeam>(TEAMS_KEY)
-  const now = new Date().toISOString()
-  const team: SavedTeam = {
-    id: uid(),
-    name: input.name.trim(),
-    players: normalizePlayers(input.players),
-    createdAt: now,
-    updatedAt: now,
-  }
-  write(TEAMS_KEY, [...teams, team])
-  return team
-}
-
-export function updateTeam(id: string, input: { name: string; players: RosterPlayer[] }): void {
-  const teams = read<SavedTeam>(TEAMS_KEY)
-  const next = teams.map((t) =>
-    t.id === id
-      ? { ...t, name: input.name.trim(), players: normalizePlayers(input.players), updatedAt: new Date().toISOString() }
-      : t,
-  )
-  write(TEAMS_KEY, next)
-}
-
-export function deleteTeam(id: string): void {
-  write(
-    TEAMS_KEY,
-    read<SavedTeam>(TEAMS_KEY).filter((t) => t.id !== id),
-  )
-}
-
-// Clona uma equipe gerando uma cópia totalmente independente (novo id e novos atletas).
-export function cloneTeam(id: string, newName: string): SavedTeam | undefined {
-  const original = getTeam(id)
-  if (!original) return undefined
-  return saveTeam({
-    name: newName.trim() || `${original.name} (cópia)`,
-    players: original.players.map((p) => ({ ...p })),
-  })
+async function requireUserId(): Promise<string> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error("Sessão expirada. Faça login novamente para salvar seus dados.")
+  return user.id
 }
 
 function normalizePlayers(players: RosterPlayer[]): RosterPlayer[] {
@@ -102,53 +52,222 @@ function normalizePlayers(players: RosterPlayer[]): RosterPlayer[] {
     .filter((p) => p.name !== "" && p.number > 0)
 }
 
-/* ----------------------------- Competições ----------------------------- */
+/* ------------------------------- Equipes ------------------------------- */
 
-export function getCompetitions(): Competition[] {
-  return read<Competition>(COMPETITIONS_KEY).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+export async function getTeams(): Promise<SavedTeam[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("summary_teams")
+    .select("id, name, players, created_at, updated_at")
+    .order("name", { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: r.name as string,
+    players: (r.players as RosterPlayer[]) ?? [],
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  }))
 }
 
-export function saveCompetition(input: {
+export async function getTeam(id: string): Promise<SavedTeam | undefined> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("summary_teams")
+    .select("id, name, players, created_at, updated_at")
+    .eq("id", id)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return undefined
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    players: (data.players as RosterPlayer[]) ?? [],
+    createdAt: data.created_at as string,
+    updatedAt: data.updated_at as string,
+  }
+}
+
+export async function saveTeam(input: { name: string; players: RosterPlayer[] }): Promise<SavedTeam> {
+  const supabase = createClient()
+  const userId = await requireUserId()
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from("summary_teams")
+    .insert({
+      user_id: userId,
+      name: input.name.trim(),
+      players: normalizePlayers(input.players),
+      updated_at: now,
+    })
+    .select("id, name, players, created_at, updated_at")
+    .single()
+  if (error) throw error
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    players: (data.players as RosterPlayer[]) ?? [],
+    createdAt: data.created_at as string,
+    updatedAt: data.updated_at as string,
+  }
+}
+
+export async function updateTeam(id: string, input: { name: string; players: RosterPlayer[] }): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from("summary_teams")
+    .update({
+      name: input.name.trim(),
+      players: normalizePlayers(input.players),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+  if (error) throw error
+}
+
+export async function deleteTeam(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from("summary_teams").delete().eq("id", id)
+  if (error) throw error
+}
+
+// Clona uma equipe gerando uma cópia totalmente independente (novo id e novos atletas).
+export async function cloneTeam(id: string, newName: string): Promise<SavedTeam | undefined> {
+  const original = await getTeam(id)
+  if (!original) return undefined
+  return saveTeam({
+    name: newName.trim() || `${original.name} (cópia)`,
+    players: original.players.map((p) => ({ ...p })),
+  })
+}
+
+/* ----------------------------- Competições ----------------------------- */
+
+export async function getCompetitions(): Promise<Competition[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("summary_competitions")
+    .select("id, name, category, season, team_ids, created_at")
+    .order("name", { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: r.name as string,
+    category: (r.category as string) ?? "",
+    season: (r.season as string) ?? "",
+    teamIds: (r.team_ids as string[]) ?? [],
+    createdAt: r.created_at as string,
+  }))
+}
+
+export async function saveCompetition(input: {
   name: string
   category: string
   season: string
   teamIds?: string[]
-}): Competition {
-  const list = read<Competition>(COMPETITIONS_KEY)
-  const comp: Competition = {
-    id: uid(),
+}): Promise<Competition> {
+  const supabase = createClient()
+  const userId = await requireUserId()
+  const { data, error } = await supabase
+    .from("summary_competitions")
+    .insert({
+      user_id: userId,
+      name: input.name.trim(),
+      category: input.category.trim(),
+      season: input.season.trim(),
+      team_ids: input.teamIds ?? [],
+    })
+    .select("id, name, category, season, team_ids, created_at")
+    .single()
+  if (error) throw error
+  return {
+    id: data.id as string,
+    name: data.name as string,
+    category: (data.category as string) ?? "",
+    season: (data.season as string) ?? "",
+    teamIds: (data.team_ids as string[]) ?? [],
+    createdAt: data.created_at as string,
+  }
+}
+
+export async function updateCompetition(
+  id: string,
+  input: { name: string; category: string; season: string; teamIds?: string[] },
+): Promise<void> {
+  const supabase = createClient()
+  const patch: Record<string, unknown> = {
     name: input.name.trim(),
     category: input.category.trim(),
     season: input.season.trim(),
-    teamIds: input.teamIds ?? [],
-    createdAt: new Date().toISOString(),
   }
-  write(COMPETITIONS_KEY, [...list, comp])
-  return comp
+  if (input.teamIds !== undefined) patch.team_ids = input.teamIds
+  const { error } = await supabase.from("summary_competitions").update(patch).eq("id", id)
+  if (error) throw error
 }
 
-export function updateCompetition(
-  id: string,
-  input: { name: string; category: string; season: string; teamIds?: string[] },
-): void {
-  const list = read<Competition>(COMPETITIONS_KEY)
-  const next = list.map((c) =>
-    c.id === id
-      ? {
-          ...c,
-          name: input.name.trim(),
-          category: input.category.trim(),
-          season: input.season.trim(),
-          teamIds: input.teamIds ?? c.teamIds ?? [],
-        }
-      : c,
-  )
-  write(COMPETITIONS_KEY, next)
+export async function deleteCompetition(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from("summary_competitions").delete().eq("id", id)
+  if (error) throw error
 }
 
-export function deleteCompetition(id: string): void {
-  write(
-    COMPETITIONS_KEY,
-    read<Competition>(COMPETITIONS_KEY).filter((c) => c.id !== id),
-  )
+/* ------------------------------- Súmulas ------------------------------- */
+
+export async function getMatches(): Promise<SavedMatchRecord[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("summary_matches")
+    .select("id, competition_id, championship_name, winner_name, scoreline, data, played_at")
+    .order("played_at", { ascending: false })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    competitionId: (r.competition_id as string | null) ?? null,
+    championshipName: (r.championship_name as string) ?? "",
+    winnerName: (r.winner_name as string) ?? "",
+    scoreline: (r.scoreline as string) ?? "",
+    date: r.played_at as string,
+    data: (r.data as Record<string, unknown>) ?? {},
+  }))
+}
+
+export async function saveMatch(input: {
+  competitionId?: string | null
+  championshipName: string
+  winnerName: string
+  scoreline: string
+  data: Record<string, unknown>
+}): Promise<SavedMatchRecord> {
+  const supabase = createClient()
+  const userId = await requireUserId()
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from("summary_matches")
+    .insert({
+      user_id: userId,
+      competition_id: input.competitionId ?? null,
+      championship_name: input.championshipName,
+      winner_name: input.winnerName,
+      scoreline: input.scoreline,
+      data: input.data,
+      played_at: now,
+    })
+    .select("id, competition_id, championship_name, winner_name, scoreline, data, played_at")
+    .single()
+  if (error) throw error
+  return {
+    id: data.id as string,
+    competitionId: (data.competition_id as string | null) ?? null,
+    championshipName: (data.championship_name as string) ?? "",
+    winnerName: (data.winner_name as string) ?? "",
+    scoreline: (data.scoreline as string) ?? "",
+    date: data.played_at as string,
+    data: (data.data as Record<string, unknown>) ?? {},
+  }
+}
+
+export async function deleteMatch(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from("summary_matches").delete().eq("id", id)
+  if (error) throw error
 }
