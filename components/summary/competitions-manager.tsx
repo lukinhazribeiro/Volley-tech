@@ -25,10 +25,16 @@ export function CompetitionsManager({ onBack }: { onBack: () => void }) {
   const [season, setSeason] = useState("")
   const [teamIds, setTeamIds] = useState<string[]>([])
   const [teams, setTeams] = useState<SavedTeam[]>([])
+  const [saving, setSaving] = useState(false)
 
-  const refresh = () => {
-    setCompetitions(getCompetitions())
-    setTeams(getTeams())
+  const refresh = async () => {
+    try {
+      const [comps, tms] = await Promise.all([getCompetitions(), getTeams()])
+      setCompetitions(comps)
+      setTeams(tms)
+    } catch (err) {
+      console.error("[v0] Erro ao carregar competições:", err)
+    }
   }
   useEffect(() => {
     refresh()
@@ -63,21 +69,32 @@ export function CompetitionsManager({ onBack }: { onBack: () => void }) {
 
   const canSave = name.trim() !== ""
 
-  const handleSave = () => {
-    if (!canSave) return
-    if (editingId) {
-      updateCompetition(editingId, { name, category, season, teamIds })
-    } else {
-      saveCompetition({ name, category, season, teamIds })
+  const handleSave = async () => {
+    if (!canSave || saving) return
+    setSaving(true)
+    try {
+      if (editingId) {
+        await updateCompetition(editingId, { name, category, season, teamIds })
+      } else {
+        await saveCompetition({ name, category, season, teamIds })
+      }
+      await refresh()
+      resetForm()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível salvar a competição.")
+    } finally {
+      setSaving(false)
     }
-    refresh()
-    resetForm()
   }
 
-  const handleDelete = (comp: Competition) => {
+  const handleDelete = async (comp: Competition) => {
     if (!confirm(`Excluir a competição "${comp.name}"?`)) return
-    deleteCompetition(comp.id)
-    refresh()
+    try {
+      await deleteCompetition(comp.id)
+      await refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível excluir a competição.")
+    }
   }
 
   return (
@@ -180,9 +197,13 @@ export function CompetitionsManager({ onBack }: { onBack: () => void }) {
               <Button variant="outline" onClick={resetForm}>
                 Cancelar
               </Button>
-              <Button onClick={handleSave} disabled={!canSave} className="bg-orange-600 hover:bg-orange-700 text-white">
+              <Button
+                onClick={handleSave}
+                disabled={!canSave || saving}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
                 <Save className="w-4 h-4 mr-1" />
-                Salvar
+                {saving ? "Salvando..." : "Salvar"}
               </Button>
             </div>
           </CardContent>

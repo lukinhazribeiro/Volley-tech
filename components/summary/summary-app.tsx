@@ -33,7 +33,15 @@ import {
 import { GameReport } from "@/components/summary/game-report"
 import { TeamsManager } from "@/components/summary/teams-manager"
 import { CompetitionsManager } from "@/components/summary/competitions-manager"
-import { getTeams, getCompetitions, type SavedTeam, type Competition } from "@/lib/summary/registry"
+import {
+  getTeams,
+  getCompetitions,
+  getMatches,
+  saveMatch,
+  deleteMatch,
+  type SavedTeam,
+  type Competition,
+} from "@/lib/summary/registry"
 
 type Player = {
   number: number
@@ -91,7 +99,7 @@ type SetResult = {
 }
 
 type SavedMatch = {
-  id: number
+  id: string
   date: string
   championshipName: string
   teamA: Team
@@ -169,21 +177,29 @@ export default function SummaryApp() {
   const [competitions, setCompetitions] = useState<Competition[]>([])
   const [selectedCompetitionId, setSelectedCompetitionId] = useState<string>("")
 
-  const refreshRegistry = () => {
-    setSavedTeams(getTeams())
-    setCompetitions(getCompetitions())
+  const refreshRegistry = async () => {
+    try {
+      const [teams, comps] = await Promise.all([getTeams(), getCompetitions()])
+      setSavedTeams(teams)
+      setCompetitions(comps)
+    } catch (err) {
+      console.error("[v0] Erro ao carregar equipes/competições:", err)
+    }
+  }
+
+  const refreshMatches = async () => {
+    try {
+      const records = await getMatches()
+      // Reconstrói a súmula completa a partir do JSON salvo, usando o id do banco.
+      setSavedMatches(records.map((r) => ({ ...(r.data as unknown as SavedMatch), id: r.id, date: r.date })))
+    } catch (err) {
+      console.error("[v0] Erro ao carregar histórico de jogos:", err)
+    }
   }
 
   useEffect(() => {
-    const saved = localStorage.getItem("summary_saved_matches")
-    if (saved) {
-      try {
-        setSavedMatches(JSON.parse(saved))
-      } catch {
-        setSavedMatches([])
-      }
-    }
     refreshRegistry()
+    refreshMatches()
   }, [])
 
   // Equipes disponíveis para seleção: se a competição definir equipes participantes,
@@ -419,31 +435,48 @@ export default function SummaryApp() {
     setGameStarted(false)
   }
 
-  const saveMatchToHistory = () => {
+  const [savingMatch, setSavingMatch] = useState(false)
+
+  const saveMatchToHistory = async () => {
+    if (savingMatch) return
+    setSavingMatch(true)
     const finalSetsA = setHistory.filter((s) => s.winner === "A").length
     const finalSetsB = setHistory.filter((s) => s.winner === "B").length
     const winnerName = finalSetsA >= finalSetsB ? teamA.name : teamB.name
-    const match: SavedMatch = {
-      id: Date.now(),
-      date: new Date().toISOString(),
+    const scoreline = `${finalSetsA} - ${finalSetsB}`
+    const matchData = {
       championshipName,
       teamA: { ...teamA },
       teamB: { ...teamB },
       setHistory: [...setHistory],
       winnerName,
-      scoreline: `${finalSetsA} - ${finalSetsB}`,
+      scoreline,
     }
-    const updated = [match, ...savedMatches]
-    setSavedMatches(updated)
-    localStorage.setItem("summary_saved_matches", JSON.stringify(updated))
-    alert("Jogo salvo no histórico!")
+    try {
+      await saveMatch({
+        competitionId: selectedCompetitionId || null,
+        championshipName,
+        winnerName,
+        scoreline,
+        data: matchData as unknown as Record<string, unknown>,
+      })
+      await refreshMatches()
+      alert("Jogo salvo no histórico da sua conta!")
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível salvar o jogo.")
+    } finally {
+      setSavingMatch(false)
+    }
   }
 
-  const deleteSavedMatch = (id: number) => {
+  const deleteSavedMatch = async (id: string) => {
     if (!confirm("Excluir este jogo do histórico?")) return
-    const updated = savedMatches.filter((m) => m.id !== id)
-    setSavedMatches(updated)
-    localStorage.setItem("summary_saved_matches", JSON.stringify(updated))
+    try {
+      await deleteMatch(id)
+      await refreshMatches()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível excluir o jogo.")
+    }
   }
 
   const restartGame = () => {
@@ -1260,9 +1293,13 @@ export default function SummaryApp() {
               <Button onClick={() => setShowReport(true)} className="bg-orange-600 hover:bg-orange-700 text-white">
                 Ver Súmula
               </Button>
-              <Button onClick={saveMatchToHistory} className="bg-amber-500 hover:bg-amber-600 text-white">
-                <Trophy className="w-4 h-4 mr-1" />
-                Salvar no Histórico
+                <Button
+                  onClick={saveMatchToHistory}
+                  disabled={savingMatch}
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                >
+                  <Trophy className="w-4 h-4 mr-1" />
+                  {savingMatch ? "Salvando..." : "Salvar no Histórico"}
               </Button>
               <Button variant="outline" onClick={restartGame}>
                 Reiniciar Jogo
