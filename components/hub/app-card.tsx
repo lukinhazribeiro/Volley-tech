@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+import { useRef } from "react"
 import Link from "next/link"
 import type { LucideIcon } from "lucide-react"
 import { ArrowUpRight } from "lucide-react"
@@ -27,11 +29,26 @@ export function AppCard({
   status,
   image,
 }: AppCardProps) {
+  const cardRef = useRef<HTMLAnchorElement>(null)
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLAnchorElement>) => {
+    const el = cardRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const px = (e.clientX - rect.left) / rect.width
+    const py = (e.clientY - rect.top) / rect.height
+    el.style.setProperty("--mx", `${px * 100}%`)
+    el.style.setProperty("--my", `${py * 100}%`)
+  }
+
   return (
     <Link
+      ref={cardRef}
       href={href}
       aria-label={`Abrir ${title}`}
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--hub-border)] bg-[var(--hub-surface)] transition-all duration-300 hover:border-[var(--hub-accent)]/60 hover:-translate-y-1 hover:shadow-2xl hover:shadow-[var(--hub-accent)]/10 active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--hub-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--hub-bg)]"
+      onPointerMove={handlePointerMove}
+      style={{ animationDelay: `${index * 90}ms` }}
+      className="hub-reveal hub-spot group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-[var(--hub-border)] bg-[var(--hub-surface)] transition-all duration-300 hover:border-[var(--hub-accent)]/60 hover:-translate-y-1 hover:shadow-2xl hover:shadow-[var(--hub-accent)]/10 active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--hub-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--hub-bg)]"
     >
       {/* media header */}
       <div className="relative h-40 w-full overflow-hidden">
@@ -42,6 +59,9 @@ export function AppCard({
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--hub-surface)] via-[var(--hub-surface)]/40 to-transparent" />
+
+        {/* brilho cinematográfico varrendo a imagem no hover */}
+        <span className="hub-sheen" aria-hidden="true" />
 
         {/* index */}
         <span className="absolute left-4 top-4 font-mono text-sm font-semibold tracking-widest text-white/90">

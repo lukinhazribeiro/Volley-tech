@@ -91,13 +91,18 @@ export default function HubPage() {
 
       <div className="relative mx-auto w-full max-w-6xl px-6">
         {/* hero com barra superior integrada à imagem */}
-        <section className="relative mt-6 overflow-hidden rounded-3xl border border-[var(--hub-border)] bg-black">
+        <section className="hub-reveal relative mt-6 overflow-hidden rounded-3xl border border-[var(--hub-border)] bg-black">
           {/* imagem completa, sem corte */}
           <img
             src="/images/hub-hero.jpg"
             alt="VolleyTech - central de performance no voleibol"
             className="block h-auto w-full"
           />
+
+          {/* feixe de luz cinematográfico varrendo o herói */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden mix-blend-screen" aria-hidden="true">
+            <div className="hub-rays absolute -inset-y-1/2 left-0 w-1/3" />
+          </div>
 
           {/* degradê no topo para legibilidade dos botões */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/80 to-transparent" />
@@ -144,7 +149,10 @@ export default function HubPage() {
         </section>
 
         {/* ticker */}
-        <div className="relative mb-16 overflow-hidden rounded-xl border border-[var(--hub-border)] bg-[var(--hub-surface)]/60 py-3">
+        <div
+          className="hub-reveal relative mb-16 overflow-hidden rounded-xl border border-[var(--hub-border)] bg-[var(--hub-surface)]/60 py-3"
+          style={{ animationDelay: "120ms" }}
+        >
           <div className="flex w-max hub-ticker gap-10 whitespace-nowrap">
             {[...ticker, ...ticker].map((item, i) => (
               <span key={i} className="flex items-center gap-2 text-sm text-[var(--hub-muted)]">
@@ -179,7 +187,16 @@ export default function HubPage() {
             ))}
 
             {/* highlight block */}
-            <div className="relative flex min-h-[19rem] flex-col justify-center overflow-hidden rounded-2xl border border-[var(--hub-border)] bg-[var(--hub-surface)] p-8 md:col-span-2 lg:col-span-2">
+            <div
+              className="hub-reveal hub-spot relative flex min-h-[19rem] flex-col justify-center overflow-hidden rounded-2xl border border-[var(--hub-border)] bg-[var(--hub-surface)] p-8 md:col-span-2 lg:col-span-2"
+              style={{ animationDelay: `${apps.length * 90 + 90}ms` }}
+              onPointerMove={(e) => {
+                const el = e.currentTarget
+                const rect = el.getBoundingClientRect()
+                el.style.setProperty("--mx", `${((e.clientX - rect.left) / rect.width) * 100}%`)
+                el.style.setProperty("--my", `${((e.clientY - rect.top) / rect.height) * 100}%`)
+              }}
+            >
               <img
                 src="/images/hub-highlight.jpg"
                 alt=""
