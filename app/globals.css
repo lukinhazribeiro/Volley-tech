@@ -231,3 +231,161 @@
   filter: drop-shadow(0 0 14px var(--hub-accent-soft));
 }
 .hub-logo-3d:hover { animation-play-state: paused; }
+
+/* ===== Cinematic "anime movie" life (scoped to the hub) ===== */
+
+/* entrada com foco: sobe, revela e limpa o desfoque (sensação de câmera focando) */
+@keyframes hub-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.98);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+.hub-reveal {
+  opacity: 0;
+  animation: hub-reveal 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* feixes de luz diagonais varrendo o herói, como cena de abertura */
+@keyframes hub-rays {
+  0% { transform: translateX(-30%) rotate(8deg); opacity: 0; }
+  20% { opacity: 0.6; }
+  80% { opacity: 0.6; }
+  100% { transform: translateX(130%) rotate(8deg); opacity: 0; }
+}
+.hub-rays {
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    var(--hub-accent-soft) 42%,
+    oklch(1 0 0 / 22%) 50%,
+    var(--hub-accent-soft) 58%,
+    transparent 100%
+  );
+  animation: hub-rays 7s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* brilho que varre a imagem do card no hover (estilo anime shine) */
+@keyframes hub-sheen {
+  0% { transform: translateX(-160%) skewX(-18deg); }
+  100% { transform: translateX(320%) skewX(-18deg); }
+}
+.hub-sheen {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 45%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 0%) 35%,
+    oklch(1 0 0 / 45%) 50%,
+    oklch(1 0 0 / 0%) 65%,
+    transparent 100%
+  );
+  transform: translateX(-160%) skewX(-18deg);
+}
+.group:hover .hub-sheen {
+  animation: hub-sheen 0.85s ease-out;
+}
+
+/* holofote que segue o ponteiro sobre o card */
+.hub-spot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 0%),
+    var(--hub-accent-soft),
+    transparent 60%
+  );
+}
+.hub-spot:hover::before { opacity: 1; }
+
+/* pulso de borda de destaque, respiração de energia */
+@keyframes hub-border-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--hub-accent-soft); }
+  50% { box-shadow: 0 0 26px 2px var(--hub-accent-soft); }
+}
+.hub-border-breathe { animation: hub-border-breathe 4.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-reveal { opacity: 1; animation: none; }
+  .hub-rays,
+  .group:hover .hub-sheen,
+  .hub-border-breathe { animation: none; }
+  .hub-spot:hover::before { opacity: 0; }
+}
+
+/* entrada com reveal (fade + slide up) */
+@keyframes hub-reveal {
+  0% { opacity: 0; transform: translateY(26px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.hub-reveal {
+  opacity: 0;
+  animation: hub-reveal 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* spotlight interativo que segue o mouse sobre os cards */
+.hub-spot {
+  position: relative;
+}
+.hub-spot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    16rem 16rem at var(--mx, 50%) var(--my, 0%),
+    var(--hub-accent-soft),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+.hub-spot:hover::before { opacity: 1; }
+
+/* leve tilt 3D no hover */
+.hub-tilt {
+  transform: perspective(1000px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
+  transition: transform 0.25s ease;
+  transform-style: preserve-3d;
+}
+
+/* brilho passando (sheen) sobre a imagem no hover */
+@keyframes hub-sheen {
+  0% { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(220%) skewX(-18deg); }
+}
+.hub-sheen {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 22%), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+  z-index: 2;
+}
+.group:hover .hub-sheen { animation: hub-sheen 0.9s ease forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-reveal { opacity: 1; animation: none; }
+  .hub-tilt { transform: none; }
+  .hub-spot::before,
+  .group:hover .hub-sheen { display: none; }
+}
