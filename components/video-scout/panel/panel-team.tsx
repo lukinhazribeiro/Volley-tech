@@ -91,6 +91,7 @@ export function PanelTeam({
   const accentText = accent === "blue" ? "text-blue-600" : "text-pink-600"
   const accentBar = accent === "blue" ? "bg-blue-500" : "bg-pink-500"
   const accentBorder = accent === "blue" ? "border-blue-200" : "border-pink-200"
+  const accentBorder2 = accent === "blue" ? "border-blue-400" : "border-pink-400"
 
   // Formação efetiva: aplica a troca automática do líbero no fundo.
   // O estado de saque define se o líbero cobre a P1 (só quando não está sacando).
@@ -173,14 +174,14 @@ export function PanelTeam({
         title={big ? "Clique para substituir" : "Selecionar posição da ação"}
       >
         <span
-          className={`relative flex items-center justify-center rounded-full border-2 font-extrabold shadow-sm transition-all active:scale-90 ${
+          className={`relative flex items-center justify-center rounded-full border-2 font-extrabold transition-all active:scale-90 ${
             big ? "h-16 w-16 text-2xl" : "h-14 w-14 text-xl"
           } ${
             !big && activePos === pos
-              ? `${accentBar} border-transparent text-white ring-2 ring-offset-2 ring-orange-300`
+              ? `${accentBar} border-transparent text-white shadow-md ring-2 ring-orange-400 ring-offset-2`
               : isLiberoAt(pos)
-                ? "border-amber-400 bg-amber-50 text-amber-600"
-                : `border-slate-300 bg-slate-50 ${accentText}`
+                ? "border-amber-400 bg-amber-100 text-amber-700 shadow-sm hover:bg-amber-200"
+                : `${accentBorder2} bg-white ${accentText} shadow-sm hover:bg-slate-50`
           }`}
         >
           {numberAt(pos)}
@@ -264,7 +265,7 @@ export function PanelTeam({
         <button
           type="button"
           onClick={handleLevantamento}
-          className="mt-2.5 flex min-h-12 w-full touch-manipulation select-none items-center justify-center rounded-xl border-2 border-indigo-300 bg-indigo-50 px-2 py-3 text-sm font-extrabold uppercase tracking-wide text-indigo-700 shadow-sm transition-all hover:bg-indigo-100 active:scale-95 active:shadow-none"
+          className="mt-2.5 flex min-h-12 w-full touch-manipulation select-none items-center justify-center rounded-xl bg-indigo-600 px-2 py-3 text-sm font-extrabold uppercase tracking-wide text-white shadow-sm transition-all hover:bg-indigo-500 active:scale-95 active:shadow-none"
         >
           Levantamento
         </button>
