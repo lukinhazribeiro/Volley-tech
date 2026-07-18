@@ -115,20 +115,39 @@ export function computeBreakdowns(actions: ScoutAction[]): FundamentoBreakdown[]
     })
   }
 
-  // Bloqueio: pontos de bloqueio por posição (ponta, meio, oposto).
+  // Bloqueio: separa bloqueio-PONTO (por posição), bloqueio POSITIVO (toque que
+  // seguiu em jogo, não é ponto nem erro) e ERRO — cada um no seu próprio segmento.
   {
     const list = of("bloqueio")
+    const pontos = list.filter((a) => a.resultado === "ponto" && !a.toque)
     const pos: { k: BloqueioPosicao; c: string }[] = [
       { k: "ponta", c: COR.verde },
       { k: "meio", c: COR.azul },
       { k: "oposto", c: COR.laranja },
     ]
-    const segments = pos.map(({ k, c }) => ({
-      key: k,
-      label: BLOQUEIO_LABEL[k],
-      value: list.filter((a) => a.detalhe === k).length,
-      color: c,
-    }))
+    const segments = [
+      // Pontos de bloqueio por posição.
+      ...pos.map(({ k, c }) => ({
+        key: k,
+        label: BLOQUEIO_LABEL[k],
+        value: pontos.filter((a) => a.detalhe === k).length,
+        color: c,
+      })),
+      // Bloqueio positivo (toque): a bola tocou no bloqueio e o rally seguiu.
+      {
+        key: "toque",
+        label: "Positivo (toque)",
+        value: list.filter((a) => a.toque).length,
+        color: COR.teal,
+      },
+      // Erro de bloqueio.
+      {
+        key: "erro",
+        label: "Erro",
+        value: list.filter((a) => a.resultado === "erro").length,
+        color: COR.vermelho,
+      },
+    ]
     result.push({
       fundamento: "bloqueio",
       total: segments.reduce((s, x) => s + x.value, 0),
