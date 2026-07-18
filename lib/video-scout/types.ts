@@ -89,6 +89,11 @@ export interface ScoutAction {
   team?: TeamSide
   /** Indica que a ação foi inserida automaticamente (ex.: levantamento antes do ataque). */
   auto?: boolean
+  /**
+   * Bloqueio positivo (toque): o bloqueio tocou na bola e o rally seguiu (houve
+   * defesa depois). Não conta ponto nem erro — é apenas uma ação positiva.
+   */
+  toque?: boolean
   /** Confiança da IA entre 0 e 1. */
   confidence: number
   /** Indica se o usuário já validou/corrigiu a ação. */
@@ -248,7 +253,7 @@ export const DEFESA_LABEL: Record<DefesaTipo, string> = {
 }
 
 /** Zona/tipo do ataque conforme a posição do atacante. */
-export type AtaqueZona = "ponta" | "meio" | "oposto" | "fundo" | "segunda"
+export type AtaqueZona = "ponta" | "meio" | "oposto" | "fundo" | "segunda" | "volume"
 
 export const ATAQUE_ZONA_LABEL: Record<AtaqueZona, string> = {
   ponta: "Ponta (P4)",
@@ -256,6 +261,7 @@ export const ATAQUE_ZONA_LABEL: Record<AtaqueZona, string> = {
   oposto: "Oposto (P2)",
   fundo: "Fundo (P1/P6)",
   segunda: "Bola de Segunda",
+  volume: "Ataque de Volume",
 }
 
 /** Fundamentos que usam o campo `detalhe` (sub-classificação). */
@@ -270,7 +276,7 @@ export const DETALHE_OPCOES: Partial<Record<Fundamento, { value: string; label: 
   levantamento: (["ponta", "meio", "oposto", "fundo", "segunda", "erro"] as LevantamentoAlvo[]).map(
     (k) => ({ value: k, label: LEVANTAMENTO_LABEL[k] }),
   ),
-  ataque: (["ponta", "meio", "oposto", "fundo", "segunda"] as AtaqueZona[]).map((k) => ({
+  ataque: (["ponta", "meio", "oposto", "fundo", "segunda", "volume"] as AtaqueZona[]).map((k) => ({
     value: k,
     label: ATAQUE_ZONA_LABEL[k],
   })),
