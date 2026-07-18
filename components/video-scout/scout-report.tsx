@@ -387,36 +387,50 @@ export function ScoutReport({
         import("html2canvas-pro"),
         import("jspdf"),
       ])
-      // Largura de captura ampla para as tabelas renderizarem sem corte lateral.
-      const captureWidth = Math.max(node.scrollWidth, 1180)
+      // Renderiza numa largura de documento fixa (proporção A4) para o layout ficar
+      // consistente e nítido, independentemente do tamanho da tela.
+      const DOC_WIDTH = 900
       const canvas = await html2canvas(node, {
         scale: 2,
-        backgroundColor: "#f8fafc",
+        backgroundColor: "#ffffff",
         useCORS: true,
-        windowWidth: captureWidth,
+        windowWidth: DOC_WIDTH,
         onclone: (doc) => {
-          // Remove rolagem horizontal das planilhas para capturar a tabela inteira.
+          const clone = doc.querySelector<HTMLElement>("[data-pdf-report]") ?? node
+          clone.style.width = `${DOC_WIDTH}px`
+          clone.style.padding = "40px"
+          // Revela o cabeçalho do documento (fica oculto na tela).
+          doc.querySelectorAll<HTMLElement>("[data-pdf-header]").forEach((el) => {
+            el.classList.remove("hidden")
+            el.style.display = "block"
+            el.style.marginBottom = "8px"
+          })
+          // Mostra as tabelas por inteiro, sem rolagem lateral.
           doc.querySelectorAll<HTMLElement>(".overflow-x-auto").forEach((el) => {
             el.style.overflow = "visible"
           })
         },
       })
+
       const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = pageWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const margin = 24
       const imgData = canvas.toDataURL("image/png")
-      // Fatiamento em múltiplas páginas A4 mantendo a imagem idêntica ao relatório.
+      const imgWidth = pageWidth - margin * 2
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const usableHeight = pageHeight - margin * 2
+
+      // Fatiamento em páginas A4 com margem branca uniforme em todas as bordas.
       let heightLeft = imgHeight
-      let position = 0
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
+      let position = margin
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight)
+      heightLeft -= usableHeight
       while (heightLeft > 0) {
-        position -= pageHeight
+        position -= usableHeight
         pdf.addPage()
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight)
+        heightLeft -= usableHeight
       }
       pdf.save("scout-relatorio.pdf")
     } catch (err) {
@@ -499,7 +513,44 @@ export function ScoutReport({
         </div>
       </div>
 
-      <div ref={reportRef} className="space-y-5 bg-slate-50 p-2">
+      <div ref={reportRef} data-pdf-report className="space-y-5 rounded-xl bg-white p-2 md:p-2">
+      {/* Cabeçalho do documento — visível apenas no PDF exportado (revelado no onclone). */}
+      <div data-pdf-header className="hidden">
+        <div className="flex items-start justify-between border-b-2 border-orange-500 pb-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">
+              Volley Tech · Scout View
+            </p>
+            <h1 className="mt-1 text-2xl font-extrabold text-slate-900">Relatório de Scout</h1>
+            <p className="mt-1 text-sm font-semibold text-slate-600">
+              {(teamAName || "Equipe A") + "  ×  " + (teamBName || "Equipe B")}
+            </p>
+          </div>
+          <div className="text-right text-xs text-slate-500">
+            <p>
+              Equipe:{" "}
+              <span className="font-semibold text-slate-700">
+                {teamFilter === "todos"
+                  ? "Ambas"
+                  : teamFilter === "casa"
+                    ? teamAName || "Equipe A"
+                    : teamBName || "Equipe B"}
+              </span>
+            </p>
+            <p className="mt-0.5">
+              Gerado em{" "}
+              <span className="font-semibold text-slate-700">
+                {new Date().toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Resumo geral */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
