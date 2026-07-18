@@ -366,8 +366,15 @@ function defesaTipoAuto(actions: ScoutAction[], team: TeamSide): string {
   // Bloqueio antes da defesa → recuperação, independentemente da equipe que defende.
   if (ultima.fundamento === "bloqueio") return "recuperacao"
   if (ultima.fundamento === "ataque" && ultima.team && ultima.team !== team) {
-    // Defender um "ataque de volume" do adversário = passe de volume, não defesa de ataque.
-    if (ultima.detalhe === "volume") return "volume"
+    // Defender um "ataque de volume" do adversário = passe de volume, não defesa de
+    // ataque. Detecção pelo contexto: a devolução de volume é aquela em que o
+    // adversário atacou logo após defender, sem levantamento no meio.
+    const idx = actions.indexOf(ultima)
+    const anterAdv = actions
+      .slice(0, idx)
+      .filter((a) => a.rallyId === ultima.rallyId && a.team === ultima.team)
+      .pop()
+    if (anterAdv?.fundamento === "defesa") return "volume"
     return "ataque"
   }
   if (ultima.fundamento === "ataque" && ultima.team === team) return "recuperacao"
@@ -491,9 +498,10 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   if (input.fundamento === "bloqueio") {
     detalhe = bloqueioDetalheFromPos(posicao)
   } else if (input.fundamento === "ataque") {
-    // Devolução direta após a própria defesa (sem levantamento) = ataque de volume.
+    // O ataque sempre mantém a posição real (ponta/meio/oposto/fundo/segunda).
+    // A "devolução de volume" continua sem gerar levantamento automático (ehVolume),
+    // mas não sobrescreve mais a zona real do ataque.
     if (ehBolaDeSegunda) detalhe = "segunda"
-    else if (ehVolume) detalhe = "volume"
     else detalhe = ataqueAlvo
   } else if (input.fundamento === "defesa") {
     detalhe = input.detalhe ?? defesaTipoAuto(state.actions, input.team)
