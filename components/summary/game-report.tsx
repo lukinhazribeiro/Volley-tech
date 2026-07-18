@@ -75,6 +75,12 @@ export function GameReport({ teamA, teamB, setHistory, championshipName }: GameR
     year: "numeric",
   })
 
+  // URL absoluta para a logo funcionar também na janela de impressão (about:blank).
+  const logoSrc =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/volley-tech-logo.png`
+      : "/volley-tech-logo.png"
+
   const handlePrint = () => {
     const printContent = document.getElementById("game-report")
     if (!printContent) return
@@ -151,7 +157,14 @@ export function GameReport({ teamA, teamB, setHistory, championshipName }: GameR
                 </div>
               )}
             </div>
-            <div className="text-right">
+            <div className="flex items-center gap-2">
+              <img
+                src={logoSrc || "/placeholder.svg"}
+                alt="Volley Tech"
+                width={40}
+                height={40}
+                style={{ objectFit: "contain" }}
+              />
               <div className="text-2xl font-bold">VOLLEY TECH</div>
             </div>
           </div>
@@ -426,9 +439,18 @@ export function GameReport({ teamA, teamB, setHistory, championshipName }: GameR
           </div>
 
           {/* Rodapé */}
-          <p className="text-[7px] text-center text-gray-500 mt-2">
-            Documento gerado pelo Sistema Volley Tech em {new Date().toLocaleString("pt-BR")}
-          </p>
+          <div className="mt-2 flex items-center justify-center gap-1.5">
+            <img
+              src={logoSrc || "/placeholder.svg"}
+              alt="Volley Tech"
+              width={12}
+              height={12}
+              style={{ objectFit: "contain" }}
+            />
+            <p className="text-[7px] text-center text-gray-500">
+              Documento gerado pelo Sistema Volley Tech em {new Date().toLocaleString("pt-BR")}
+            </p>
+          </div>
         </div>
       </div>
     </>

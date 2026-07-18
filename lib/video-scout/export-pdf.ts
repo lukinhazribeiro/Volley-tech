@@ -1,6 +1,23 @@
 import type { FundamentoBreakdown, PlayerStat, ScoutSummary } from "./stats"
 import { TEAM_LABEL, type Fundamento, type TeamSide } from "./types"
 
+/** Carrega a logo da Volley Tech como dataURL para embutir no PDF (marca do documento). */
+async function loadLogoDataUrl(): Promise<string | null> {
+  try {
+    const res = await fetch("/volley-tech-logo.png")
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : null)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
 /** Converte "#rrggbb" em tupla [r, g, b] para as APIs do jsPDF. */
 function rgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "")
@@ -147,6 +164,7 @@ export async function exportScoutPdf(params: ExportPdfParams) {
   })
 
   // ---------- Cabeçalho ----------
+  const logoData = await loadLogoDataUrl()
   const headerH = 76
   doc.setFillColor(...C.ink)
   doc.roundedRect(M, y, CW, headerH, 8, 8, "F")
@@ -155,19 +173,27 @@ export async function exportScoutPdf(params: ExportPdfParams) {
   doc.roundedRect(M, y, 6, headerH, 3, 3, "F")
   doc.rect(M + 3, y, 4, headerH, "F")
 
+  // Logo da marca (à esquerda). O texto desloca para a direita quando há logo.
+  const logoSize = 46
+  let textX = M + 22
+  if (logoData) {
+    doc.addImage(logoData, "PNG", M + 18, y + (headerH - logoSize) / 2, logoSize, logoSize)
+    textX = M + 18 + logoSize + 14
+  }
+
   doc.setTextColor(...C.orange)
   doc.setFont("helvetica", "bold")
   doc.setFontSize(8)
-  doc.text("VOLLEY TECH  ·  SCOUT VIEW", M + 22, y + 22)
+  doc.text("VOLLEY TECH  ·  SCOUT VIEW", textX, y + 22)
 
   doc.setTextColor(...C.white)
   doc.setFontSize(20)
-  doc.text("Relatório de Scout", M + 22, y + 46)
+  doc.text("Relatório de Scout", textX, y + 46)
 
   doc.setFont("helvetica", "normal")
   doc.setFontSize(11)
   doc.setTextColor(226, 232, 240)
-  doc.text(`${teamAName || "Equipe A"}   ×   ${teamBName || "Equipe B"}`, M + 22, y + 64)
+  doc.text(`${teamAName || "Equipe A"}   ×   ${teamBName || "Equipe B"}`, textX, y + 64)
 
   // Bloco direito: equipe filtrada + data.
   doc.setFontSize(8)
@@ -385,10 +411,15 @@ export async function exportScoutPdf(params: ExportPdfParams) {
     doc.setDrawColor(...C.slate200)
     doc.setLineWidth(0.5)
     doc.line(M, pageH - 28, pageW - M, pageH - 28)
+    let footTextX = M
+    if (logoData) {
+      doc.addImage(logoData, "PNG", M, pageH - 24, 11, 11)
+      footTextX = M + 15
+    }
     doc.setFont("helvetica", "normal")
     doc.setFontSize(7)
     doc.setTextColor(...C.slate400)
-    doc.text("Volley Tech · Scout View", M, pageH - 16)
+    doc.text("Volley Tech · Scout View", footTextX, pageH - 16)
     doc.text(`Página ${p} de ${pageCount}`, pageW - M, pageH - 16, { align: "right" })
   }
 
