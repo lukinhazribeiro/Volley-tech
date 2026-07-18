@@ -353,29 +353,25 @@ function ataqueZonaFromPlayer(team: TeamConfig, posicao: Posicao, playerId: stri
  * Classifica automaticamente o tipo de defesa pelo contexto do rally:
  * - após toque de bloqueio (de QUALQUER equipe) → "recuperacao" (a bola tocou no
  *   bloqueio e alguém recuperou — vale independentemente de quem defende);
- * - após ataque do adversário → "ataque" (defesa de ataque);
+ * - após "ataque de volume" do adversário (bola devolvida/passe por cima) →
+ *   "volume" (passe de volume): defender uma bola de volume não é defesa de ataque;
+ * - após ataque normal do adversário → "ataque" (defesa de ataque);
  * - após ataque da PRÓPRIA equipe → "recuperacao" (a bola voltou do bloqueio/
  *   rede e a mesma equipe recuperou);
- * - após passe/bola fácil do adversário → "volume".
+ * - caso contrário (bola fácil/passe) → "volume".
  */
 function defesaTipoAuto(actions: ScoutAction[], team: TeamSide): string {
   const ultima = actions[actions.length - 1]
   if (!ultima) return "volume"
   // Bloqueio antes da defesa → recuperação, independentemente da equipe que defende.
   if (ultima.fundamento === "bloqueio") return "recuperacao"
-  if (ultima.fundamento === "ataque" && ultima.team && ultima.team !== team) return "ataque"
+  if (ultima.fundamento === "ataque" && ultima.team && ultima.team !== team) {
+    // Defender um "ataque de volume" do adversário = passe de volume, não defesa de ataque.
+    if (ultima.detalhe === "volume") return "volume"
+    return "ataque"
+  }
   if (ultima.fundamento === "ataque" && ultima.team === team) return "recuperacao"
   return "volume"
-}
-
-/**
- * Indica que a mesma equipe já defendeu a bola neste rally: sinaliza um ataque
- * de transição (ataque de volume) — ação positiva de ataque após defesa/passe.
- */
-function houveDefesaNoRally(actions: ScoutAction[], rallyId: string, team: TeamSide): boolean {
-  return actions.some(
-    (a) => a.rallyId === rallyId && a.team === team && a.fundamento === "defesa",
-  )
 }
 
 /**
@@ -451,11 +447,19 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   // oposto=oposto, fundo=fundo). É reutilizada como alvo do levantamento.
   const ataqueAlvo = ataqueZonaFromPlayer(team, posicao, playerId)
 
-  // Auto-levantamento antes do ataque (exceto bola de segunda). O alvo do
-  // levantamento acompanha o destino real do ataque, não a posição clicada.
-  if (input.fundamento === "ataque" && !ehBolaDeSegunda) {
-    const noRally = state.actions.filter((a) => a.rallyId === rallyId && a.team === input.team)
-    const ultima = noRally[noRally.length - 1]
+  // Última ação da PRÓPRIA equipe neste rally (antes desta).
+  const noRallyTime = state.actions.filter((a) => a.rallyId === rallyId && a.team === input.team)
+  const ultimaDoTime = noRallyTime[noRallyTime.length - 1]
+
+  // Ataque de volume: devolução DIRETA após a própria defesa (passe por cima da
+  // rede, sem levantamento). Não é ataque de transição — por isso não leva set.
+  const ehVolume =
+    input.fundamento === "ataque" && !ehBolaDeSegunda && ultimaDoTime?.fundamento === "defesa"
+
+  // Auto-levantamento antes do ataque (exceto bola de segunda e ataque de volume).
+  // O alvo do levantamento acompanha o destino real do ataque, não a posição clicada.
+  if (input.fundamento === "ataque" && !ehBolaDeSegunda && !ehVolume) {
+    const ultima = ultimaDoTime
     if (!ultima || ultima.fundamento !== "levantamento") {
       // Se o levantador defendeu neste rally, quem levanta é o líbero.
       const setterId = setterDefendeu && team.liberoId ? team.liberoId : setterOnCourt
@@ -487,9 +491,9 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   if (input.fundamento === "bloqueio") {
     detalhe = bloqueioDetalheFromPos(posicao)
   } else if (input.fundamento === "ataque") {
-    // Ataque após defesa da própria equipe no rally = ataque de volume (transição).
+    // Devolução direta após a própria defesa (sem levantamento) = ataque de volume.
     if (ehBolaDeSegunda) detalhe = "segunda"
-    else if (houveDefesaNoRally(state.actions, rallyId, input.team)) detalhe = "volume"
+    else if (ehVolume) detalhe = "volume"
     else detalhe = ataqueAlvo
   } else if (input.fundamento === "defesa") {
     detalhe = input.detalhe ?? defesaTipoAuto(state.actions, input.team)
