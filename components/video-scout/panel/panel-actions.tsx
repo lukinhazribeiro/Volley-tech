@@ -83,9 +83,18 @@ export function PanelActions({ actions, onDelete, onUndo }: PanelActionsProps) {
                         auto
                       </span>
                     )}
+                    {a.fundamento === "bloqueio" && a.toque && (
+                      <span className="rounded border border-indigo-200 bg-indigo-50 px-1 text-[10px] font-bold text-indigo-700">
+                        toque +
+                      </span>
+                    )}
                   </span>
-                  <span className={`shrink-0 text-xs font-semibold uppercase ${QUALIDADE_STYLE[q]}`}>
-                    {QUALIDADE_LABEL[q]}
+                  <span
+                    className={`shrink-0 text-xs font-semibold uppercase ${
+                      a.fundamento === "bloqueio" && a.toque ? "text-indigo-600" : QUALIDADE_STYLE[q]
+                    }`}
+                  >
+                    {a.fundamento === "bloqueio" && a.toque ? "Bloqueio +" : QUALIDADE_LABEL[q]}
                   </span>
                   <button
                     type="button"

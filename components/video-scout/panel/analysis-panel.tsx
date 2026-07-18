@@ -26,6 +26,7 @@ import {
   nextSet,
   quickStats,
   recordAction,
+  setServingTeam,
   substitute,
   undoLast,
   updateTeam,
@@ -225,6 +226,11 @@ export function AnalysisPanel() {
 
   const handleAmend = useCallback((side: TeamSide, quality: "ponto" | "erro") => {
     setMatch((prev) => amendLastQuality(prev, side, quality))
+  }, [])
+
+  // Define qual equipe inicia sacando (só na configuração inicial do set).
+  const handleSetServing = useCallback((side: TeamSide) => {
+    setMatch((prev) => setServingTeam(prev, side))
   }, [])
 
   const canAmend = useMemo(() => {
@@ -709,6 +715,53 @@ export function AnalysisPanel() {
                     Set {match.set}
                   </span>
                 </div>
+
+                {/* Saque inicial: define quem começa sacando para acertar a leitura
+                    do rodízio desde a primeira jogada. Só editável antes da 1ª ação. */}
+                {match.actions.length === 0 ? (
+                  <div className="mb-3 flex flex-col items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Quem inicia o saque?
+                    </span>
+                    <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
+                      <button
+                        type="button"
+                        onClick={() => handleSetServing("casa")}
+                        className={`max-w-[8rem] truncate rounded-md px-3 py-1 text-xs font-bold transition ${
+                          match.servingTeam === "casa"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-white"
+                        }`}
+                      >
+                        {match.teamA.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetServing("adversario")}
+                        className={`max-w-[8rem] truncate rounded-md px-3 py-1 text-xs font-bold transition ${
+                          match.servingTeam === "adversario"
+                            ? "bg-pink-600 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-white"
+                        }`}
+                      >
+                        {match.teamB.name}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-3 flex items-center justify-center">
+                    <span className="text-[10px] font-medium text-slate-400">
+                      Saque:{" "}
+                      <span
+                        className={
+                          match.servingTeam === "adversario" ? "text-pink-600" : "text-blue-600"
+                        }
+                      >
+                        {match.servingTeam === "adversario" ? match.teamB.name : match.teamA.name}
+                      </span>
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center justify-center gap-4">
                   <div className="flex min-w-0 flex-1 flex-col items-end text-right">
                     <span className="truncate text-xs font-semibold uppercase tracking-wide text-blue-600">
@@ -717,7 +770,7 @@ export function AnalysisPanel() {
                     <span className="text-3xl font-bold tabular-nums text-slate-800">
                       {stats.pontosA}
                     </span>
-                    {(match.servingTeam === null || match.servingTeam === "casa") && (
+                    {match.servingTeam === "casa" && (
                       <span className="text-[10px] font-medium text-slate-400">saque</span>
                     )}
                   </div>

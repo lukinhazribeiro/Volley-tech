@@ -186,6 +186,16 @@ export function nextSet(state: MatchState): MatchState {
   }
 }
 
+/**
+ * Define manualmente qual equipe inicia sacando. Serve para acertar a leitura do
+ * rodízio desde o começo do set: assim o líbero entra na P1 da equipe que recebe
+ * já na primeira jogada e a rotação por sideout fica correta. Só deve ser usada
+ * antes de registrar qualquer ação (na configuração inicial do set).
+ */
+export function setServingTeam(state: MatchState, side: TeamSide): MatchState {
+  return { ...state, servingTeam: side }
+}
+
 /** Aplica a pontuação e a rotação por sideout, retornando o novo estado parcial. */
 function applyScoring(
   state: MatchState,
@@ -341,19 +351,55 @@ function ataqueZonaFromPlayer(team: TeamConfig, posicao: Posicao, playerId: stri
 
 /**
  * Classifica automaticamente o tipo de defesa pelo contexto do rally:
- * - após ataque do adversário → "ataque" (defesa de ataque);
- * - após toque de bloqueio da própria equipe → "recuperacao";
+ * - após toque de bloqueio (de QUALQUER equipe) → "recuperacao" (a bola tocou no
+ *   bloqueio e alguém recuperou — vale independentemente de quem defende);
+ * - após "ataque de volume" do adversário (bola devolvida/passe por cima) →
+ *   "volume" (passe de volume): defender uma bola de volume não é defesa de ataque;
+ * - após ataque normal do adversário → "ataque" (defesa de ataque);
  * - após ataque da PRÓPRIA equipe → "recuperacao" (a bola voltou do bloqueio/
  *   rede e a mesma equipe recuperou);
- * - após passe/bola fácil do adversário → "volume".
+ * - caso contrário (bola fácil/passe) → "volume".
  */
 function defesaTipoAuto(actions: ScoutAction[], team: TeamSide): string {
   const ultima = actions[actions.length - 1]
   if (!ultima) return "volume"
-  if (ultima.fundamento === "ataque" && ultima.team && ultima.team !== team) return "ataque"
-  if (ultima.fundamento === "bloqueio" && ultima.team === team) return "recuperacao"
+  // Bloqueio antes da defesa → recuperação, independentemente da equipe que defende.
+  if (ultima.fundamento === "bloqueio") return "recuperacao"
+  if (ultima.fundamento === "ataque" && ultima.team && ultima.team !== team) {
+    // Defender um "ataque de volume" do adversário = passe de volume, não defesa de
+    // ataque. Detecção pelo contexto: a devolução de volume é aquela em que o
+    // adversário atacou logo após defender, sem levantamento no meio.
+    const idx = actions.indexOf(ultima)
+    const anterAdv = actions
+      .slice(0, idx)
+      .filter((a) => a.rallyId === ultima.rallyId && a.team === ultima.team)
+      .pop()
+    if (anterAdv?.fundamento === "defesa") return "volume"
+    return "ataque"
+  }
   if (ultima.fundamento === "ataque" && ultima.team === team) return "recuperacao"
   return "volume"
+}
+
+/**
+ * Indica que o LEVANTADOR da equipe defendeu a bola neste rally. Nesse caso o
+ * levantamento seguinte é atribuído ao líbero (quem levanta quando o levantador
+ * está fora da jogada por ter defendido).
+ */
+function setterDefendeuNoRally(
+  actions: ScoutAction[],
+  rallyId: string,
+  team: TeamSide,
+  setterId: string | null,
+): boolean {
+  if (!setterId) return false
+  for (let i = actions.length - 1; i >= 0; i--) {
+    const a = actions[i]
+    if (a.rallyId !== rallyId) break
+    if (a.team !== team) continue
+    if (a.fundamento === "defesa" && a.playerId === setterId) return true
+  }
+  return false
 }
 
 /**
@@ -384,7 +430,17 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   const isServing = input.fundamento === "saque" ? true : teamServing ?? true
 
   // Atleta que executa a ação (formação efetiva já aplica o líbero no fundo).
-  const playerId = resolvePlayerId(team, posicao, input.fundamento, isServing)
+  let playerId = resolvePlayerId(team, posicao, input.fundamento, isServing)
+
+  // Levantador na quadra e se ele já defendeu neste rally. Quando o levantador
+  // defende, o levantamento seguinte é do líbero (quem cobre o levantador).
+  const setterOnCourt = onCourtPlayerId(team, team.setterPosicao, isServing)
+  const setterDefendeu = setterDefendeuNoRally(state.actions, rallyId, input.team, setterOnCourt)
+
+  // Levantamento manual executado pelo levantador que já defendeu → conta para o líbero.
+  if (input.fundamento === "levantamento" && setterDefendeu && team.liberoId) {
+    playerId = team.liberoId
+  }
 
   // Bola de segunda: o levantador ataca pela rede. Identificado pela FUNÇÃO do
   // atleta (não pela posição fixa), então vale em qualquer rotação em que o
@@ -398,13 +454,22 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   // oposto=oposto, fundo=fundo). É reutilizada como alvo do levantamento.
   const ataqueAlvo = ataqueZonaFromPlayer(team, posicao, playerId)
 
-  // Auto-levantamento antes do ataque (exceto bola de segunda). O alvo do
-  // levantamento acompanha o destino real do ataque, não a posição clicada.
-  if (input.fundamento === "ataque" && !ehBolaDeSegunda) {
-    const noRally = state.actions.filter((a) => a.rallyId === rallyId && a.team === input.team)
-    const ultima = noRally[noRally.length - 1]
+  // Última ação da PRÓPRIA equipe neste rally (antes desta).
+  const noRallyTime = state.actions.filter((a) => a.rallyId === rallyId && a.team === input.team)
+  const ultimaDoTime = noRallyTime[noRallyTime.length - 1]
+
+  // Ataque de volume: devolução DIRETA após a própria defesa (passe por cima da
+  // rede, sem levantamento). Não é ataque de transição — por isso não leva set.
+  const ehVolume =
+    input.fundamento === "ataque" && !ehBolaDeSegunda && ultimaDoTime?.fundamento === "defesa"
+
+  // Auto-levantamento antes do ataque (exceto bola de segunda e ataque de volume).
+  // O alvo do levantamento acompanha o destino real do ataque, não a posição clicada.
+  if (input.fundamento === "ataque" && !ehBolaDeSegunda && !ehVolume) {
+    const ultima = ultimaDoTime
     if (!ultima || ultima.fundamento !== "levantamento") {
-      const setterId = onCourtPlayerId(team, team.setterPosicao, isServing)
+      // Se o levantador defendeu neste rally, quem levanta é o líbero.
+      const setterId = setterDefendeu && team.liberoId ? team.liberoId : setterOnCourt
       novas.push({
         id: uid("act"),
         rallyId,
@@ -433,7 +498,11 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   if (input.fundamento === "bloqueio") {
     detalhe = bloqueioDetalheFromPos(posicao)
   } else if (input.fundamento === "ataque") {
-    detalhe = ehBolaDeSegunda ? "segunda" : ataqueAlvo
+    // O ataque sempre mantém a posição real (ponta/meio/oposto/fundo/segunda).
+    // A "devolução de volume" continua sem gerar levantamento automático (ehVolume),
+    // mas não sobrescreve mais a zona real do ataque.
+    if (ehBolaDeSegunda) detalhe = "segunda"
+    else detalhe = ataqueAlvo
   } else if (input.fundamento === "defesa") {
     detalhe = input.detalhe ?? defesaTipoAuto(state.actions, input.team)
   } else {
@@ -481,6 +550,20 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   })
 
   const actions = [...state.actions, ...novas]
+
+  // Bloqueio positivo (toque): ao registrar uma DEFESA, o bloqueio mais recente
+  // do rally (de qualquer equipe) que seguiu em jogo é marcado como toque
+  // positivo — não conta ponto nem erro, é só uma ação positiva de bloqueio.
+  if (input.fundamento === "defesa") {
+    for (let i = actions.length - 2; i >= 0; i--) {
+      const a = actions[i]
+      if (a.rallyId !== rallyId) break
+      if (a.fundamento === "bloqueio" && a.resultado === "continuidade" && !a.toque) {
+        actions[i] = { ...a, toque: true }
+        break
+      }
+    }
+  }
 
   // Marca a ação bloqueada da outra equipe como erro (contabiliza no scout do
   // atacante/passador), sem pontuar de novo — o ponto já é do bloqueio.
