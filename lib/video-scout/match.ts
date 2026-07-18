@@ -186,6 +186,16 @@ export function nextSet(state: MatchState): MatchState {
   }
 }
 
+/**
+ * Define manualmente qual equipe inicia sacando. Serve para acertar a leitura do
+ * rodízio desde o começo do set: assim o líbero entra na P1 da equipe que recebe
+ * já na primeira jogada e a rotação por sideout fica correta. Só deve ser usada
+ * antes de registrar qualquer ação (na configuração inicial do set).
+ */
+export function setServingTeam(state: MatchState, side: TeamSide): MatchState {
+  return { ...state, servingTeam: side }
+}
+
 /** Aplica a pontuação e a rotação por sideout, retornando o novo estado parcial. */
 function applyScoring(
   state: MatchState,
