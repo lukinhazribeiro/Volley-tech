@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { ArrowLeft, Download, Target, TrendingUp, Trophy, XCircle } from "lucide-react"
+import { useMemo, useRef, useState } from "react"
+import { ArrowLeft, Download, FileText, Loader2, Target, TrendingUp, Trophy, XCircle } from "lucide-react"
 import {
   FUNDAMENTO_LABEL,
   TEAM_LABEL,
@@ -295,6 +295,9 @@ export function ScoutReport({
   const [athleteFilter, setAthleteFilter] = useState<string>("todos")
   const [fundamentoFilter, setFundamentoFilter] = useState<Fundamento | "todos">("todos")
   const [teamFilter, setTeamFilter] = useState<TeamSide | "todos">("todos")
+  const [exportingPdf, setExportingPdf] = useState(false)
+  // Área do relatório capturada no PDF (resumo + gráficos + planilhas).
+  const reportRef = useRef<HTMLDivElement>(null)
 
   const playerById = useMemo(() => {
     const map = new Map<string, Player>()
@@ -374,6 +377,55 @@ export function ScoutReport({
     URL.revokeObjectURL(url)
   }
 
+  // Gera um PDF que é uma imagem idêntica ao relatório exibido na tela.
+  async function exportPDF() {
+    const node = reportRef.current
+    if (!node || exportingPdf) return
+    setExportingPdf(true)
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas-pro"),
+        import("jspdf"),
+      ])
+      // Largura de captura ampla para as tabelas renderizarem sem corte lateral.
+      const captureWidth = Math.max(node.scrollWidth, 1180)
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        backgroundColor: "#f8fafc",
+        useCORS: true,
+        windowWidth: captureWidth,
+        onclone: (doc) => {
+          // Remove rolagem horizontal das planilhas para capturar a tabela inteira.
+          doc.querySelectorAll<HTMLElement>(".overflow-x-auto").forEach((el) => {
+            el.style.overflow = "visible"
+          })
+        },
+      })
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = pageWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const imgData = canvas.toDataURL("image/png")
+      // Fatiamento em múltiplas páginas A4 mantendo a imagem idêntica ao relatório.
+      let heightLeft = imgHeight
+      let position = 0
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+      while (heightLeft > 0) {
+        position -= pageHeight
+        pdf.addPage()
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+      pdf.save("scout-relatorio.pdf")
+    } catch (err) {
+      console.error("[v0] Falha ao exportar PDF:", err)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -447,6 +499,7 @@ export function ScoutReport({
         </div>
       </div>
 
+      <div ref={reportRef} className="space-y-5 bg-slate-50 p-2">
       {/* Resumo geral */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
@@ -496,15 +549,30 @@ export function ScoutReport({
               100%, mais decisivo o atleta)
             </p>
           </div>
-          <button
-            type="button"
-            onClick={exportCSV}
-            disabled={summary.jogadores.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Download className="h-3.5 w-3.5" aria-hidden="true" />
-            Exportar CSV
-          </button>
+          <div className="flex gap-2" data-html2canvas-ignore="true">
+            <button
+              type="button"
+              onClick={exportPDF}
+              disabled={summary.jogadores.length === 0 || exportingPdf}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {exportingPdf ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              {exportingPdf ? "Gerando PDF..." : "Exportar PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={exportCSV}
+              disabled={summary.jogadores.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Exportar CSV
+            </button>
+          </div>
         </div>
 
         {summary.jogadores.length === 0 ? (
@@ -518,6 +586,7 @@ export function ScoutReport({
             ) : null,
           )
         )}
+      </div>
       </div>
     </div>
   )
