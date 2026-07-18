@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ArrowLeft, Download, Target, TrendingUp, Trophy, XCircle } from "lucide-react"
+import { ArrowLeft, Download, FileText, Loader2, Target, TrendingUp, Trophy, XCircle } from "lucide-react"
 import {
   FUNDAMENTO_LABEL,
   TEAM_LABEL,
@@ -12,6 +12,7 @@ import {
   type TeamSide,
 } from "@/lib/video-scout/types"
 import { computeBreakdowns, computeSummary, type PlayerStat } from "@/lib/video-scout/stats"
+import { exportScoutPdf } from "@/lib/video-scout/export-pdf"
 import { ScoutCharts } from "./scout-charts"
 
 interface ScoutReportProps {
@@ -295,6 +296,7 @@ export function ScoutReport({
   const [athleteFilter, setAthleteFilter] = useState<string>("todos")
   const [fundamentoFilter, setFundamentoFilter] = useState<Fundamento | "todos">("todos")
   const [teamFilter, setTeamFilter] = useState<TeamSide | "todos">("todos")
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   const playerById = useMemo(() => {
     const map = new Map<string, Player>()
@@ -372,6 +374,34 @@ export function ScoutReport({
     a.download = "scout-planilha.csv"
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Gera um PDF desenhado vetorialmente (caixas, gráficos e planilhas reais),
+  // com layout profissional — não é uma foto da tela.
+  async function exportPDF() {
+    if (exportingPdf) return
+    setExportingPdf(true)
+    try {
+      const teamFilterLabel =
+        teamFilter === "todos"
+          ? "Ambas"
+          : teamFilter === "casa"
+            ? teamAName || TEAM_LABEL.casa
+            : teamBName || TEAM_LABEL.adversario
+      await exportScoutPdf({
+        summary,
+        breakdowns,
+        statsByTeam,
+        teamsToShow,
+        teamAName,
+        teamBName,
+        teamFilterLabel,
+      })
+    } catch (err) {
+      console.error("[v0] Falha ao exportar PDF:", err)
+    } finally {
+      setExportingPdf(false)
+    }
   }
 
   return (
@@ -496,15 +526,30 @@ export function ScoutReport({
               100%, mais decisivo o atleta)
             </p>
           </div>
-          <button
-            type="button"
-            onClick={exportCSV}
-            disabled={summary.jogadores.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Download className="h-3.5 w-3.5" aria-hidden="true" />
-            Exportar CSV
-          </button>
+          <div className="flex gap-2" data-html2canvas-ignore="true">
+            <button
+              type="button"
+              onClick={exportPDF}
+              disabled={summary.jogadores.length === 0 || exportingPdf}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {exportingPdf ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              {exportingPdf ? "Gerando PDF..." : "Exportar PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={exportCSV}
+              disabled={summary.jogadores.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Exportar CSV
+            </button>
+          </div>
         </div>
 
         {summary.jogadores.length === 0 ? (
