@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { ArrowLeft, Download, FileText, Loader2, Target, TrendingUp, Trophy, XCircle } from "lucide-react"
 import {
   FUNDAMENTO_LABEL,
@@ -296,6 +296,8 @@ export function ScoutReport({
   const [fundamentoFilter, setFundamentoFilter] = useState<Fundamento | "todos">("todos")
   const [teamFilter, setTeamFilter] = useState<TeamSide | "todos">("todos")
   const [exportingPdf, setExportingPdf] = useState(false)
+  // Área do relatório capturada no PDF (resumo + gráficos + planilhas).
+  const reportRef = useRef<HTMLDivElement>(null)
 
   const playerById = useMemo(() => {
     const map = new Map<string, Player>()
@@ -375,21 +377,62 @@ export function ScoutReport({
     URL.revokeObjectURL(url)
   }
 
-  // Gera um PDF profissional desenhado do zero (cartões, gráficos e planilhas).
+  // Gera um PDF que é uma imagem idêntica ao relatório exibido na tela.
   async function exportPDF() {
-    if (exportingPdf || summary.jogadores.length === 0) return
+    const node = reportRef.current
+    if (!node || exportingPdf) return
     setExportingPdf(true)
     try {
-      const { exportScoutPdf } = await import("@/lib/video-scout/pdf-report")
-      await exportScoutPdf({
-        summary,
-        breakdowns,
-        statsByTeam,
-        teamsToShow,
-        teamAName,
-        teamBName,
-        teamFilter,
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas-pro"),
+        import("jspdf"),
+      ])
+      // Renderiza numa largura de documento fixa (proporção A4) para o layout ficar
+      // consistente e nítido, independentemente do tamanho da tela.
+      const DOC_WIDTH = 900
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        windowWidth: DOC_WIDTH,
+        onclone: (doc) => {
+          const clone = doc.querySelector<HTMLElement>("[data-pdf-report]") ?? node
+          clone.style.width = `${DOC_WIDTH}px`
+          clone.style.padding = "40px"
+          // Revela o cabeçalho do documento (fica oculto na tela).
+          doc.querySelectorAll<HTMLElement>("[data-pdf-header]").forEach((el) => {
+            el.classList.remove("hidden")
+            el.style.display = "block"
+            el.style.marginBottom = "8px"
+          })
+          // Mostra as tabelas por inteiro, sem rolagem lateral.
+          doc.querySelectorAll<HTMLElement>(".overflow-x-auto").forEach((el) => {
+            el.style.overflow = "visible"
+          })
+        },
       })
+
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 24
+      const imgData = canvas.toDataURL("image/png")
+      const imgWidth = pageWidth - margin * 2
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const usableHeight = pageHeight - margin * 2
+
+      // Fatiamento em páginas A4 com margem branca uniforme em todas as bordas.
+      let heightLeft = imgHeight
+      let position = margin
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight)
+      heightLeft -= usableHeight
+      while (heightLeft > 0) {
+        position -= usableHeight
+        pdf.addPage()
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight)
+        heightLeft -= usableHeight
+      }
+      pdf.save("scout-relatorio.pdf")
     } catch (err) {
       console.error("[v0] Falha ao exportar PDF:", err)
     } finally {
@@ -470,6 +513,44 @@ export function ScoutReport({
         </div>
       </div>
 
+      <div ref={reportRef} data-pdf-report className="space-y-5 rounded-xl bg-white p-2 md:p-2">
+      {/* Cabeçalho do documento — visível apenas no PDF exportado (revelado no onclone). */}
+      <div data-pdf-header className="hidden">
+        <div className="flex items-start justify-between border-b-2 border-orange-500 pb-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">
+              Volley Tech · Scout View
+            </p>
+            <h1 className="mt-1 text-2xl font-extrabold text-slate-900">Relatório de Scout</h1>
+            <p className="mt-1 text-sm font-semibold text-slate-600">
+              {(teamAName || "Equipe A") + "  ×  " + (teamBName || "Equipe B")}
+            </p>
+          </div>
+          <div className="text-right text-xs text-slate-500">
+            <p>
+              Equipe:{" "}
+              <span className="font-semibold text-slate-700">
+                {teamFilter === "todos"
+                  ? "Ambas"
+                  : teamFilter === "casa"
+                    ? teamAName || "Equipe A"
+                    : teamBName || "Equipe B"}
+              </span>
+            </p>
+            <p className="mt-0.5">
+              Gerado em{" "}
+              <span className="font-semibold text-slate-700">
+                {new Date().toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Resumo geral */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
@@ -519,7 +600,7 @@ export function ScoutReport({
               100%, mais decisivo o atleta)
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2" data-html2canvas-ignore="true">
             <button
               type="button"
               onClick={exportPDF}
@@ -556,6 +637,7 @@ export function ScoutReport({
             ) : null,
           )
         )}
+      </div>
       </div>
     </div>
   )
