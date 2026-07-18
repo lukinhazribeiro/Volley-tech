@@ -3,7 +3,7 @@
 import { useState, useEffect, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Volleyball, Menu, Search, Bell, PanelLeftClose, PanelLeftOpen, X, ArrowLeft, Pencil, Check } from "lucide-react"
+import { Menu, Search, Bell, PanelLeftClose, PanelLeftOpen, X, ArrowLeft, Pencil, Check } from "lucide-react"
 import { nav } from "@/lib/gestao/nav"
 import { cn } from "@/lib/utils"
 import { getStoredUser } from "@/lib/auth"
@@ -100,9 +100,12 @@ export function AppShell({
 
   const Brand = ({ compact }: { compact: boolean }) => (
     <div className={cn("flex items-center gap-3 px-6 py-6", compact && "justify-center px-0")}>
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/30">
-        <Volleyball className="h-6 w-6" />
-      </div>
+      <img
+        src="/volley-tech-logo.png"
+        alt="Volley Tech"
+        className="h-11 w-11 shrink-0 object-contain"
+        draggable={false}
+      />
       {!compact && (
         <div className="leading-tight">
           <p className="text-lg font-extrabold tracking-tight text-sidebar-foreground">
