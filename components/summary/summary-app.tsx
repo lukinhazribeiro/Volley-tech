@@ -901,6 +901,15 @@ export default function SummaryApp() {
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <VolleyTechLogo className="h-8 w-8 shrink-0" />
+                <div className="leading-tight">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-orange-600">
+                    Volley Tech
+                  </p>
+                  <p className="text-sm font-bold tracking-wide text-slate-800">Summary Game</p>
+                </div>
+              </div>
               {championshipName && (
                 <div className="flex items-center gap-1 text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full w-fit mt-0.5 border border-yellow-100">
                   <Trophy className="size-3" />
