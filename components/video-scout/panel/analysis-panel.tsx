@@ -643,7 +643,22 @@ export function AnalysisPanel() {
             >
               <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
-            <h1 className="text-lg font-bold tracking-wide text-slate-800">PAINEL DE ANÁLISE</h1>
+            <div className="flex items-center gap-2">
+              <img
+                src="/volley-tech-logo.png"
+                alt="Volley Tech"
+                className="h-8 w-8 shrink-0 object-contain"
+                draggable={false}
+              />
+              <div className="leading-tight">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-orange-600">
+                  Volley Tech
+                </p>
+                <h1 className="text-base font-bold tracking-wide text-slate-800 sm:text-lg">
+                  PAINEL DE ANÁLISE
+                </h1>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {liveSessions.length > 0 && (

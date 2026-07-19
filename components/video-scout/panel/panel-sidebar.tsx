@@ -33,9 +33,12 @@ export function PanelSidebar({ open, onClose, teamAName, teamBName, onEditTeam }
       <aside className="relative flex h-full w-64 flex-col border-r border-orange-100 bg-white shadow-xl">
         <div className="flex items-center justify-between px-5 py-5">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-100 ring-1 ring-orange-200">
-              <span className="text-lg font-bold text-orange-600">V</span>
-            </div>
+            <img
+              src="/volley-tech-logo.png"
+              alt="Volley Tech"
+              className="h-9 w-9 shrink-0 object-contain"
+              draggable={false}
+            />
             <div className="leading-tight">
               <p className="text-sm font-bold tracking-wide text-slate-800">VOLLEY</p>
               <p className="-mt-0.5 text-sm font-bold tracking-wide text-orange-600">TECH</p>
