@@ -99,6 +99,81 @@ export async function frequenciaMensalPorTurma(competencia: string) {
   }))
 }
 
+/**
+ * Grade de frequência MENSAL por turma: linhas = atletas, colunas = cada data de
+ * aula registrada no mês. Cada célula traz o status (presente/atrasado/falta).
+ * Usada no bloco de frequência do relatório por turma.
+ */
+export async function gradeFrequenciaMensal(competencia: string) {
+  const userId = await getGestaoUserId()
+  const rows = await db
+    .select({
+      turmaId: presencas.turmaId,
+      turmaNome: turmas.nome,
+      atletaId: atletas.id,
+      atletaNome: atletas.nome,
+      data: presencas.data,
+      status: presencas.status,
+    })
+    .from(presencas)
+    .innerJoin(atletas, eq(atletas.id, presencas.atletaId))
+    .leftJoin(turmas, eq(turmas.id, presencas.turmaId))
+    .where(and(sql`to_char(${presencas.data}, 'YYYY-MM') = ${competencia}`, eq(presencas.userId, userId)))
+    .orderBy(atletas.nome, presencas.data)
+
+  type Cel = "P" | "A" | "F"
+  type AtletaLinha = { atletaId: number; nome: string; celulas: Record<string, Cel>; presentes: number }
+  type Bloco = {
+    turmaId: number
+    turmaNome: string
+    datas: string[]
+    atletas: AtletaLinha[]
+  }
+
+  const blocos = new Map<number, Bloco>()
+  const datasPorTurma = new Map<number, Set<string>>()
+
+  for (const r of rows) {
+    const tId = Number(r.turmaId ?? 0)
+    if (!blocos.has(tId)) {
+      blocos.set(tId, { turmaId: tId, turmaNome: r.turmaNome ?? "Sem turma", datas: [], atletas: [] })
+      datasPorTurma.set(tId, new Set())
+    }
+    datasPorTurma.get(tId)!.add(r.data)
+
+    const bloco = blocos.get(tId)!
+    let linha = bloco.atletas.find((a) => a.atletaId === r.atletaId)
+    if (!linha) {
+      linha = { atletaId: r.atletaId, nome: r.atletaNome, celulas: {}, presentes: 0 }
+      bloco.atletas.push(linha)
+    }
+    const cel: Cel = r.status === "presente" ? "P" : r.status === "atrasado" ? "A" : "F"
+    linha.celulas[r.data] = cel
+    if (cel === "P" || cel === "A") linha.presentes += 1
+  }
+
+  return Array.from(blocos.values())
+    .map((b) => {
+      const datas = Array.from(datasPorTurma.get(b.turmaId) ?? []).sort()
+      return {
+        turmaId: b.turmaId,
+        turmaNome: b.turmaNome,
+        datas,
+        totalAulas: datas.length,
+        atletas: b.atletas
+          .sort((a, z) => a.nome.localeCompare(z.nome))
+          .map((a) => ({
+            nome: a.nome,
+            celulas: a.celulas,
+            presentes: a.presentes,
+            total: datas.length,
+            percentual: datas.length > 0 ? Math.round((a.presentes / datas.length) * 100) : 0,
+          })),
+      }
+    })
+    .sort((a, z) => a.turmaNome.localeCompare(z.turmaNome))
+}
+
 /** Lista as competências (AAAA-MM) que possuem presenças registradas, mais recente primeiro. */
 export async function competenciasComPresenca() {
   const userId = await getGestaoUserId()

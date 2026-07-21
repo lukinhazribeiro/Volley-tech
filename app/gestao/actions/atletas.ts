@@ -44,6 +44,39 @@ export async function listAtletas(search?: string) {
     .orderBy(asc(atletas.nome))
 }
 
+/**
+ * Lista os atletas com os campos necessários aos relatórios (inclui data de
+ * nascimento e turma principal), para agrupar por turma ou por ano de nascimento.
+ */
+export async function atletasParaRelatorio() {
+  const userId = await getGestaoUserId()
+  const rows = await db
+    .select({
+      nome: atletas.nome,
+      turmaNome: turmas.nome,
+      categoriaNome: categorias.nome,
+      dataNascimento: atletas.dataNascimento,
+      dataInscricao: atletas.dataInscricao,
+      valorMensalidade: atletas.valorMensalidade,
+      ativo: atletas.ativo,
+    })
+    .from(atletas)
+    .leftJoin(turmas, eq(turmas.id, atletas.turmaId))
+    .leftJoin(categorias, eq(categorias.id, atletas.categoriaId))
+    .where(eq(atletas.userId, userId))
+    .orderBy(asc(atletas.nome))
+
+  return rows.map((a) => ({
+    nome: a.nome,
+    turmaNome: a.turmaNome,
+    categoriaNome: a.categoriaNome,
+    dataNascimento: a.dataNascimento,
+    dataInscricao: a.dataInscricao,
+    mensalidade: Number(a.valorMensalidade),
+    ativo: a.ativo,
+  }))
+}
+
 export async function getAtleta(id: number) {
   const userId = await getGestaoUserId()
   const [a] = await db
