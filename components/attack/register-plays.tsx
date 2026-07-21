@@ -23,6 +23,7 @@ import {
   getSetterName,
   getAttackLinesWithOrigin,
   getAttackLegend,
+  getAttackByPosition,
 } from "@/lib/attack/volley-stats"
 import { exportToPDF } from "@/lib/attack/export-pdf"
 import { LastPlaysPanel } from "@/components/attack/last-plays-panel"
@@ -807,6 +808,21 @@ function TeamStatsView({
   const hasL1 = statsL1.totals[team] > 0
   const hasL2 = statsL2.totals[team] > 0
 
+  // Filtro do gráfico de direções: "todos" (visão geral sobreposta) ou por local de ataque.
+  const attackByPosition = getAttackByPosition(teamPlays, team)
+  const [courtFilter, setCourtFilter] = useState<SetPosition | "todos">("todos")
+  const activeGroup = attackByPosition.find((g) => g.position === courtFilter)
+  const courtLines =
+    courtFilter === "todos" ? getAttackLinesWithOrigin(teamPlays, team) : (activeGroup?.lines ?? [])
+  const courtLegend =
+    courtFilter === "todos"
+      ? getAttackLegend(teamPlays, team)
+      : (activeGroup?.lines ?? []).map((l) => ({
+          attackType: l.attackType,
+          count: l.count,
+          percentage: l.percentage,
+        }))
+
   const resultCards = [
     {
       key: "ponto" as const,
@@ -912,7 +928,34 @@ function TeamStatsView({
 
           {/* Quadra */}
           <div className="mb-6">
-            <h3 className="font-semibold text-slate-700 mb-3">Quadra - Direções de Ataque</h3>
+            <h3 className="font-semibold text-slate-700 mb-1">Quadra - Direções de Ataque</h3>
+            <p className="text-xs text-slate-400 mb-3">
+              {courtFilter === "todos"
+                ? "Todas as direções sobrepostas. Filtre por local para leitura individual."
+                : `Direções dos ataques originados na ${activeGroup?.label ?? ""} (${activeGroup?.description ?? ""}).`}
+            </p>
+
+            {/* Filtro por local de ataque */}
+            {attackByPosition.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-2 mb-4">
+                <button
+                  onClick={() => setCourtFilter("todos")}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${courtFilter === "todos" ? "bg-orange-600 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-orange-50"}`}
+                >
+                  Ver todos
+                </button>
+                {attackByPosition.map((g) => (
+                  <button
+                    key={g.position}
+                    onClick={() => setCourtFilter(g.position)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${courtFilter === g.position ? "bg-orange-600 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-orange-50"}`}
+                  >
+                    {g.label} <span className="opacity-70">({g.total})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="flex justify-center" style={{ perspective: "800px" }}>
               <div style={{ transform: "rotateX(45deg) rotateZ(0deg)", transformStyle: "preserve-3d" }}>
                 <svg
@@ -968,7 +1011,7 @@ function TeamStatsView({
                     P1
                   </text>
 
-                  {getAttackLinesWithOrigin(teamPlays, team).map((attack, i) => {
+                  {courtLines.map((attack, i) => {
                     const midX = (attack.line.startX + attack.line.endX) / 2
                     const midY = (attack.line.startY + 20 + attack.line.endY) / 2
                     const color = attackLineColors[attack.attackType as AttackType]
@@ -996,7 +1039,7 @@ function TeamStatsView({
             </div>
 
             <div className="flex flex-wrap justify-center gap-2 mt-3">
-              {getAttackLegend(teamPlays, team).map((item) => (
+              {courtLegend.map((item) => (
                 <div key={item.attackType} className="flex items-center gap-1 text-xs bg-slate-100 px-2 py-1 rounded">
                   <span
                     className="w-3 h-3 rounded-full"
