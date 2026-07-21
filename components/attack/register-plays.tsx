@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/attack/ui/button"
-import { Check, X, History, Download, User, Users, ArrowLeft } from "lucide-react"
+import { Check, X, History, User, Users, ArrowLeft } from "lucide-react"
 import {
   type Team,
   type SetPosition,
@@ -26,6 +26,7 @@ import {
   getAttackByPosition,
 } from "@/lib/attack/volley-stats"
 import { exportToPDF, buildAttackReportHTML } from "@/lib/attack/export-pdf"
+import { ExportPdfMenu } from "@/components/attack/export-pdf-menu"
 import { LastPlaysPanel } from "@/components/attack/last-plays-panel"
 import { SetterComparisonChart } from "@/components/attack/distribution-charts"
 
@@ -411,7 +412,7 @@ export default function RegisterPlays() {
               setSelectedSessionForStats(s)
               setMainTab("collector")
             }}
-            onExport={(s) => exportToPDF(currentSessionPlays, teamNames, settersA, settersB, s)}
+            onExport={(s, teams) => exportToPDF(currentSessionPlays, teamNames, settersA, settersB, s, teams)}
             onDelete={deleteSession}
             onBack={() => {
               setViewMode("collector")
@@ -421,7 +422,7 @@ export default function RegisterPlays() {
         ) : selectedSessionForStats ? (
           <SessionStatsView
             session={selectedSessionForStats}
-            onExport={(s) => exportToPDF(currentSessionPlays, teamNames, settersA, settersB, s)}
+            onExport={(s, teams) => exportToPDF(currentSessionPlays, teamNames, settersA, settersB, s, teams)}
             onBack={() => {
               setSelectedSessionForStats(null)
               setViewMode("history")
@@ -634,7 +635,7 @@ function HistoryView({
 }: {
   sessions: Session[]
   onView: (s: Session) => void
-  onExport: (s: Session) => void
+  onExport: (s: Session, teams: Team[]) => void
   onDelete: (id: number) => void
   onBack: () => void
 }) {
@@ -667,12 +668,10 @@ function HistoryView({
                   <button className="px-3 py-1 text-sm rounded bg-blue-600 text-white" onClick={() => onView(session)}>
                     Ver
                   </button>
-                  <button
-                    className="px-3 py-1 text-sm rounded bg-slate-600 text-white"
-                    onClick={() => onExport(session)}
-                  >
-                    PDF
-                  </button>
+                  <ExportPdfMenu
+                    teamNames={session.teamNames}
+                    onExport={(teams) => onExport(session, teams)}
+                  />
                   <button
                     className="px-3 py-1 text-sm rounded bg-red-500 text-white"
                     onClick={() => onDelete(session.id)}
@@ -695,7 +694,7 @@ function SessionStatsView({
   onBack,
 }: {
   session: Session
-  onExport: (s: Session) => void
+  onExport: (s: Session, teams: Team[]) => void
   onBack: () => void
 }) {
   // Renderiza EXATAMENTE o mesmo conteúdo do PDF oficial (documento salvo).
@@ -718,10 +717,7 @@ function SessionStatsView({
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => onExport(session)}>
-              <Download className="w-4 h-4 mr-1" />
-              PDF
-            </Button>
+            <ExportPdfMenu teamNames={session.teamNames} onExport={(teams) => onExport(session, teams)} />
             <Button variant="outline" size="sm" onClick={onBack}>
               Voltar
             </Button>
