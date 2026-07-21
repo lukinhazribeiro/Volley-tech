@@ -16,20 +16,50 @@ import {
   attackLineColors,
 } from "./volley-stats"
 
-export function exportToPDF(
-  currentSessionPlays: Play[],
-  teamNames: TeamNames,
-  settersA: Setters,
-  settersB: Setters,
-  session?: Session,
-) {
+/** Estilos do relatório oficial, escopados sob `.vt-report` para poder ser
+ *  injetado com segurança na aplicação (sem conflitar com utilitários do Tailwind). */
+const REPORT_SCOPED_STYLES = `
+.vt-report{font-family:Arial,sans-serif;color:#111827}
+.vt-report h1{color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:10px;font-size:22px;margin:0}
+.vt-report h2{color:#374151;margin-top:25px}
+.vt-report h3{color:#374151}
+.vt-report .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.vt-report .card{border:1px solid #d1d5db;padding:15px;border-radius:8px}
+.vt-report .summary{display:flex;gap:20px;margin:20px 0}
+.vt-report .summary-item{flex:1;text-align:center;padding:15px;background:#f3f4f6;border-radius:8px}
+.vt-report .summary-value{font-size:28px;font-weight:bold;color:#1e40af}
+.vt-report .courts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.vt-report svg{page-break-inside:avoid;break-inside:avoid}
+@media (max-width:640px){.vt-report .grid,.vt-report .courts-grid{grid-template-columns:1fr}}
+`
+
+export interface ReportInput {
+  currentSessionPlays: Play[]
+  teamNames: TeamNames
+  settersA: Setters
+  settersB: Setters
+  session?: Session
+}
+
+/**
+ * Monta o conteúdo do relatório OFICIAL (o mesmo do PDF). Retorna o HTML interno
+ * (sem <html>/<body>) já com a `<style>` escopada, para ser reaproveitado tanto na
+ * exportação em PDF quanto na visualização "Ver" do histórico — garantindo que os
+ * dois sejam idênticos.
+ */
+export function buildAttackReportHTML({
+  currentSessionPlays,
+  teamNames,
+  settersA,
+  settersB,
+  session,
+}: ReportInput): { html: string; sessionName: string; isEmpty: boolean } {
   const playsToExport = session ? session.plays : currentSessionPlays
   const sessionName = session ? session.name : `Sessão ${new Date().toLocaleDateString("pt-BR")}`
   const currentTeamNames = session ? session.teamNames : teamNames
 
   if (playsToExport.length === 0) {
-    alert("Nenhuma jogada para exportar!")
-    return
+    return { html: "", sessionName, isEmpty: true }
   }
 
   const exportStats = getStats(playsToExport)
@@ -126,7 +156,7 @@ export function exportToPDF(
       <div class="courts-grid">${groups.map(courtSvg).join("")}</div>`
   }
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${sessionName}</title><style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,sans-serif;padding:30px;max-width:900px;margin:0 auto}h1{color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:10px}h2{color:#374151;margin-top:25px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.card{border:1px solid #d1d5db;padding:15px;border-radius:8px}.summary{display:flex;gap:20px;margin:20px 0}.summary-item{flex:1;text-align:center;padding:15px;background:#f3f4f6;border-radius:8px}.summary-value{font-size:28px;font-weight:bold;color:#1e40af}.courts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}svg{page-break-inside:avoid;break-inside:avoid}@media print{.courts-grid{grid-template-columns:1fr 1fr}}</style></head><body>
+  const body = `
 <div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #f97316;padding-bottom:10px;margin-bottom:8px">
   <img src="${logoSrc}" alt="Volley Tech" style="width:44px;height:44px;object-fit:contain" />
   <div>
@@ -153,8 +183,30 @@ ${createSetterSection("B", 1, statsB1)}${createSetterSection("B", 2, statsB2)}
     .join("")}<h3>Resultados</h3>${createBar("Ponto", exportStats.results.B.ponto, exportStats.totals.B, "#10b981")}${createBar("Certo", exportStats.results.B.certo, exportStats.totals.B, "#3b82f6")}${createBar("Erro", exportStats.results.B.erro, exportStats.totals.B, "#ef4444")}${createBar("Bloqueado", exportStats.results.B.bloqueado, exportStats.totals.B, "#f97316")}</div>
 </div>
 <div style="margin-top:24px"><h2 style="color:#1e40af">${currentTeamNames.A} — Ataques por Local</h2>${courtsSection("A")}</div>
-<div style="margin-top:24px"><h2 style="color:#ef4444">${currentTeamNames.B} — Ataques por Local</h2>${courtsSection("B")}</div>
-</body></html>`
+<div style="margin-top:24px"><h2 style="color:#ef4444">${currentTeamNames.B} — Ataques por Local</h2>${courtsSection("B")}</div>`
+
+  return {
+    html: `<style>${REPORT_SCOPED_STYLES}</style><div class="vt-report">${body}</div>`,
+    sessionName,
+    isEmpty: false,
+  }
+}
+
+export function exportToPDF(
+  currentSessionPlays: Play[],
+  teamNames: TeamNames,
+  settersA: Setters,
+  settersB: Setters,
+  session?: Session,
+) {
+  const report = buildAttackReportHTML({ currentSessionPlays, teamNames, settersA, settersB, session })
+  if (report.isEmpty) {
+    alert("Nenhuma jogada para exportar!")
+    return
+  }
+
+  // O documento impresso usa exatamente o mesmo conteúdo mostrado no "Ver".
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${report.sessionName}</title><style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{padding:30px;max-width:900px;margin:0 auto}@media print{.vt-report .courts-grid{grid-template-columns:1fr 1fr}}</style></head><body>${report.html}</body></html>`
 
   const blob = new Blob([html], { type: "text/html" })
   const url = URL.createObjectURL(blob)

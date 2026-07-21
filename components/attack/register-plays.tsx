@@ -25,7 +25,7 @@ import {
   getAttackLegend,
   getAttackByPosition,
 } from "@/lib/attack/volley-stats"
-import { exportToPDF } from "@/lib/attack/export-pdf"
+import { exportToPDF, buildAttackReportHTML } from "@/lib/attack/export-pdf"
 import { LastPlaysPanel } from "@/components/attack/last-plays-panel"
 import { SetterComparisonChart } from "@/components/attack/distribution-charts"
 
@@ -698,16 +698,25 @@ function SessionStatsView({
   onExport: (s: Session) => void
   onBack: () => void
 }) {
-  const sessionStats = getStats(session.plays)
-  const teams: { key: Team; name: string; accent: string }[] = [
-    { key: "A", name: session.teamNames.A, accent: "blue" },
-    { key: "B", name: session.teamNames.B, accent: "red" },
-  ]
+  // Renderiza EXATAMENTE o mesmo conteúdo do PDF oficial (documento salvo).
+  const report = buildAttackReportHTML({
+    currentSessionPlays: session.plays,
+    teamNames: session.teamNames,
+    settersA: session.settersA,
+    settersB: session.settersB,
+    session,
+  })
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm mb-4">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-slate-800">{session.name}</h2>
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">{session.name}</h2>
+            <p className="text-sm text-slate-500">
+              {new Date(session.date).toLocaleString("pt-BR")} • {session.plays.length} jogadas
+            </p>
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => onExport(session)}>
               <Download className="w-4 h-4 mr-1" />
@@ -718,71 +727,14 @@ function SessionStatsView({
             </Button>
           </div>
         </div>
-        <p className="text-sm text-slate-500 mb-4">
-          {new Date(session.date).toLocaleString("pt-BR")} • {session.plays.length} jogadas
-        </p>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
-            <p className="text-sm text-blue-600">{session.teamNames.A}</p>
-            <p className="text-3xl font-bold text-blue-700">{sessionStats.totals.A}</p>
-            <p className="text-xs text-blue-500">jogadas</p>
+        {report.isEmpty ? (
+          <p className="text-slate-500 text-center py-8">Nenhuma jogada registrada nesta sessão.</p>
+        ) : (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6 overflow-x-auto">
+            <div dangerouslySetInnerHTML={{ __html: report.html }} />
           </div>
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
-            <p className="text-sm text-red-600">{session.teamNames.B}</p>
-            <p className="text-3xl font-bold text-red-700">{sessionStats.totals.B}</p>
-            <p className="text-xs text-red-500">jogadas</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {teams.map(({ key, name, accent }) =>
-            sessionStats.totals[key] > 0 ? (
-              <div key={key} className={`border rounded-lg p-4 ${accent === "blue" ? "border-blue-200" : "border-red-200"}`}>
-                <h3 className={`font-semibold mb-3 ${accent === "blue" ? "text-blue-800" : "text-red-800"}`}>{name} - Levantamentos</h3>
-                {setPositions.map((pos) => {
-                  const count = sessionStats.positions[key]?.[pos.value] || 0
-                  const pct = sessionStats.totals[key] > 0 ? (count / sessionStats.totals[key]) * 100 : 0
-                  return (
-                    <div key={pos.value} className="mb-2">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-slate-600">{pos.label}</span>
-                        <span className="font-medium">
-                          {count} ({pct.toFixed(1)}%)
-                        </span>
-                      </div>
-                      <div className={`rounded-full p-1 ${accent === "blue" ? "bg-blue-100" : "bg-red-100"}`}>
-                        <div
-                          className={`p-1.5 ${accent === "blue" ? "bg-blue-600" : "bg-red-500"} rounded-full transition-all duration-500`}
-                          style={{ width: `${pct}%`, minWidth: count > 0 ? "0.75rem" : "0" }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-                <h4 className={`font-semibold mt-4 mb-3 ${accent === "blue" ? "text-blue-800" : "text-red-800"}`}>Resultados</h4>
-                <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                  <div className="p-2 bg-green-100 rounded">
-                    <p className="font-bold text-green-700">{sessionStats.results[key].ponto}</p>
-                    <p className="text-green-600">Pontos</p>
-                  </div>
-                  <div className="p-2 bg-blue-100 rounded">
-                    <p className="font-bold text-blue-700">{sessionStats.results[key].certo}</p>
-                    <p className="text-blue-600">Certos</p>
-                  </div>
-                  <div className="p-2 bg-red-100 rounded">
-                    <p className="font-bold text-red-700">{sessionStats.results[key].erro}</p>
-                    <p className="text-red-600">Erros</p>
-                  </div>
-                  <div className="p-2 bg-orange-100 rounded">
-                    <p className="font-bold text-orange-700">{sessionStats.results[key].bloqueado}</p>
-                    <p className="text-orange-600">Bloq.</p>
-                  </div>
-                </div>
-              </div>
-            ) : null,
-          )}
-        </div>
+        )}
       </div>
     </div>
   )
