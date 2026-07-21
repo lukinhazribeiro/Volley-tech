@@ -101,7 +101,7 @@ export function exportToPDF(
         <strong style="color:#1e293b;font-size:13px">${group.label} <span style="color:#94a3b8;font-weight:normal">(${group.description})</span></strong>
         <span style="font-size:11px;color:#f97316;font-weight:bold">${group.total} ataques</span>
       </div>
-      <svg viewBox="0 0 200 220" style="width:100%;max-width:190px;display:block;margin:0 auto">
+      <svg viewBox="0 0 200 220" width="190" height="209" preserveAspectRatio="xMidYMid meet" style="width:190px;height:209px;max-width:100%;display:block;margin:0 auto">
         <rect x="5" y="5" width="190" height="210" fill="#f5f0dc" stroke="#1e3a5f" stroke-width="3" rx="2" />
         <rect x="5" y="20" width="190" height="10" fill="#1e3a5f" />
         <text x="100" y="15" text-anchor="middle" font-size="9" fill="#1e3a5f" font-weight="bold">REDE</text>
@@ -123,10 +123,10 @@ export function exportToPDF(
     if (groups.length === 0) return ""
     return `<h3 style="margin-top:18px">Direções de Ataque por Local</h3>
       <p style="font-size:12px;color:#6b7280;margin:0 0 10px">Uma quadra por local de origem, para leitura individual de cada posição.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${groups.map(courtSvg).join("")}</div>`
+      <div class="courts-grid">${groups.map(courtSvg).join("")}</div>`
   }
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${sessionName}</title><style>body{font-family:Arial,sans-serif;padding:30px;max-width:900px;margin:0 auto}h1{color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:10px}h2{color:#374151;margin-top:25px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.card{border:1px solid #d1d5db;padding:15px;border-radius:8px}.summary{display:flex;gap:20px;margin:20px 0}.summary-item{flex:1;text-align:center;padding:15px;background:#f3f4f6;border-radius:8px}.summary-value{font-size:28px;font-weight:bold;color:#1e40af}</style></head><body>
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${sessionName}</title><style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,sans-serif;padding:30px;max-width:900px;margin:0 auto}h1{color:#1e40af;border-bottom:2px solid #1e40af;padding-bottom:10px}h2{color:#374151;margin-top:25px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.card{border:1px solid #d1d5db;padding:15px;border-radius:8px}.summary{display:flex;gap:20px;margin:20px 0}.summary-item{flex:1;text-align:center;padding:15px;background:#f3f4f6;border-radius:8px}.summary-value{font-size:28px;font-weight:bold;color:#1e40af}.courts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}svg{page-break-inside:avoid;break-inside:avoid}@media print{.courts-grid{grid-template-columns:1fr 1fr}}</style></head><body>
 <div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #f97316;padding-bottom:10px;margin-bottom:8px">
   <img src="${logoSrc}" alt="Volley Tech" style="width:44px;height:44px;object-fit:contain" />
   <div>
@@ -160,6 +160,32 @@ ${createSetterSection("B", 1, statsB1)}${createSetterSection("B", 2, statsB2)}
   const url = URL.createObjectURL(blob)
   const win = window.open(url, "_blank")
   if (win) {
-    win.onload = () => win.print()
+    win.onload = () => {
+      // Aguarda as imagens (logo) carregarem para não imprimir com conteúdo faltando.
+      const imgs = Array.from(win.document.images)
+      const pending = imgs.filter((img) => !img.complete)
+      let done = false
+      const doPrint = () => {
+        if (done) return
+        done = true
+        win.focus()
+        win.print()
+      }
+      if (pending.length === 0) {
+        doPrint()
+      } else {
+        let loaded = 0
+        pending.forEach((img) => {
+          const finish = () => {
+            loaded += 1
+            if (loaded >= pending.length) doPrint()
+          }
+          img.addEventListener("load", finish)
+          img.addEventListener("error", finish)
+        })
+      }
+      // Segurança: imprime mesmo que algum recurso demore.
+      win.setTimeout(doPrint, 1200)
+    }
   }
 }
