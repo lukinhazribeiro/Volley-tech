@@ -66,6 +66,17 @@ export const presencas = pgTable("presencas", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 })
 
+export const despesas = pgTable("despesas", {
+  id: serial("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
+  descricao: text("descricao").notNull(),
+  categoria: text("categoria").notNull().default("geral"),
+  valor: numeric("valor").notNull().default("0"),
+  data: date("data").notNull(),
+  observacao: text("observacao"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+})
+
 export const mensalidades = pgTable("mensalidades", {
   id: serial("id").primaryKey(),
   userId: uuid("user_id").notNull(),

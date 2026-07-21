@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/lib/gestao/db"
-import { atletas, mensalidades, turmas } from "@/lib/gestao/db/schema"
+import { atletas, despesas, mensalidades, turmas } from "@/lib/gestao/db/schema"
 import { getGestaoUserId } from "@/lib/gestao/auth"
 import { and, desc, eq, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
@@ -206,5 +206,120 @@ export async function resumoFinanceiro() {
     pendente: Number(row?.pendente ?? 0),
     totalReg: Number(row?.totalReg ?? 0),
     pagos: Number(row?.pagos ?? 0),
+  }
+}
+
+/** Anos-calendário que têm receita (mensalidade paga) OU despesa registrada. */
+export async function anosComMovimento() {
+  const userId = await getGestaoUserId()
+  const rec = await db
+    .select({ ano: sql<string>`extract(year from ${mensalidades.dataPagamento})::text` })
+    .from(mensalidades)
+    .where(and(eq(mensalidades.userId, userId), eq(mensalidades.status, "pago")))
+    .groupBy(sql`extract(year from ${mensalidades.dataPagamento})`)
+  const desp = await db
+    .select({ ano: sql<string>`extract(year from ${despesas.data})::text` })
+    .from(despesas)
+    .where(eq(despesas.userId, userId))
+    .groupBy(sql`extract(year from ${despesas.data})`)
+
+  const anos = new Set<number>()
+  for (const r of rec) if (r.ano) anos.add(Number(r.ano))
+  for (const d of desp) if (d.ano) anos.add(Number(d.ano))
+  anos.add(new Date().getFullYear())
+  return Array.from(anos).sort((a, b) => b - a)
+}
+
+/**
+ * Balanço financeiro anual (regime de caixa) para declaração de imposto de renda.
+ * Considera receitas pela DATA DE PAGAMENTO das mensalidades e as despesas manuais.
+ * Retorna o consolidado por mês, o total do ano, a receita por turma e as
+ * despesas por categoria.
+ */
+export async function balancoAnual(ano: number) {
+  const userId = await getGestaoUserId()
+
+  // Receitas por mês (mensalidades pagas no ano-calendário).
+  const receitaMes = await db
+    .select({
+      mes: sql<string>`to_char(${mensalidades.dataPagamento}, 'MM')`,
+      total: sql<number>`coalesce(sum(${mensalidades.valor}), 0)`,
+    })
+    .from(mensalidades)
+    .where(
+      and(
+        eq(mensalidades.userId, userId),
+        eq(mensalidades.status, "pago"),
+        sql`extract(year from ${mensalidades.dataPagamento}) = ${ano}`,
+      ),
+    )
+    .groupBy(sql`to_char(${mensalidades.dataPagamento}, 'MM')`)
+
+  // Despesas por mês.
+  const despesaMes = await db
+    .select({
+      mes: sql<string>`to_char(${despesas.data}, 'MM')`,
+      total: sql<number>`coalesce(sum(${despesas.valor}), 0)`,
+    })
+    .from(despesas)
+    .where(and(eq(despesas.userId, userId), sql`extract(year from ${despesas.data}) = ${ano}`))
+    .groupBy(sql`to_char(${despesas.data}, 'MM')`)
+
+  // Receita por turma no ano.
+  const receitaTurma = await db
+    .select({
+      turmaNome: turmas.nome,
+      total: sql<number>`coalesce(sum(${mensalidades.valor}), 0)`,
+    })
+    .from(mensalidades)
+    .leftJoin(turmas, eq(turmas.id, mensalidades.turmaId))
+    .where(
+      and(
+        eq(mensalidades.userId, userId),
+        eq(mensalidades.status, "pago"),
+        sql`extract(year from ${mensalidades.dataPagamento}) = ${ano}`,
+      ),
+    )
+    .groupBy(turmas.nome)
+    .orderBy(desc(sql`coalesce(sum(${mensalidades.valor}), 0)`))
+
+  // Despesas por categoria no ano.
+  const despesaCategoria = await db
+    .select({
+      categoria: despesas.categoria,
+      total: sql<number>`coalesce(sum(${despesas.valor}), 0)`,
+    })
+    .from(despesas)
+    .where(and(eq(despesas.userId, userId), sql`extract(year from ${despesas.data}) = ${ano}`))
+    .groupBy(despesas.categoria)
+    .orderBy(desc(sql`coalesce(sum(${despesas.valor}), 0)`))
+
+  const recMap = new Map(receitaMes.map((r) => [r.mes, Number(r.total)]))
+  const despMap = new Map(despesaMes.map((r) => [r.mes, Number(r.total)]))
+
+  const meses = Array.from({ length: 12 }, (_, i) => {
+    const mm = String(i + 1).padStart(2, "0")
+    const receita = recMap.get(mm) ?? 0
+    const despesa = despMap.get(mm) ?? 0
+    return { mes: i + 1, receita, despesa, resultado: receita - despesa }
+  })
+
+  const totalReceita = meses.reduce((s, m) => s + m.receita, 0)
+  const totalDespesa = meses.reduce((s, m) => s + m.despesa, 0)
+
+  return {
+    ano,
+    meses,
+    totalReceita,
+    totalDespesa,
+    resultado: totalReceita - totalDespesa,
+    receitaPorTurma: receitaTurma.map((r) => ({
+      turmaNome: r.turmaNome ?? "Sem turma",
+      total: Number(r.total),
+    })),
+    despesaPorCategoria: despesaCategoria.map((r) => ({
+      categoria: r.categoria,
+      total: Number(r.total),
+    })),
   }
 }
