@@ -240,6 +240,74 @@ export function getAttackLinesWithOrigin(playsArray: Play[], team: Team) {
   }))
 }
 
+export interface CourtAttackLine {
+  line: Line
+  count: number
+  attackType: AttackType
+  position: SetPosition
+  /** Percentual relativo ao total de ataques daquele local (para leitura por posição). */
+  percentage: number
+}
+
+export interface PositionAttackGroup {
+  position: SetPosition
+  label: string
+  description: string
+  total: number
+  lines: CourtAttackLine[]
+}
+
+/**
+ * Agrupa as direções de ataque de uma equipe POR LOCAL de ataque (posição).
+ * Cada grupo traz o total de ataques do local e as linhas por tipo de ataque,
+ * com o percentual calculado em relação ao total daquele local — ideal para
+ * ler a tendência de direção de cada posição isoladamente.
+ */
+export function getAttackByPosition(playsArray: Play[], team: Team): PositionAttackGroup[] {
+  const teamPlays = playsArray.filter(
+    (p) => p.team === team && p.status === "levantamento" && p.attackType && p.attackType !== "bloqueado",
+  )
+
+  const byPos = new Map<SetPosition, Play[]>()
+  for (const p of teamPlays) {
+    if (!p.position || !p.attackType) continue
+    if (!byPos.has(p.position)) byPos.set(p.position, [])
+    byPos.get(p.position)!.push(p)
+  }
+
+  const result: PositionAttackGroup[] = []
+  for (const meta of setPositions) {
+    const posPlays = byPos.get(meta.value) ?? []
+    if (posPlays.length === 0) continue
+
+    const grouped = new Map<AttackType, number>()
+    for (const p of posPlays) {
+      if (!p.attackType) continue
+      grouped.set(p.attackType, (grouped.get(p.attackType) ?? 0) + 1)
+    }
+
+    const lines: CourtAttackLine[] = Array.from(grouped.entries())
+      .map(([attackType, count]) => ({
+        line: getAttackLines(meta.value, attackType),
+        count,
+        attackType,
+        position: meta.value,
+        percentage: Math.round((count / posPlays.length) * 100),
+      }))
+      .sort((a, b) => b.count - a.count)
+
+    result.push({
+      position: meta.value,
+      label: meta.label,
+      description: meta.description,
+      total: posPlays.length,
+      lines,
+    })
+  }
+
+  return result
+}
+
 export function getAttackLegend(playsArray: Play[], team: Team) {
   const teamPlays = playsArray.filter(
     (p) => p.team === team && p.status === "levantamento" && p.attackType && p.attackType !== "bloqueado",
