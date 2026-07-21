@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/attack/ui/card"
 import { Badge } from "@/components/attack/ui/badge"
 import { Button } from "@/components/attack/ui/button"
-import { Users, TrendingUp, Activity, Trophy, Download, Trash2, History, ChevronDown, ChevronUp, Target } from "lucide-react"
+import { Users, TrendingUp, Activity, Trophy, Download, Trash2, History, ChevronDown, ChevronUp, Target, Shield } from "lucide-react"
 import {
   type Play,
   type Session,
 } from "@/lib/attack/volley-stats"
-import { exportToPDF } from "@/lib/attack/export-pdf"
+import { exportToPDF, exportAggregateToPDF } from "@/lib/attack/export-pdf"
+import { ExportPdfMenu } from "@/components/attack/export-pdf-menu"
 import { PositionRadarChart, AttackDonutChart } from "@/components/attack/distribution-charts"
 
 interface AthleteGame {
@@ -36,6 +37,17 @@ interface AthleteAggregate {
   blocked: number
   positions: Record<string, number>
   attacks: Record<string, number>
+}
+
+interface TeamAggregate {
+  key: string
+  teamName: string
+  sessionIds: Set<number>
+  plays: Play[]
+  totalLifts: number
+  points: number
+  correct: number
+  errors: number
 }
 
 function emptyPositions(): Record<string, number> {
@@ -93,10 +105,11 @@ export default function PerformanceAnalysis() {
           if (setterPlays.length === 0) continue
 
           const displayName = name || `Levantador ${num}`
-          // Atletas com nome são unificadas pelo nome (case-insensitive) entre todos os jogos e equipes.
-          // Sem nome ficam por sessão/equipe para não unir atletas diferentes por engano.
+          // Levantadoras com nome são somadas por (equipe + nome), case-insensitive, entre todos
+          // os jogos — ou seja, mesmo nome DENTRO da mesma equipe é unificado; equipes distintas
+          // ficam separadas. Sem nome ficam por sessão/equipe para não unir atletas diferentes.
           const key = name
-            ? `named||${name.toLowerCase()}`
+            ? `named||${teamName.toLowerCase()}||${name.toLowerCase()}`
             : `anon||${teamName}||${displayName}||${session.id}`
 
           let agg = map.get(key)
@@ -153,6 +166,50 @@ export default function PerformanceAnalysis() {
             correct: gCorrect,
             errors: gErrors,
           })
+        }
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.totalLifts - a.totalLifts)
+  }, [sessions])
+
+  // Agrega EQUIPES por nome (case-insensitive) somando todas as jogadas dos jogos em que
+  // a equipe aparece, independente de ter sido a equipe A ou B naquele jogo.
+  const teamAggregates = useMemo<TeamAggregate[]>(() => {
+    const map = new Map<string, TeamAggregate>()
+
+    for (const session of sessions) {
+      const configs: { team: "A" | "B"; name: string }[] = [
+        { team: "A", name: (session.teamNames?.A || "Equipe A").trim() },
+        { team: "B", name: (session.teamNames?.B || "Equipe B").trim() },
+      ]
+
+      for (const { team, name } of configs) {
+        const teamPlays = session.plays.filter((p) => p.team === team && p.status === "levantamento")
+        if (teamPlays.length === 0) continue
+
+        const key = name.toLowerCase()
+        let agg = map.get(key)
+        if (!agg) {
+          agg = {
+            key,
+            teamName: name,
+            sessionIds: new Set(),
+            plays: [],
+            totalLifts: 0,
+            points: 0,
+            correct: 0,
+            errors: 0,
+          }
+          map.set(key, agg)
+        }
+        agg.sessionIds.add(session.id)
+        for (const p of teamPlays) {
+          agg.plays.push(p)
+          agg.totalLifts++
+          if (p.result === "ponto") agg.points++
+          else if (p.result === "certo") agg.correct++
+          else if (p.result === "erro") agg.errors++
         }
       }
     }
@@ -279,14 +336,12 @@ export default function PerformanceAnalysis() {
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => exportToPDF(session.plays, session.teamNames, session.settersA, session.settersB, session)}
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      PDF
-                    </Button>
+                    <ExportPdfMenu
+                      teamNames={session.teamNames}
+                      onExport={(teams) =>
+                        exportToPDF(session.plays, session.teamNames, session.settersA, session.settersB, session, teams)
+                      }
+                    />
                     <Button
                       size="sm"
                       variant="outline"
@@ -322,6 +377,78 @@ export default function PerformanceAnalysis() {
               {team}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Desempenho por equipe (nomes iguais somados) */}
+      {teamAggregates.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-orange-600" />
+              Desempenho por Equipe
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Equipes com o mesmo nome têm os dados somados entre todos os jogos.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {teamAggregates.map((team) => {
+              const scoring = team.points + team.correct
+              const totalRes = team.points + team.correct + team.errors
+              const eff = totalRes > 0 ? Math.round((scoring / totalRes) * 100) : 0
+              const gamesLabel = team.sessionIds.size === 1 ? "1 jogo" : `${team.sessionIds.size} jogos`
+              return (
+                <Card key={team.key} className="bg-white border border-orange-100 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-slate-900 truncate">{team.teamName}</h3>
+                        <p className="text-sm text-slate-500">
+                          {gamesLabel} • {team.totalLifts} levantamentos
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() =>
+                          exportAggregateToPDF({
+                            title: team.teamName,
+                            kind: "Equipe",
+                            subtitle: `Consolidado de ${gamesLabel} • ${team.totalLifts} levantamentos`,
+                            plays: team.plays,
+                            chips: [{ label: "Aproveitamento", value: `${eff}%` }],
+                          })
+                        }
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        PDF
+                      </Button>
+                    </div>
+                    <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+                      <div className="rounded-lg bg-orange-50 p-2">
+                        <p className="text-lg font-bold text-orange-600">{eff}%</p>
+                        <p className="text-xs text-slate-500">Aprov.</p>
+                      </div>
+                      <div className="rounded-lg bg-green-50 p-2">
+                        <p className="text-lg font-bold text-green-600">{team.points}</p>
+                        <p className="text-xs text-slate-500">Pontos</p>
+                      </div>
+                      <div className="rounded-lg bg-blue-50 p-2">
+                        <p className="text-lg font-bold text-blue-600">{team.correct}</p>
+                        <p className="text-xs text-slate-500">Certos</p>
+                      </div>
+                      <div className="rounded-lg bg-red-50 p-2">
+                        <p className="text-lg font-bold text-red-500">{team.errors}</p>
+                        <p className="text-xs text-slate-500">Erros</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -373,6 +500,28 @@ export default function PerformanceAnalysis() {
 
               {isExpanded && (
                 <CardContent className="border-t border-orange-100 bg-orange-50/40 p-5 space-y-6">
+                  {/* Exportar relatório individual (modelo oficial com quadras por local) */}
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        exportAggregateToPDF({
+                          title: athlete.setterName,
+                          kind: "Levantadora",
+                          subtitle: `${athlete.teams.join(", ")} • ${
+                            athlete.games.length === 1 ? "1 jogo" : `${athlete.games.length} jogos`
+                          } • ${athlete.totalLifts} levantamentos`,
+                          plays: athlete.plays,
+                          chips: [{ label: "Aproveitamento", value: `${eff}%` }],
+                        })
+                      }
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      Exportar PDF
+                    </Button>
+                  </div>
+
                   {/* Resultado geral */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-white rounded-lg p-3 text-center border border-green-200">
