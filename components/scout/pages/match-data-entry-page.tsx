@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/scout/ui/tabs"
 import { Button } from "@/components/scout/ui/button"
-import EightFaceDataEntry from "@/components/scout/eight-face-entry/eight-face-data-entry"
+import SmartDataEntry from "@/components/scout/smart-entry/smart-data-entry"
 import ModernStatsDashboard from "@/components/scout/heatmaps/modern-stats-dashboard"
 import PlayerStatsSpreadsheet from "@/components/scout/spreadsheets/player-stats-spreadsheet"
 import MatchSetupPage from "./match-setup-page"
@@ -64,6 +64,14 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
   const [waitingSave, setWaitingSave] = useState(false)
 
   const [stats, setStats] = useState({ statsA: createEmptyStats(), statsB: createEmptyStats() })
+
+  // Dados granulares extras do coletor inteligente (toque a toque + direção do
+  // ataque inferida). NÃO alimentam os dashboards existentes; ficam guardados
+  // separadamente para uso futuro, mantendo compatibilidade total.
+  const [rallyExtras, setRallyExtras] = useState<unknown[]>([])
+  const handleRallyExtras = (extras: unknown) => {
+    setRallyExtras((prev) => [...prev, extras])
+  }
 
   useEffect(() => {
     if (!isSynced || !roomId) return
@@ -483,7 +491,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         </div>
 
         <TabsContent value="entry" className="h-[calc(100%-45px)] overflow-auto">
-          <EightFaceDataEntry
+          <SmartDataEntry
             onActionComplete={handleNewAction}
             teamAName={matchData.teamAName}
             teamBName={matchData.teamBName}
@@ -491,6 +499,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
             teamBScore={currentSet.teamBScore}
             teamAPlayers={matchData.teamAPlayers}
             teamBPlayers={matchData.teamBPlayers}
+            onRallyExtras={handleRallyExtras}
           />
         </TabsContent>
 
