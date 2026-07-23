@@ -184,6 +184,21 @@ export const DIRECTION_LABEL: Record<AttackDirection, string> = {
  */
 export type AttackOrigin = "saida" | "entrada" | "meio" | "fundo"
 
+/** Converte token de ataque na posição de bloqueio usada pelo MatchAction. */
+function blockPosFromToken(token?: AttackToken): "O" | "M" | "P" | "FS" {
+  switch (token) {
+    case "O":
+      return "O"
+    case "M":
+      return "M"
+    case "F":
+    case "S":
+      return "FS"
+    default:
+      return "P"
+  }
+}
+
 /**
  * Converte o token de ataque (attackPosition) na origem usada para leitura.
  * Ponta => saída; Oposto => entrada; Meio => meio; Fundo/Segunda => fundo.
@@ -310,6 +325,17 @@ export function finalizeRally(
   directionOverride?: AttackDirection,
 ): RallyResult {
   const actions: MatchAction[] = []
+  // Garante os campos obrigatórios do MatchAction. serveQuality é obrigatório no
+  // contrato; usamos "+" (saque em jogo) como padrão para ações não relacionadas
+  // ao saque, exatamente como o coletor antigo assumia.
+  const emit = (a: Partial<MatchAction> & Pick<MatchAction, "servingTeam" | "servingPlayer" | "attackingTeam">) => {
+    actions.push({
+      id: newId(),
+      timestamp: Date.now(),
+      serveQuality: "+",
+      ...a,
+    } as MatchAction)
+  }
   if (touches.length === 0) {
     return { actions, pointScoredBy: "A", extras: { touches } }
   }
@@ -327,9 +353,7 @@ export function finalizeRally(
   if (serveIsTerminal) {
     if (end === "point") {
       // Ace: ponto de quem sacou.
-      actions.push({
-        id: newId(),
-        timestamp: Date.now(),
+      emit({
         servingTeam,
         servingPlayer,
         serveQuality: "ka",
@@ -338,9 +362,7 @@ export function finalizeRally(
       return { actions, pointScoredBy: servingTeam, extras: { touches } }
     }
     // Erro de saque: ponto do adversário.
-    actions.push({
-      id: newId(),
-      timestamp: Date.now(),
+    emit({
       servingTeam,
       servingPlayer,
       serveQuality: "-",
@@ -359,9 +381,7 @@ export function finalizeRally(
 
   // Se houve saque em jogo, registra a ação de saque+recepção (não-pontual).
   if (serve) {
-    actions.push({
-      id: newId(),
-      timestamp: Date.now(),
+    emit({
       servingTeam,
       servingPlayer,
       serveQuality: "+",
@@ -388,9 +408,7 @@ export function finalizeRally(
       }
     }
     if (atk) {
-      actions.push({
-        id: newId(),
-        timestamp: Date.now(),
+      emit({
         servingTeam,
         servingPlayer,
         attackingTeam: atk.team,
@@ -411,9 +429,7 @@ export function finalizeRally(
 
     if (end === "point") {
       // Ataque ponto. Direção vem do painel (override) quando não há defesa.
-      actions.push({
-        id: newId(),
-        timestamp: Date.now(),
+      emit({
         servingTeam,
         servingPlayer,
         attackingTeam,
@@ -428,9 +444,7 @@ export function finalizeRally(
       }
     }
     // Ataque erro: ponto do adversário.
-    actions.push({
-      id: newId(),
-      timestamp: Date.now(),
+    emit({
       servingTeam,
       servingPlayer,
       attackingTeam,
@@ -455,9 +469,7 @@ export function finalizeRally(
       }
     }
     if (end === "point") {
-      actions.push({
-        id: newId(),
-        timestamp: Date.now(),
+      emit({
         servingTeam,
         servingPlayer,
         attackingTeam,
@@ -465,14 +477,12 @@ export function finalizeRally(
         resultComplemento: "+",
         actionPlayer: atk?.player ?? 0,
         blockingPlayer: lastTouch.player,
-        blockingPosition: (atk?.attackToken as any) ?? "P",
+        blockingPosition: blockPosFromToken(atk?.attackToken),
       })
       return { actions, pointScoredBy: blockingTeam, extras: { touches } }
     }
     // Erro de bloqueio (bola na rede/fora): ponto do time atacante.
-    actions.push({
-      id: newId(),
-      timestamp: Date.now(),
+    emit({
       servingTeam,
       servingPlayer,
       attackingTeam,
@@ -494,9 +504,7 @@ export function finalizeRally(
   if (end === "error") {
     // Erro genérico modelado como erro de ataque do time (mantém contabilidade
     // de ponto correta para o placar/sets).
-    actions.push({
-      id: newId(),
-      timestamp: Date.now(),
+    emit({
       servingTeam,
       servingPlayer,
       attackingTeam: teamOfLast,
@@ -507,9 +515,7 @@ export function finalizeRally(
     return { actions, pointScoredBy: opp, extras: { touches } }
   }
   // Ponto genérico para o time do último toque.
-  actions.push({
-    id: newId(),
-    timestamp: Date.now(),
+  emit({
     servingTeam,
     servingPlayer,
     attackingTeam: teamOfLast,
