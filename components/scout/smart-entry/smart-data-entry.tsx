@@ -19,7 +19,6 @@ import {
 } from "lucide-react"
 import type { MatchAction, TeamStats } from "@/lib/scout/match-parser"
 import type { Player } from "@/components/scout/team-roster-management"
-import FormationSetup from "./formation-setup"
 import {
   type CourtPos,
   type Formation,
@@ -27,16 +26,14 @@ import {
   type Fundamento,
   type Touch,
   type AttackToken,
-  type AttackDirection,
   type PlayerRole,
   ROLE_LABEL,
+  ROLE_OPTIONS,
+  DEFAULT_DEFENSIVE_BY_ROLE,
   applyLibero,
   rotateFormation,
   findSetter,
   findPosition,
-  attackTokenToOrigin,
-  inferAttackDirection,
-  possibleDirections,
   finalizeRally,
   describeSystem,
   BACK_ROW,
@@ -115,10 +112,14 @@ export default function SmartDataEntry({
   setNumber = 1,
   onRallyExtras,
 }: SmartDataEntryProps) {
-  const [setupA, setSetupA] = useState<TeamSetup | null>(null)
-  const [setupB, setSetupB] = useState<TeamSetup | null>(null)
-  const [formationA, setFormationA] = useState<Formation | null>(null)
-  const [formationB, setFormationB] = useState<Formation | null>(null)
+  // A quadra aparece imediatamente: montamos uma formação padrão a partir dos
+  // atletas (ou geramos números 1..6). Formação, funções e líbero podem ser
+  // ajustados na própria página, na quadra (botão "Formação / Atletas").
+  const [setupA, setSetupA] = useState<TeamSetup>(() => buildDefaultSetup(teamAPlayers))
+  const [setupB, setSetupB] = useState<TeamSetup>(() => buildDefaultSetup(teamBPlayers))
+  const [formationA, setFormationA] = useState<Formation>(() => buildDefaultSetup(teamAPlayers).formation)
+  const [formationB, setFormationB] = useState<Formation>(() => buildDefaultSetup(teamBPlayers).formation)
+  const [editMode, setEditMode] = useState(false)
 
   const [servingTeam, setServingTeam] = useState<"A" | "B">("A")
   const [possession, setPossession] = useState<"A" | "B">("A")
@@ -128,10 +129,6 @@ export default function SmartDataEntry({
   const [log, setLog] = useState<LogEntry[]>([])
   const [perfTeam, setPerfTeam] = useState<"A" | "B">("A")
 
-  const [directionPanel, setDirectionPanel] = useState<{
-    origin: ReturnType<typeof attackTokenToOrigin>
-    finalize: (dir: AttackDirection) => void
-  } | null>(null)
   const [setterChooser, setSetterChooser] = useState<{ options: { role: PlayerRole; player: number; pos: CourtPos }[] } | null>(
     null,
   )
@@ -153,23 +150,19 @@ export default function SmartDataEntry({
     return setup?.roles[num]
   }
 
-  const handleSetupComplete = (a: TeamSetup, b: TeamSetup) => {
-    setSetupA(a)
-    setSetupB(b)
-    setFormationA(a.formation)
-    setFormationB(b.formation)
+  // Atualiza o número de um atleta numa posição da formação (editor inline).
+  const setFormationSlot = (team: "A" | "B", pos: CourtPos, num: number) => {
+    if (team === "A") setFormationA((f) => ({ ...f, [pos]: num }))
+    else setFormationB((f) => ({ ...f, [pos]: num }))
   }
-
-  if (!setupA || !setupB || !formationA || !formationB) {
-    return (
-      <FormationSetup
-        teamAName={teamAName}
-        teamBName={teamBName}
-        teamAPlayers={teamAPlayers}
-        teamBPlayers={teamBPlayers}
-        onComplete={handleSetupComplete}
-      />
-    )
+  // Define/atualiza a função de um atleta (por número).
+  const setRole = (team: "A" | "B", num: number, role: PlayerRole) => {
+    const setSetup = team === "A" ? setSetupA : setSetupB
+    setSetup((s) => ({ ...s, roles: { ...s.roles, [num]: role } }))
+  }
+  const setLibero = (team: "A" | "B", num: number | undefined) => {
+    const setSetup = team === "A" ? setSetupA : setSetupB
+    setSetup((s) => ({ ...s, liberoNumber: num }))
   }
 
   // Formação exibida (com líbero aplicado automaticamente).
@@ -260,10 +253,10 @@ export default function SmartDataEntry({
     })
   }
 
-  const commit = (end: "point" | "error", direction?: AttackDirection) => {
+  const handleEnd = (end: "point" | "error") => {
     if (touches.length === 0) return
     const lastF = touches[touches.length - 1].fundamento
-    const result = finalizeRally(touches, end, direction)
+    const result = finalizeRally(touches, end)
     result.actions.forEach((a) => onActionComplete(a))
     onRallyExtras?.(result.extras)
     finalizeDisplay(end, lastF)
@@ -271,35 +264,12 @@ export default function SmartDataEntry({
     // Rodízio automático: quem conquista o saque (side-out) gira.
     const winner = result.pointScoredBy
     if (winner !== servingTeam) {
-      if (winner === "A") setFormationA((f) => (f ? rotateFormation(f) : f))
-      else setFormationB((f) => (f ? rotateFormation(f) : f))
+      if (winner === "A") setFormationA((f) => rotateFormation(f))
+      else setFormationB((f) => rotateFormation(f))
     }
     setServingTeam(winner)
     setPossession(winner)
     resetRally()
-  }
-
-  const handleEnd = (end: "point" | "error") => {
-    if (touches.length === 0) return
-    const last = touches[touches.length - 1]
-    if (end === "point" && last.fundamento === "A" && last.attackToken) {
-      const origin = attackTokenToOrigin(last.attackToken)
-      setDirectionPanel({
-        origin,
-        finalize: (dir) => {
-          setDirectionPanel(null)
-          commit("point", dir)
-        },
-      })
-      return
-    }
-    let inferred: AttackDirection | undefined
-    if (last.fundamento === "A" && last.attackToken) {
-      const origin = attackTokenToOrigin(last.attackToken)
-      const defense = [...touches].reverse().find((t) => t.fundamento === "D" && t.team !== last.team)
-      inferred = inferAttackDirection(origin, defense?.courtPos ?? null)
-    }
-    commit(end, inferred)
   }
 
   const undoLast = () => {
@@ -347,7 +317,11 @@ export default function SmartDataEntry({
             </div>
           </div>
 
-          <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">
+          <button
+            onClick={() => setEditMode(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+            aria-label="Editar formação e atletas"
+          >
             <Settings className="h-5 w-5" />
           </button>
         </header>
@@ -467,6 +441,12 @@ export default function SmartDataEntry({
 
           {/* ---- Coluna 3: quadras ---- */}
           <div className="space-y-3">
+            <button
+              onClick={() => setEditMode(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white py-2 text-sm font-bold text-slate-500 hover:border-slate-400 hover:text-slate-700"
+            >
+              <Settings className="h-4 w-4" /> Formação / Atletas
+            </button>
             <CourtView
               team="A"
               name={teamAName}
@@ -659,31 +639,21 @@ export default function SmartDataEntry({
         </div>
       </div>
 
-      {/* ===== Painel: direção do ataque (ponto direto) ===== */}
-      {directionPanel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-1 text-lg font-bold text-slate-900">Direção do ataque</h3>
-            <p className="mb-4 text-sm text-slate-500">O ataque terminou em ponto. Selecione a direção da bola.</p>
-            <div className="grid grid-cols-2 gap-2">
-              {possibleDirections(directionPanel.origin).map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => directionPanel.finalize(d.value)}
-                  className="rounded-lg border border-slate-200 bg-white py-4 font-semibold text-slate-800 transition hover:border-orange-400 hover:bg-orange-50"
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => directionPanel.finalize("indefinida")}
-              className="mt-3 w-full text-center text-sm text-slate-400 hover:text-slate-600"
-            >
-              Não identificar direção
-            </button>
-          </div>
-        </div>
+      {/* ===== Editor inline: formação / atletas / funções ===== */}
+      {editMode && (
+        <FormationEditor
+          teamAName={teamAName}
+          teamBName={teamBName}
+          formationA={formationA}
+          formationB={formationB}
+          setupA={setupA}
+          setupB={setupB}
+          nameOf={nameOf}
+          onSlot={setFormationSlot}
+          onRole={setRole}
+          onLibero={setLibero}
+          onClose={() => setEditMode(false)}
+        />
       )}
 
       {/* ===== Painel: quem levantou? (levantador defendeu) ===== */}
@@ -978,4 +948,161 @@ function formatTime(totalSeconds: number): string {
   const s = totalSeconds % 60
   const pad = (n: number) => n.toString().padStart(2, "0")
   return `${pad(h)}:${pad(m)}:${pad(s)}`
+}
+
+const DEFAULT_ROLE_BY_POS: Record<CourtPos, PlayerRole> = {
+  1: "levantador",
+  2: "oposto",
+  3: "central",
+  4: "ponteiro",
+  5: "ponteiro",
+  6: "central",
+}
+
+/**
+ * Monta uma formação/setup padrão a partir dos atletas cadastrados (ou gera
+ * números 1..6 quando não há cadastro), para que a quadra apareça de imediato.
+ * Tudo pode ser ajustado depois no editor inline (Formação / Atletas).
+ */
+function buildDefaultSetup(players: Player[]): TeamSetup {
+  const roles: Record<number, PlayerRole> = {}
+  for (const p of players) if (p.role) roles[p.number] = p.role
+
+  const liberoPlayer = players.find((p) => p.role === "libero")
+  const courtNums = players.filter((p) => p.role !== "libero").map((p) => p.number)
+
+  // Garante 6 atletas em quadra.
+  let next = 1
+  while (courtNums.length < 6) {
+    while (courtNums.includes(next) || next === liberoPlayer?.number) next++
+    courtNums.push(next)
+    next++
+  }
+
+  const formation = {
+    1: courtNums[0],
+    2: courtNums[1],
+    3: courtNums[2],
+    4: courtNums[3],
+    5: courtNums[4],
+    6: courtNums[5],
+  } as Formation
+
+  ;([1, 2, 3, 4, 5, 6] as CourtPos[]).forEach((pos) => {
+    const num = formation[pos]
+    if (!roles[num]) roles[num] = DEFAULT_ROLE_BY_POS[pos]
+  })
+  if (liberoPlayer && !roles[liberoPlayer.number]) roles[liberoPlayer.number] = "libero"
+
+  return {
+    formation,
+    roles,
+    liberoNumber: liberoPlayer?.number,
+    defensiveByRole: { ...DEFAULT_DEFENSIVE_BY_ROLE },
+  }
+}
+
+interface FormationEditorProps {
+  teamAName: string
+  teamBName: string
+  formationA: Formation
+  formationB: Formation
+  setupA: TeamSetup
+  setupB: TeamSetup
+  nameOf: (team: "A" | "B", num: number) => string
+  onSlot: (team: "A" | "B", pos: CourtPos, num: number) => void
+  onRole: (team: "A" | "B", num: number, role: PlayerRole) => void
+  onLibero: (team: "A" | "B", num: number | undefined) => void
+  onClose: () => void
+}
+
+/** Editor inline: define números, funções e líbero direto na quadra. */
+function FormationEditor({
+  teamAName,
+  teamBName,
+  formationA,
+  formationB,
+  setupA,
+  setupB,
+  nameOf,
+  onSlot,
+  onRole,
+  onLibero,
+  onClose,
+}: FormationEditorProps) {
+  const renderTeam = (team: "A" | "B", name: string, formation: Formation, setup: TeamSetup) => {
+    const accent = team === "A" ? "text-blue-600" : "text-orange-500"
+    return (
+      <div className="flex-1">
+        <h4 className={`mb-2 text-base font-black ${accent}`}>{name}</h4>
+        <div className="grid grid-cols-3 gap-2">
+          {([4, 3, 2, 5, 6, 1] as CourtPos[]).map((pos) => {
+            const num = formation[pos]
+            return (
+              <div key={pos} className="rounded-lg border border-slate-200 p-2">
+                <p className="mb-1 text-xs font-bold text-slate-700">P{pos}</p>
+                <label className="block text-[10px] text-slate-400">Número</label>
+                <input
+                  type="number"
+                  value={num}
+                  onChange={(e) => onSlot(team, pos, Number(e.target.value))}
+                  className="mb-1 h-8 w-full rounded border border-slate-200 px-2 text-sm"
+                />
+                <label className="block text-[10px] text-slate-400">Função</label>
+                <select
+                  value={setup.roles[num] ?? ""}
+                  onChange={(e) => onRole(team, num, e.target.value as PlayerRole)}
+                  className="h-8 w-full rounded border border-slate-200 px-1 text-xs"
+                >
+                  <option value="">—</option>
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 truncate text-[10px] text-slate-400">{nameOf(team, num)}</p>
+              </div>
+            )
+          })}
+        </div>
+        <div className="mt-2">
+          <label className="mb-1 block text-xs font-medium text-slate-600">Líbero</label>
+          <input
+            type="number"
+            value={setup.liberoNumber ?? ""}
+            placeholder="Sem líbero"
+            onChange={(e) => onLibero(team, e.target.value ? Number(e.target.value) : undefined)}
+            className="h-8 w-full rounded border border-slate-200 px-2 text-sm"
+          />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+        <div className="mb-3">
+          <h3 className="text-lg font-black text-slate-900">Formação / Atletas</h3>
+          <p className="text-sm text-slate-500">
+            Monte a formação na quadra: número, função e líbero. O rodízio, o líbero e o levantador passam a ser
+            automáticos.
+          </p>
+        </div>
+        <div className="flex flex-col gap-6 sm:flex-row">
+          {renderTeam("A", teamAName, formationA, setupA)}
+          {renderTeam("B", teamBName, formationB, setupB)}
+        </div>
+        <div className="mt-5 flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded-xl bg-green-600 px-6 py-2.5 text-sm font-black uppercase text-white hover:bg-green-700"
+          >
+            Pronto
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }

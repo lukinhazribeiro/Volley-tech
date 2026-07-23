@@ -81,19 +81,11 @@ export default function TeamRosterManagement({
   const [error, setError] = useState<string | null>(null)
 
   const handleSave = () => {
-    // Considera apenas atletas efetivamente cadastrados (com nome preenchido).
+    // Cadastro NÃO é obrigatório aqui: os atletas, funções e a formação também
+    // podem ser definidos direto na quadra do coletor. Passamos adiante o que
+    // estiver preenchido (com nome), sem travar o início da coleta.
     const activeA = teamAPlayers.filter((p) => p.name.trim())
     const activeB = teamBPlayers.filter((p) => p.name.trim())
-
-    const missingRole = [...activeA, ...activeB].some((p) => !p.role)
-    if (missingRole) {
-      setError("Defina a função de todos os atletas cadastrados (com nome preenchido).")
-      return
-    }
-    if (activeA.length < 6 || activeB.length < 6) {
-      setError("Cadastre ao menos 6 atletas em cada equipe.")
-      return
-    }
     setError(null)
     onRosterComplete(activeA, activeB)
   }
