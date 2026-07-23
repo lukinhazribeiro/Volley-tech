@@ -184,6 +184,26 @@ export const DIRECTION_LABEL: Record<AttackDirection, string> = {
  */
 export type AttackOrigin = "saida" | "entrada" | "meio" | "fundo"
 
+/**
+ * Zona do saque a partir da POSIÇÃO de quadra de quem recebeu (regra do jogo):
+ *   P5 => "7.5" | P6 => "8.6" | P1 => "9.1".
+ * Qualquer outra posição cai no padrão central "8.6".
+ */
+export function serveZoneFromCourtPos(pos: CourtPos | null): "7.5" | "8.6" | "9.1" {
+  if (pos === 5) return "7.5"
+  if (pos === 1) return "9.1"
+  return "8.6"
+}
+
+/** Tipo de defesa dentro da inteligência do jogo. */
+export type DefenseType = "ataque" | "recuperacao" | "volume"
+
+export const DEFENSE_LABEL: Record<DefenseType, string> = {
+  ataque: "Defesa de ataque",
+  recuperacao: "Defesa de recuperação",
+  volume: "Defesa de volume",
+}
+
 /** Converte token de ataque na posição de bloqueio usada pelo MatchAction. */
 function blockPosFromToken(token?: AttackToken): "O" | "M" | "P" | "FS" {
   switch (token) {
@@ -300,6 +320,10 @@ export interface RallyResult {
     touches: Touch[]
     attackDirection?: AttackDirection
     attackOrigin?: AttackOrigin
+    /** Defesas classificadas pela inteligência do jogo. */
+    defenses?: { player: number; team: "A" | "B"; type: DefenseType }[]
+    /** Bloqueios registrados no rally (todos contam como positivos). */
+    blocks?: { player: number; team: "A" | "B" }[]
   }
 }
 
@@ -373,54 +397,111 @@ export function finalizeRally(
 
   // Base do saque (em jogo) + recepção, quando existirem.
   const receivingTeam: "A" | "B" = servingTeam === "A" ? "B" : "A"
-  const passingQuality: "A" | "B" | "C" | "D" | undefined = reception
+
+  // PASSE = RECEPÇÃO, agora BINÁRIO (regra do usuário): não existe mais A/B/C.
+  //   positivo  => "A" (passe/recepção CERTO)
+  //   negativo  => "C" (passe/recepção ERRADO, mas o rally só encerra pelos
+  //                     botões Ponto/Erro; um erro terminal usa "D").
+  const passingQuality: "A" | "C" | undefined = reception
     ? reception.positive
       ? "A"
       : "C"
     : undefined
 
+  // Zona do saque = posição de quadra de quem recebeu (P5=7.5, P6=8.6, P1=9.1).
+  const serveZone = reception ? serveZoneFromCourtPos(reception.courtPos) : "8.6"
+
   // Se houve saque em jogo, registra a ação de saque+recepção (não-pontual).
-  // IMPORTANTE: o parser só contabiliza a recepção quando `serveZone` E
-  // `passingQuality` estão preenchidos. Por isso definimos um serveZone padrão
-  // ("8.6"), garantindo que o PASSE/RECEPÇÃO seja de fato registrado nas
-  // estatísticas — antes ele era descartado silenciosamente.
+  // O parser só contabiliza a recepção quando `serveZone` E `passingQuality`
+  // estão preenchidos — ambos são garantidos aqui.
   if (serve) {
     emit({
       servingTeam,
       servingPlayer,
       serveQuality: "+",
-      serveZone: "8.6",
+      serveZone,
       passingQuality: passingQuality ?? "A",
       passingPlayer: reception?.player ?? 0,
       attackingTeam: receivingTeam,
     })
   }
 
-  // ---- Defesas intermediárias (transição): cada defesa vira ação "D" ------
-  // Uma defesa "não terminal" mantém o rally vivo e credita defesa + o ataque
-  // anterior do adversário. Iteramos pelos toques de defesa que NÃO sejam o
-  // último toque do rally.
+  // ---- Toques intermediários: BLOQUEIOS e DEFESAS (transição) -------------
+  // Regras da inteligência do jogo:
+  //  • Todo BLOQUEIO conta como bloqueio POSITIVO (mesmo sem encerrar o rally).
+  //  • DEFESA de ataque      => reagir a um ataque adversário.
+  //  • DEFESA de recuperação => quando houve BLOQUEIO antes (bola tocada no bloqueio).
+  //  • DEFESA de volume       => a bola defendida volta DIRETO para a outra quadra
+  //                              (próximo toque já é do adversário).
+  const defenses: RallyResult["extras"]["defenses"] = []
+  const blocks: RallyResult["extras"]["blocks"] = []
+
   for (let i = 0; i < touches.length - 1; i++) {
     const t = touches[i]
-    if (t.fundamento !== "D") continue
-    // Procura o ataque imediatamente anterior (do time adversário) para creditar.
-    let atk: Touch | undefined
-    for (let j = i - 1; j >= 0; j--) {
-      if (touches[j].fundamento === "A") {
-        atk = touches[j]
-        break
+
+    // Ataque adversário mais recente antes deste toque.
+    const lastOppAttack = (team: "A" | "B") => {
+      for (let j = i - 1; j >= 0; j--) {
+        if (touches[j].fundamento === "A" && touches[j].team !== team) return touches[j]
       }
+      return undefined
     }
-    if (atk) {
+
+    // ----- Bloqueio: sempre positivo -----
+    if (t.fundamento === "B") {
+      const atk = lastOppAttack(t.team)
+      blocks!.push({ player: t.player, team: t.team })
       emit({
         servingTeam,
         servingPlayer,
-        attackingTeam: atk.team,
-        attackPosition: atk.attackToken ?? "P",
-        resultComplemento: "D",
-        actionPlayer: atk.player,
-        defensivePlayer: t.player,
+        attackingTeam: atk?.team ?? (t.team === "A" ? "B" : "A"),
+        attackPosition: atk?.attackToken ?? "P",
+        // "REC" credita bloqueio positivo ao bloqueador sem encerrar o rally.
+        resultComplemento: "REC",
+        actionPlayer: atk?.player ?? 0,
+        blockingPlayer: t.player,
+        blockingPosition: blockPosFromToken(atk?.attackToken),
       })
+      continue
+    }
+
+    // ----- Defesa: classifica o tipo -----
+    if (t.fundamento === "D") {
+      let atk: Touch | undefined
+      for (let j = i - 1; j >= 0; j--) {
+        if (touches[j].fundamento === "A") {
+          atk = touches[j]
+          break
+        }
+      }
+      const hadBlockBefore = touches.slice(0, i).some((x) => x.fundamento === "B")
+      const next = touches[i + 1]
+      const ballWentDirectlyOver = !!next && next.team !== t.team
+
+      let type: DefenseType = "ataque"
+      let code: "D" | "REC" | "V" = "D"
+      if (hadBlockBefore) {
+        type = "recuperacao"
+        code = "REC"
+      } else if (ballWentDirectlyOver) {
+        type = "volume"
+        code = "V"
+      }
+      defenses!.push({ player: t.player, team: t.team, type })
+
+      if (atk) {
+        emit({
+          servingTeam,
+          servingPlayer,
+          attackingTeam: atk.team,
+          attackPosition: atk.attackToken ?? "P",
+          resultComplemento: code,
+          actionPlayer: atk.player,
+          defensivePlayer: t.player,
+          ...(code === "REC" ? { blockingPosition: blockPosFromToken(atk.attackToken) } : {}),
+        })
+      }
+      continue
     }
   }
 
@@ -444,7 +525,7 @@ export function finalizeRally(
       return {
         actions,
         pointScoredBy: attackingTeam,
-        extras: { touches, attackDirection: directionOverride, attackOrigin },
+        extras: { touches, attackDirection: directionOverride, attackOrigin, defenses, blocks },
       }
     }
     // Ataque erro: ponto do adversário.
@@ -456,7 +537,7 @@ export function finalizeRally(
       resultComplemento: "!",
       actionPlayer: lastTouch.player,
     })
-    return { actions, pointScoredBy: defendingTeam, extras: { touches, attackOrigin } }
+    return { actions, pointScoredBy: defendingTeam, extras: { touches, attackOrigin, defenses, blocks } }
   }
 
   if (lastTouch.fundamento === "B") {
@@ -472,6 +553,8 @@ export function finalizeRally(
         break
       }
     }
+    // Todo bloqueio conta como positivo (mesmo encerrando o rally).
+    blocks!.push({ player: lastTouch.player, team: blockingTeam })
     if (end === "point") {
       emit({
         servingTeam,
@@ -483,7 +566,7 @@ export function finalizeRally(
         blockingPlayer: lastTouch.player,
         blockingPosition: blockPosFromToken(atk?.attackToken),
       })
-      return { actions, pointScoredBy: blockingTeam, extras: { touches } }
+      return { actions, pointScoredBy: blockingTeam, extras: { touches, defenses, blocks } }
     }
     // Erro de bloqueio (bola na rede/fora): ponto do time atacante.
     emit({
@@ -494,11 +577,24 @@ export function finalizeRally(
       resultComplemento: "#",
       actionPlayer: atk?.player ?? 0,
     })
-    return { actions, pointScoredBy: attackingTeam, extras: { touches } }
+    return { actions, pointScoredBy: attackingTeam, extras: { touches, defenses, blocks } }
   }
 
-  if (lastTouch.fundamento === "S") {
-    // Já tratado acima.
+  // ---- Erro de recepção/passe terminal ------------------------------------
+  // Quando o rally encerra num PASSE com erro, é erro de recepção: ponto do
+  // adversário (normalmente a equipe que sacou).
+  if (lastTouch.fundamento === "P" && end === "error") {
+    const passTeam = lastTouch.team
+    const scorer = passTeam === "A" ? "B" : "A"
+    emit({
+      servingTeam,
+      servingPlayer,
+      serveZone: serveZoneFromCourtPos(lastTouch.courtPos),
+      passingQuality: "D",
+      passingPlayer: lastTouch.player,
+      attackingTeam: scorer,
+    })
+    return { actions, pointScoredBy: scorer, extras: { touches, defenses, blocks } }
   }
 
   // ---- Toque final genérico (P/L/D terminando o rally) --------------------
@@ -516,7 +612,7 @@ export function finalizeRally(
       resultComplemento: "!",
       actionPlayer: lastTouch.player,
     })
-    return { actions, pointScoredBy: opp, extras: { touches } }
+    return { actions, pointScoredBy: opp, extras: { touches, defenses, blocks } }
   }
   // Ponto genérico para o time do último toque.
   emit({
@@ -527,5 +623,5 @@ export function finalizeRally(
     resultComplemento: "#",
     actionPlayer: lastTouch.player,
   })
-  return { actions, pointScoredBy: teamOfLast, extras: { touches } }
+  return { actions, pointScoredBy: teamOfLast, extras: { touches, defenses, blocks } }
 }
