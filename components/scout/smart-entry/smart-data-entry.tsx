@@ -7,7 +7,6 @@ import {
   Pause,
   Play,
   Settings,
-  User,
   ArrowLeftRight,
   Swords,
   Hand,
@@ -55,10 +54,10 @@ interface SmartDataEntryProps {
 
 /** Config visual dos botões de AÇÃO (fundamentos). */
 const ACOES: { f: Fundamento; label: string; Icon: typeof Swords; color: string }[] = [
+  { f: "S", label: "SAQUE", Icon: Send, color: "text-amber-500 border-amber-200 bg-amber-50" },
+  { f: "P", label: "PASSE", Icon: Hand, color: "text-blue-600 border-blue-200 bg-blue-50" },
   { f: "A", label: "ATAQUE", Icon: Swords, color: "text-orange-500 border-orange-200 bg-orange-50" },
   { f: "B", label: "BLOQUEIO", Icon: HandMetal, color: "text-violet-600 border-violet-200 bg-violet-50" },
-  { f: "P", label: "PASSE", Icon: Hand, color: "text-blue-600 border-blue-200 bg-blue-50" },
-  { f: "S", label: "SAQUE", Icon: Send, color: "text-amber-500 border-amber-200 bg-amber-50" },
   { f: "D", label: "DEFESA", Icon: ShieldCheck, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },
   { f: "L", label: "LEVANT.", Icon: ArrowUpFromLine, color: "text-cyan-600 border-cyan-200 bg-cyan-50" },
 ]
@@ -475,13 +474,23 @@ export default function SmartDataEntry({
           </div>
         </div>
 
-        {/* ============ IDENTIFICAÇÃO + AÇÃO / QUALIFICAÇÃO ============ */}
+        {/* ============ POSIÇÕES (esq.) + FUNDAMENTOS (dir.) ============ */}
         <div className="grid gap-3 lg:grid-cols-2">
-          {/* Identificação de atletas (equipe com a posse) */}
+          {/* ---- LADO ESQUERDO: posições da equipe com a posse + PONTO ---- */}
           <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <h3 className="text-base font-black tracking-tight text-slate-800">IDENTIFICAÇÃO DE ATLETAS</h3>
-            <p className="mb-3 text-xs text-slate-400">Selecione o atleta que executou a ação</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-black tracking-tight text-slate-800">
+                {possession === "A" ? teamAName : teamBName}
+              </h3>
+              <span
+                className={`rounded-lg px-2 py-0.5 text-xs font-black text-white ${
+                  possession === "A" ? "bg-blue-600" : "bg-orange-500"
+                }`}
+              >
+                Equipe {possession}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
               {([4, 3, 2, 5, 6, 1] as CourtPos[]).map((pos) => {
                 const num = possessionCourt[pos]
                 const selected = pending?.team === possession && pending?.pos === pos
@@ -490,30 +499,33 @@ export default function SmartDataEntry({
                   <button
                     key={pos}
                     onClick={() => selectPlayer(possession, pos)}
-                    className={`flex flex-col items-center rounded-xl border-2 p-2 transition ${
-                      selected ? "border-slate-900 bg-slate-50" : "border-slate-100 hover:border-slate-300"
+                    className={`relative flex flex-col items-center rounded-xl border-2 py-2 transition ${
+                      selected
+                        ? possession === "A"
+                          ? "border-blue-600 bg-blue-50"
+                          : "border-orange-500 bg-orange-50"
+                        : "border-slate-100 hover:border-slate-300"
                     }`}
                   >
-                    <span className="text-sm font-black text-slate-700">P{pos}</span>
+                    {isLibero && (
+                      <span className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-black text-white">
+                        L
+                      </span>
+                    )}
                     <span
-                      className={`relative mt-1 flex h-12 w-12 items-center justify-center rounded-full text-white ${
+                      className={`flex h-10 w-10 items-center justify-center rounded-full text-lg font-black text-white ${
                         possession === "A" ? "bg-blue-600" : "bg-orange-500"
                       }`}
                     >
-                      <User className="h-6 w-6" />
-                      {isLibero && (
-                        <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-black">
-                          L
-                        </span>
-                      )}
+                      {num}
                     </span>
-                    <span className="mt-1 text-xs font-bold text-slate-800">#{num}</span>
+                    <span className="mt-0.5 text-sm font-black text-slate-700">P{pos}</span>
                   </button>
                 )
               })}
             </div>
             {pending && (
-              <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-center text-sm text-slate-600">
+              <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-600">
                 Selecionado:{" "}
                 <span className="font-bold text-slate-900">
                   #{pending.player} {nameOf(pending.team, pending.player)}
@@ -521,70 +533,56 @@ export default function SmartDataEntry({
                 (P{pending.pos})
               </p>
             )}
+            <button
+              onClick={() => handleEnd("point")}
+              disabled={touches.length === 0}
+              className="mt-3 w-full rounded-xl bg-green-600 py-3 text-base font-black uppercase tracking-wide text-white shadow transition hover:bg-green-700 disabled:opacity-40"
+            >
+              Ponto
+            </button>
           </div>
 
-          {/* Ação + Qualificação */}
-          <div className="space-y-3">
-            <div className="rounded-2xl bg-white p-4 shadow-sm">
-              <h3 className="mb-3 text-base font-black tracking-tight text-slate-800">AÇÃO</h3>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                {ACOES.map(({ f, label, Icon, color }) => (
-                  <button
-                    key={f}
-                    onClick={() => handleFundamento(f)}
-                    disabled={f !== "S" && f !== "L" && !pending}
-                    className={`flex flex-col items-center gap-1 rounded-xl border-2 py-3 font-bold transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 ${color}`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-lg leading-none">{f}</span>
-                    <span className="text-[9px] font-semibold text-slate-500">{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-white p-4 shadow-sm">
-              <h3 className="mb-3 text-base font-black tracking-tight text-slate-800">QUALIFICAÇÃO DA AÇÃO</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setNegative(true)}
-                  className={`rounded-xl py-3 text-sm font-black uppercase tracking-wide transition ${
-                    negative ? "bg-red-600 text-white shadow" : "bg-red-50 text-red-500"
-                  }`}
-                >
-                  Negativo
-                </button>
+          {/* ---- LADO DIREITO: fundamentos (S P A / B D L) + ERRO ---- */}
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-black tracking-tight text-slate-800">AÇÃO</h3>
+              {/* Qualificação do próximo toque */}
+              <div className="flex overflow-hidden rounded-lg border border-slate-200 text-xs font-black">
                 <button
                   onClick={() => setNegative(false)}
-                  className={`rounded-xl py-3 text-sm font-black uppercase tracking-wide transition ${
-                    !negative ? "bg-emerald-600 text-white shadow" : "bg-emerald-50 text-emerald-600"
-                  }`}
+                  className={`px-3 py-1 uppercase ${!negative ? "bg-emerald-600 text-white" : "text-slate-400"}`}
                 >
                   Positivo
                 </button>
-              </div>
-              <p className="mt-2 text-center text-xs font-semibold uppercase text-slate-400">
-                Próximo toque: {negative ? "Negativo" : "Positivo"}
-              </p>
-
-              {/* Finalização do rally */}
-              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
                 <button
-                  onClick={() => handleEnd("error")}
-                  disabled={touches.length === 0}
-                  className="rounded-xl bg-red-600 py-3 text-sm font-black uppercase text-white shadow transition hover:bg-red-700 disabled:opacity-40"
+                  onClick={() => setNegative(true)}
+                  className={`px-3 py-1 uppercase ${negative ? "bg-red-600 text-white" : "text-slate-400"}`}
                 >
-                  Erro (E)
-                </button>
-                <button
-                  onClick={() => handleEnd("point")}
-                  disabled={touches.length === 0}
-                  className="rounded-xl bg-green-600 py-3 text-sm font-black uppercase text-white shadow transition hover:bg-green-700 disabled:opacity-40"
-                >
-                  Ponto (#)
+                  Negativo
                 </button>
               </div>
             </div>
+            <div className="grid grid-cols-3 gap-2">
+              {ACOES.map(({ f, label, Icon, color }) => (
+                <button
+                  key={f}
+                  onClick={() => handleFundamento(f)}
+                  disabled={f !== "S" && f !== "L" && !pending}
+                  className={`flex flex-col items-center gap-1 rounded-xl border-2 py-3 font-bold transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 ${color}`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-lg leading-none">{f}</span>
+                  <span className="text-[9px] font-semibold text-slate-500">{label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => handleEnd("error")}
+              disabled={touches.length === 0}
+              className="mt-3 w-full rounded-xl bg-red-600 py-3 text-base font-black uppercase tracking-wide text-white shadow transition hover:bg-red-700 disabled:opacity-40"
+            >
+              Erro
+            </button>
           </div>
         </div>
 
