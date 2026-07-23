@@ -436,6 +436,17 @@ export function finalizeRally(
   const defenses: RallyResult["extras"]["defenses"] = []
   const blocks: RallyResult["extras"]["blocks"] = []
 
+  // Levantador que originou o ataque: último toque "L" da MESMA equipe antes
+  // do índice do ataque. O levantamento é automático, mas se um não-levantador
+  // levantou (levantador defendeu), o toque "L" registrado reflete isso.
+  const setterBefore = (attackIdx: number, team: "A" | "B"): number | undefined => {
+    for (let j = attackIdx - 1; j >= 0; j--) {
+      if (touches[j].fundamento === "L" && touches[j].team === team) return touches[j].player
+    }
+    return undefined
+  }
+  const lastIdx = touches.length - 1
+
   for (let i = 0; i < touches.length - 1; i++) {
     const t = touches[i]
 
@@ -498,6 +509,7 @@ export function finalizeRally(
           resultComplemento: code,
           actionPlayer: atk.player,
           defensivePlayer: t.player,
+          settingPlayer: setterBefore(i, atk.team),
           ...(code === "REC" ? { blockingPosition: blockPosFromToken(atk.attackToken) } : {}),
         })
       }
@@ -521,6 +533,7 @@ export function finalizeRally(
         attackPosition: lastTouch.attackToken ?? "P",
         resultComplemento: "#",
         actionPlayer: lastTouch.player,
+        settingPlayer: setterBefore(lastIdx, attackingTeam),
       })
       return {
         actions,
@@ -536,6 +549,7 @@ export function finalizeRally(
       attackPosition: lastTouch.attackToken ?? "P",
       resultComplemento: "!",
       actionPlayer: lastTouch.player,
+      settingPlayer: setterBefore(lastIdx, attackingTeam),
     })
     return { actions, pointScoredBy: defendingTeam, extras: { touches, attackOrigin, defenses, blocks } }
   }
@@ -563,6 +577,7 @@ export function finalizeRally(
         attackPosition: atk?.attackToken ?? "P",
         resultComplemento: "+",
         actionPlayer: atk?.player ?? 0,
+        settingPlayer: setterBefore(lastIdx, attackingTeam),
         blockingPlayer: lastTouch.player,
         blockingPosition: blockPosFromToken(atk?.attackToken),
       })
