@@ -1,10 +1,23 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/scout/ui/button"
-import { Card } from "@/components/scout/ui/card"
-import { Trash2, Undo2, Zap } from "lucide-react"
-import type { MatchAction } from "@/lib/scout/match-parser"
+import {
+  Trash2,
+  Undo2,
+  Pause,
+  Play,
+  Settings,
+  User,
+  ArrowLeftRight,
+  Swords,
+  Hand,
+  Send,
+  ShieldCheck,
+  HandMetal,
+  ArrowUpFromLine,
+  Timer,
+} from "lucide-react"
+import type { MatchAction, TeamStats } from "@/lib/scout/match-parser"
 import type { Player } from "@/components/scout/team-roster-management"
 import FormationSetup from "./formation-setup"
 import {
@@ -15,7 +28,8 @@ import {
   type Touch,
   type AttackToken,
   type AttackDirection,
-  FUNDAMENTO_LABEL,
+  type PlayerRole,
+  ROLE_LABEL,
   applyLibero,
   rotateFormation,
   findSetter,
@@ -36,26 +50,56 @@ interface SmartDataEntryProps {
   teamBScore: number
   teamAPlayers: Player[]
   teamBPlayers: Player[]
+  statsA?: TeamStats
+  statsB?: TeamStats
+  setNumber?: number
   onRallyExtras?: (extras: unknown) => void
 }
 
-const FUNDAMENTOS: Fundamento[] = ["S", "P", "L", "A", "B", "D"]
+/** Config visual dos botões de AÇÃO (fundamentos). */
+const ACOES: { f: Fundamento; label: string; Icon: typeof Swords; color: string }[] = [
+  { f: "A", label: "ATAQUE", Icon: Swords, color: "text-orange-500 border-orange-200 bg-orange-50" },
+  { f: "B", label: "BLOQUEIO", Icon: HandMetal, color: "text-violet-600 border-violet-200 bg-violet-50" },
+  { f: "P", label: "PASSE", Icon: Hand, color: "text-blue-600 border-blue-200 bg-blue-50" },
+  { f: "S", label: "SAQUE", Icon: Send, color: "text-amber-500 border-amber-200 bg-amber-50" },
+  { f: "D", label: "DEFESA", Icon: ShieldCheck, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },
+  { f: "L", label: "LEVANT.", Icon: ArrowUpFromLine, color: "text-cyan-600 border-cyan-200 bg-cyan-50" },
+]
 
 interface LogEntry {
   id: string
   team: "A" | "B"
-  label: string
+  pos: CourtPos | null
+  f: Fundamento
+  symbol: string
   detail: string
   time: string
 }
 
 /** Deriva o token de ataque a partir da função + posição do atleta. */
-function attackTokenFor(role: string | undefined, pos: CourtPos | null): AttackToken {
-  if (pos && BACK_ROW.includes(pos)) return "F" // ataque de fundo / pipe
+function attackTokenFor(role: PlayerRole | undefined, pos: CourtPos | null): AttackToken {
+  if (pos && BACK_ROW.includes(pos)) return "F"
   if (role === "central") return "M"
   if (role === "oposto") return "O"
   if (role === "levantador") return "S"
-  return "P" // ponteiro / padrão
+  return "P"
+}
+
+function roleShort(role?: PlayerRole): string {
+  switch (role) {
+    case "levantador":
+      return "LEV"
+    case "oposto":
+      return "OP"
+    case "ponteiro":
+      return "PO"
+    case "central":
+      return "CE"
+    case "libero":
+      return "LI"
+    default:
+      return ""
+  }
 }
 
 export default function SmartDataEntry({
@@ -66,6 +110,9 @@ export default function SmartDataEntry({
   teamBScore,
   teamAPlayers,
   teamBPlayers,
+  statsA,
+  statsB,
+  setNumber = 1,
   onRallyExtras,
 }: SmartDataEntryProps) {
   const [setupA, setSetupA] = useState<TeamSetup | null>(null)
@@ -79,22 +126,29 @@ export default function SmartDataEntry({
   const [pending, setPending] = useState<{ team: "A" | "B"; player: number; pos: CourtPos | null } | null>(null)
   const [negative, setNegative] = useState(false)
   const [log, setLog] = useState<LogEntry[]>([])
+  const [perfTeam, setPerfTeam] = useState<"A" | "B">("A")
+
   const [directionPanel, setDirectionPanel] = useState<{
     origin: ReturnType<typeof attackTokenToOrigin>
     finalize: (dir: AttackDirection) => void
   } | null>(null)
+  const [setterChooser, setSetterChooser] = useState<{ options: { role: PlayerRole; player: number; pos: CourtPos }[] } | null>(
+    null,
+  )
 
   const [elapsed, setElapsed] = useState(0)
+  const [paused, setPaused] = useState(false)
   useEffect(() => {
+    if (paused) return
     const t = setInterval(() => setElapsed((e) => e + 1), 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [paused])
 
   const nameOf = (team: "A" | "B", num: number) => {
     const players = team === "A" ? teamAPlayers : teamBPlayers
     return players.find((p) => p.number === num)?.name || `#${num}`
   }
-  const roleOf = (team: "A" | "B", num: number) => {
+  const roleOf = (team: "A" | "B", num: number): PlayerRole | undefined => {
     const setup = team === "A" ? setupA : setupB
     return setup?.roles[num]
   }
@@ -123,17 +177,22 @@ export default function SmartDataEntry({
   const courtB = applyLibero(formationB, setupB)
   const setterA = findSetter(courtA, setupA)
   const setterB = findSetter(courtB, setupB)
+  const possessionCourt = possession === "A" ? courtA : courtB
+  const possessionSetup = possession === "A" ? setupA : setupB
 
-  const pushTouch = (team: "A" | "B", player: number, pos: CourtPos | null, fundamento: Fundamento) => {
+  const pushTouch = (team: "A" | "B", player: number, pos: CourtPos | null, fundamento: Fundamento, isNeg?: boolean) => {
+    const neg = isNeg ?? negative
     const attackToken = fundamento === "A" ? attackTokenFor(roleOf(team, player), pos) : undefined
-    const touch: Touch = { team, player, courtPos: pos, fundamento, attackToken, positive: !negative }
+    const touch: Touch = { team, player, courtPos: pos, fundamento, attackToken, positive: !neg }
     setTouches((prev) => [...prev, touch])
     setLog((prev) => [
       {
-        id: Math.random().toString(),
+        id: Math.random().toString(36).slice(2),
         team,
-        label: `P${pos ?? "-"} · ${FUNDAMENTO_LABEL[fundamento]}`,
-        detail: `${nameOf(team, player)}${negative ? " (negativo)" : ""}`,
+        pos,
+        f: fundamento,
+        symbol: neg ? "•" : "+",
+        detail: `${FUNDAMENTO_DETAIL[fundamento]} — ${nameOf(team, player)}`,
         time: formatTime(elapsed),
       },
       ...prev,
@@ -142,22 +201,46 @@ export default function SmartDataEntry({
     setPending(null)
   }
 
-  const handlePlayerTap = (team: "A" | "B", pos: CourtPos) => {
+  const selectPlayer = (team: "A" | "B", pos: CourtPos) => {
     const court = team === "A" ? courtA : courtB
     setPossession(team)
     setPending({ team, player: court[pos], pos })
   }
 
   const handleFundamento = (f: Fundamento) => {
-    // Levantamento sem atleta selecionado: usa o levantador em quadra da posse.
-    if (f === "L" && !pending) {
+    // Saque: sempre da P1 da equipe que saca.
+    if (f === "S") {
+      const court = servingTeam === "A" ? courtA : courtB
+      setPossession(servingTeam)
+      pushTouch(servingTeam, court[1], 1, "S")
+      return
+    }
+
+    // Levantamento automático: usa o levantador em quadra da posse.
+    // Só pergunta "quem levantou?" se o próprio levantador tiver defendido no rally.
+    if (f === "L") {
       const setter = possession === "A" ? setterA : setterB
-      const court = possession === "A" ? courtA : courtB
-      if (setter) {
+      const court = possessionCourt
+      const setterDefended =
+        setter != null && touches.some((t) => t.team === possession && t.player === setter && t.fundamento === "D")
+      if (setter != null && !setterDefended) {
         pushTouch(possession, setter, findPosition(court, setter), "L")
         return
       }
+      // Levantador defendeu (ou não há levantador em quadra): perguntar.
+      const wanted: PlayerRole[] = ["libero", "ponteiro", "central", "oposto"]
+      const options = wanted
+        .map((role) => {
+          for (const pos of [1, 2, 3, 4, 5, 6] as CourtPos[]) {
+            if (possessionSetup.roles[court[pos]] === role) return { role, player: court[pos], pos }
+          }
+          return null
+        })
+        .filter(Boolean) as { role: PlayerRole; player: number; pos: CourtPos }[]
+      setSetterChooser({ options })
+      return
     }
+
     if (!pending) return
     pushTouch(pending.team, pending.player, pending.pos, f)
   }
@@ -168,11 +251,22 @@ export default function SmartDataEntry({
     setNegative(false)
   }
 
+  const finalizeDisplay = (end: "point" | "error", f: Fundamento) => {
+    setLog((prev) => {
+      if (prev.length === 0) return prev
+      const [head, ...rest] = prev
+      const symbol = end === "point" ? "#" : "!"
+      return [{ ...head, symbol, detail: describeResult(f, end) }, ...rest]
+    })
+  }
+
   const commit = (end: "point" | "error", direction?: AttackDirection) => {
     if (touches.length === 0) return
+    const lastF = touches[touches.length - 1].fundamento
     const result = finalizeRally(touches, end, direction)
     result.actions.forEach((a) => onActionComplete(a))
     onRallyExtras?.(result.extras)
+    finalizeDisplay(end, lastF)
 
     // Rodízio automático: quem conquista o saque (side-out) gira.
     const winner = result.pointScoredBy
@@ -188,7 +282,6 @@ export default function SmartDataEntry({
   const handleEnd = (end: "point" | "error") => {
     if (touches.length === 0) return
     const last = touches[touches.length - 1]
-    // Ataque terminado em ponto sem defesa adversária: abrir painel de direção.
     if (end === "point" && last.fundamento === "A" && last.attackToken) {
       const origin = attackTokenToOrigin(last.attackToken)
       setDirectionPanel({
@@ -200,7 +293,6 @@ export default function SmartDataEntry({
       })
       return
     }
-    // Se o rally teve defesa da equipe adversária ao último ataque, infere direção.
     let inferred: AttackDirection | undefined
     if (last.fundamento === "A" && last.attackToken) {
       const origin = attackTokenToOrigin(last.attackToken)
@@ -216,191 +308,363 @@ export default function SmartDataEntry({
   }
 
   const lastLog = log[0]
+  const perfStats = perfTeam === "A" ? statsA : statsB
+  const donuts = useMemo(() => deriveDonuts(perfStats), [perfStats])
 
   return (
-    <div className="min-h-full w-full bg-gradient-to-br from-slate-100 to-slate-50 p-3">
-      {/* Cabeçalho / Placar */}
-      <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-white p-3 shadow-sm">
-        <div className="flex items-center gap-2 text-slate-900">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500 text-white">
-            <Zap className="h-5 w-5" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-sm font-extrabold tracking-tight">
-              VOLLEY <span className="text-orange-500">TECH</span>
-            </p>
-            <p className="text-[10px] text-slate-400">Scout View IA</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 text-white">
-          <span className="text-sm font-semibold">{teamAName}</span>
-          <span className="rounded bg-blue-600 px-2 py-0.5 text-lg font-bold">{teamAScore}</span>
-          <span className="text-xs text-slate-300">x</span>
-          <span className="rounded bg-orange-500 px-2 py-0.5 text-lg font-bold">{teamBScore}</span>
-          <span className="text-sm font-semibold">{teamBName}</span>
-        </div>
-        <div className="text-right text-xs text-slate-500">
-          <p className="font-mono text-sm font-bold text-slate-800">{formatTime(elapsed)}</p>
-          <p>Saque: {servingTeam === "A" ? teamAName : teamBName}</p>
-        </div>
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-[1fr_1.1fr]">
-        {/* Coluna esquerda: última ação + histórico */}
-        <div className="space-y-3">
-          <Card className="p-4">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Última ação</p>
-            {lastLog ? (
-              <div>
-                <p className="text-2xl font-extrabold text-slate-900">
-                  <span className={lastLog.team === "A" ? "text-blue-600" : "text-orange-500"}>
-                    {lastLog.team}
-                  </span>{" "}
-                  {lastLog.label}
-                </p>
-                <p className="text-sm text-slate-500">{lastLog.detail}</p>
-                <p className="mt-1 font-mono text-xs text-slate-400">{lastLog.time}</p>
-              </div>
-            ) : (
-              <p className="text-sm text-slate-400">Nenhuma ação registrada ainda.</p>
-            )}
-          </Card>
-
-          <Card className="p-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Histórico do rally</p>
-            {touches.length === 0 ? (
-              <p className="text-sm text-slate-400">
-                Selecione um atleta e um fundamento. Alterne a equipe quando a posse mudar.
+    <div className="min-h-full w-full bg-slate-100 p-2 sm:p-4">
+      <div className="mx-auto max-w-[1120px] space-y-3">
+        {/* ============ CABEÇALHO + PLACAR ============ */}
+        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white font-black">
+              V
+            </div>
+            <div className="leading-tight">
+              <p className="text-base font-black tracking-tight text-slate-900">
+                VOLLEY <span className="text-orange-500">TECH</span>
               </p>
-            ) : (
-              <ol className="space-y-1">
-                {touches.map((t, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                Inteligência para decisões vencedoras
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center overflow-hidden rounded-xl shadow-sm">
+            <div className="bg-blue-700 px-3 py-2 text-right text-white sm:px-4">
+              <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">{teamAName}</p>
+            </div>
+            <div className="bg-blue-700 px-3 py-1.5 text-3xl font-black text-white">{teamAScore}</div>
+            <div className="bg-white px-3 py-1 text-center">
+              <p className="text-[10px] font-bold uppercase text-slate-400">Set {setNumber}</p>
+              <p className="text-xs font-bold text-slate-700">
+                {teamAScore} - {teamBScore}
+              </p>
+            </div>
+            <div className="bg-orange-500 px-3 py-1.5 text-3xl font-black text-white">{teamBScore}</div>
+            <div className="bg-orange-500 px-3 py-2 text-left text-white sm:px-4">
+              <p className="text-[10px] font-bold uppercase tracking-wide opacity-90">{teamBName}</p>
+            </div>
+          </div>
+
+          <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">
+            <Settings className="h-5 w-5" />
+          </button>
+        </header>
+
+        {/* ============ CORPO PRINCIPAL (3 colunas) ============ */}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,360px)]">
+          {/* ---- Coluna 1: cronômetro + última ação + histórico ---- */}
+          <div className="space-y-3">
+            {/* Cronômetro */}
+            <div className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm">
+              <Timer className="h-5 w-5 text-slate-400" />
+              <div className="flex-1 leading-tight">
+                <p className="font-mono text-lg font-bold text-slate-800">{formatTime(elapsed)}</p>
+                <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Tempo de jogo</p>
+              </div>
+              <button
+                onClick={() => setPaused((p) => !p)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+              >
+                {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+              </button>
+            </div>
+
+            {/* Última ação */}
+            <div className="rounded-2xl border-l-4 border-blue-600 bg-white p-4 shadow-sm">
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">Última ação</p>
+              {lastLog ? (
+                <div>
+                  <p className="text-2xl font-black">
+                    <span className={lastLog.team === "A" ? "text-blue-600" : "text-orange-500"}>P{lastLog.pos ?? "-"}</span>
+                    <span className="text-slate-300"> - </span>
+                    <span className="text-orange-500">{lastLog.f}</span>
+                    <span className="text-slate-300"> - </span>
+                    <span className="text-slate-800">{lastLog.symbol}</span>
+                  </p>
+                  <p className="text-sm text-slate-600">{lastLog.detail}</p>
+                  {lastLog.pos != null && <p className="text-xs text-slate-400">Afeta na posição {lastLog.pos}</p>}
+                  <p className="mt-1 font-mono text-xs text-slate-400">{lastLog.time}</p>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">Nenhuma ação registrada ainda.</p>
+              )}
+            </div>
+
+            {/* Histórico de ações */}
+            <div className="rounded-2xl bg-white p-4 shadow-sm">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Histórico de ações</p>
+              {log.length === 0 ? (
+                <p className="text-sm text-slate-400">Registre a sequência das ações do rally.</p>
+              ) : (
+                <ol className="space-y-3">
+                  {log.slice(0, 8).map((e) => (
+                    <li key={e.id} className="flex items-center gap-3">
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
+                          e.team === "A" ? "bg-blue-600" : "bg-orange-500"
+                        }`}
+                      >
+                        {e.team}
+                      </span>
+                      <div className="min-w-0 leading-tight">
+                        <p className="font-mono text-xs text-slate-400">{e.time}</p>
+                        <p className="font-bold text-slate-800">
+                          P{e.pos ?? "-"} <span className="text-orange-500">- {e.f} -</span>{" "}
+                          <span className={e.symbol === "!" ? "text-red-500" : "text-slate-800"}>{e.symbol}</span>
+                        </p>
+                        <p className="truncate text-xs text-slate-500">{e.detail}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {touches.length > 0 && (
+                <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+                  <button
+                    onClick={undoLast}
+                    className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+                  >
+                    <Undo2 className="h-3.5 w-3.5" /> Desfazer
+                  </button>
+                  <button
+                    onClick={resetRally}
+                    className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Limpar rally
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ---- Coluna 2: DESEMPENHO GERAL ---- */}
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-black tracking-tight text-slate-800">DESEMPENHO GERAL</h2>
+              <div className="flex overflow-hidden rounded-lg border border-slate-200 text-xs font-bold">
+                <button
+                  onClick={() => setPerfTeam("A")}
+                  className={`px-3 py-1 ${perfTeam === "A" ? "bg-blue-600 text-white" : "text-slate-500"}`}
+                >
+                  {teamAName}
+                </button>
+                <button
+                  onClick={() => setPerfTeam("B")}
+                  className={`px-3 py-1 ${perfTeam === "B" ? "bg-orange-500 text-white" : "text-slate-500"}`}
+                >
+                  {teamBName}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3">
+              {donuts.map((d) => (
+                <Donut key={d.title} {...d} />
+              ))}
+            </div>
+          </div>
+
+          {/* ---- Coluna 3: quadras ---- */}
+          <div className="space-y-3">
+            <CourtView
+              team="A"
+              name={teamAName}
+              court={courtA}
+              setup={setupA}
+              system={describeSystem(setupA)}
+              setter={setterA}
+              serving={servingTeam === "A"}
+              active={possession === "A"}
+              onTap={selectPlayer}
+              pending={pending}
+              roleOf={roleOf}
+            />
+            <div className="flex items-center justify-center">
+              <div className="h-1.5 w-32 rounded-full bg-slate-300" />
+            </div>
+            <CourtView
+              team="B"
+              name={teamBName}
+              court={courtB}
+              setup={setupB}
+              system={describeSystem(setupB)}
+              setter={setterB}
+              serving={servingTeam === "B"}
+              active={possession === "B"}
+              onTap={selectPlayer}
+              pending={pending}
+              roleOf={roleOf}
+            />
+          </div>
+        </div>
+
+        {/* ============ TROCA DE EQUIPE + LIMPAR ============ */}
+        <div className="rounded-2xl bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setPossession("A")}
+              className={`flex-1 rounded-xl px-4 py-4 text-center transition ${
+                possession === "A"
+                  ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg"
+                  : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <p className="text-3xl font-black leading-none">A</p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide">{teamAName}</p>
+            </button>
+            <ArrowLeftRight className="h-6 w-6 shrink-0 text-slate-400" />
+            <button
+              onClick={() => setPossession("B")}
+              className={`flex-1 rounded-xl px-4 py-4 text-center transition ${
+                possession === "B"
+                  ? "bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg"
+                  : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              <p className="text-3xl font-black leading-none">B</p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide">{teamBName}</p>
+            </button>
+          </div>
+          <div className="mt-3 flex justify-center">
+            <button
+              onClick={undoLast}
+              disabled={touches.length === 0}
+              className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-700 disabled:opacity-40"
+            >
+              <Trash2 className="h-4 w-4" /> LIMPAR ÚLTIMA AÇÃO
+            </button>
+          </div>
+        </div>
+
+        {/* ============ IDENTIFICAÇÃO + AÇÃO / QUALIFICAÇÃO ============ */}
+        <div className="grid gap-3 lg:grid-cols-2">
+          {/* Identificação de atletas (equipe com a posse) */}
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <h3 className="text-base font-black tracking-tight text-slate-800">IDENTIFICAÇÃO DE ATLETAS</h3>
+            <p className="mb-3 text-xs text-slate-400">Selecione o atleta que executou a ação</p>
+            <div className="grid grid-cols-3 gap-3">
+              {([4, 3, 2, 5, 6, 1] as CourtPos[]).map((pos) => {
+                const num = possessionCourt[pos]
+                const selected = pending?.team === possession && pending?.pos === pos
+                const isLibero = possessionSetup.liberoNumber === num
+                return (
+                  <button
+                    key={pos}
+                    onClick={() => selectPlayer(possession, pos)}
+                    className={`flex flex-col items-center rounded-xl border-2 p-2 transition ${
+                      selected ? "border-slate-900 bg-slate-50" : "border-slate-100 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="text-sm font-black text-slate-700">P{pos}</span>
                     <span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white ${
-                        t.team === "A" ? "bg-blue-600" : "bg-orange-500"
+                      className={`relative mt-1 flex h-12 w-12 items-center justify-center rounded-full text-white ${
+                        possession === "A" ? "bg-blue-600" : "bg-orange-500"
                       }`}
                     >
-                      {t.team}
+                      <User className="h-6 w-6" />
+                      {isLibero && (
+                        <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-black">
+                          L
+                        </span>
+                      )}
                     </span>
-                    <span className="font-semibold text-slate-800">
-                      P{t.courtPos ?? "-"} · {FUNDAMENTO_LABEL[t.fundamento]}
-                    </span>
-                    <span className="text-slate-400">{nameOf(t.team, t.player)}</span>
-                    {!t.positive && <span className="text-xs font-medium text-red-500">neg</span>}
-                  </li>
+                    <span className="mt-1 text-xs font-bold text-slate-800">#{num}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {pending && (
+              <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-center text-sm text-slate-600">
+                Selecionado:{" "}
+                <span className="font-bold text-slate-900">
+                  #{pending.player} {nameOf(pending.team, pending.player)}
+                </span>{" "}
+                (P{pending.pos})
+              </p>
+            )}
+          </div>
+
+          {/* Ação + Qualificação */}
+          <div className="space-y-3">
+            <div className="rounded-2xl bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-base font-black tracking-tight text-slate-800">AÇÃO</h3>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {ACOES.map(({ f, label, Icon, color }) => (
+                  <button
+                    key={f}
+                    onClick={() => handleFundamento(f)}
+                    disabled={f !== "S" && f !== "L" && !pending}
+                    className={`flex flex-col items-center gap-1 rounded-xl border-2 py-3 font-bold transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 ${color}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-lg leading-none">{f}</span>
+                    <span className="text-[9px] font-semibold text-slate-500">{label}</span>
+                  </button>
                 ))}
-              </ol>
-            )}
-            {touches.length > 0 && (
-              <div className="mt-3 flex gap-2">
-                <Button size="sm" variant="outline" onClick={undoLast}>
-                  <Undo2 className="mr-1 h-4 w-4" />
-                  Desfazer toque
-                </Button>
-                <Button size="sm" variant="ghost" className="text-red-500" onClick={resetRally}>
-                  <Trash2 className="mr-1 h-4 w-4" />
-                  Limpar rally
-                </Button>
               </div>
-            )}
-          </Card>
+            </div>
+
+            <div className="rounded-2xl bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-base font-black tracking-tight text-slate-800">QUALIFICAÇÃO DA AÇÃO</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setNegative(true)}
+                  className={`rounded-xl py-3 text-sm font-black uppercase tracking-wide transition ${
+                    negative ? "bg-red-600 text-white shadow" : "bg-red-50 text-red-500"
+                  }`}
+                >
+                  Negativo
+                </button>
+                <button
+                  onClick={() => setNegative(false)}
+                  className={`rounded-xl py-3 text-sm font-black uppercase tracking-wide transition ${
+                    !negative ? "bg-emerald-600 text-white shadow" : "bg-emerald-50 text-emerald-600"
+                  }`}
+                >
+                  Positivo
+                </button>
+              </div>
+              <p className="mt-2 text-center text-xs font-semibold uppercase text-slate-400">
+                Próximo toque: {negative ? "Negativo" : "Positivo"}
+              </p>
+
+              {/* Finalização do rally */}
+              <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                <button
+                  onClick={() => handleEnd("error")}
+                  disabled={touches.length === 0}
+                  className="rounded-xl bg-red-600 py-3 text-sm font-black uppercase text-white shadow transition hover:bg-red-700 disabled:opacity-40"
+                >
+                  Erro (E)
+                </button>
+                <button
+                  onClick={() => handleEnd("point")}
+                  disabled={touches.length === 0}
+                  className="rounded-xl bg-green-600 py-3 text-sm font-black uppercase text-white shadow transition hover:bg-green-700 disabled:opacity-40"
+                >
+                  Ponto (#)
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Coluna direita: quadras */}
-        <div className="space-y-3">
-          {renderCourt("A", teamAName, courtA, setupA, describeSystem(setupA), setterA, servingTeam === "A", possession === "A", handlePlayerTap, pending, nameOf, roleOf)}
-          {renderCourt("B", teamBName, courtB, setupB, describeSystem(setupB), setterB, servingTeam === "B", possession === "B", handlePlayerTap, pending, nameOf, roleOf)}
+        {/* Rodapé */}
+        <div className="flex items-center justify-between px-2 pb-2 text-xs text-slate-400">
+          <span className="font-semibold uppercase tracking-wide">
+            Inteligência para <span className="text-orange-400">decisões vencedoras</span>
+          </span>
+          <span className="font-black text-blue-700">SCOUT VIEW IA</span>
         </div>
       </div>
 
-      {/* Controles de registro */}
-      <Card className="mt-3 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Posse da bola
-          </p>
-          {pending && (
-            <p className="text-sm text-slate-600">
-              Selecionado:{" "}
-              <span className="font-bold text-slate-900">
-                #{pending.player} {nameOf(pending.team, pending.player)}
-              </span>{" "}
-              (P{pending.pos})
-            </p>
-          )}
-        </div>
-
-        <div className="mb-4 flex items-center justify-center gap-3">
-          <button
-            onClick={() => setPossession("A")}
-            className={`flex-1 rounded-xl px-4 py-3 text-lg font-extrabold transition ${
-              possession === "A" ? "bg-blue-600 text-white shadow" : "bg-slate-100 text-slate-500"
-            }`}
-          >
-            {teamAName}
-          </button>
-          <span className="text-slate-400">↔</span>
-          <button
-            onClick={() => setPossession("B")}
-            className={`flex-1 rounded-xl px-4 py-3 text-lg font-extrabold transition ${
-              possession === "B" ? "bg-orange-500 text-white shadow" : "bg-slate-100 text-slate-500"
-            }`}
-          >
-            {teamBName}
-          </button>
-        </div>
-
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Fundamento</p>
-        <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {FUNDAMENTOS.map((f) => (
-            <button
-              key={f}
-              onClick={() => handleFundamento(f)}
-              disabled={f !== "L" && !pending}
-              className="rounded-lg border border-slate-200 bg-white py-3 text-center font-bold text-slate-800 transition hover:border-orange-400 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span className="block text-lg">{f}</span>
-              <span className="block text-[10px] font-medium text-slate-400">{FUNDAMENTO_LABEL[f]}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setNegative((n) => !n)}
-            className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
-              negative ? "bg-red-600 text-white" : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            Próximo toque: {negative ? "NEGATIVO" : "POSITIVO"}
-          </button>
-          <div className="flex-1" />
-          <Button
-            onClick={() => handleEnd("error")}
-            disabled={touches.length === 0}
-            className="bg-red-600 px-6 font-bold text-white hover:bg-red-700"
-          >
-            Erro (E)
-          </Button>
-          <Button
-            onClick={() => handleEnd("point")}
-            disabled={touches.length === 0}
-            className="bg-green-600 px-6 font-bold text-white hover:bg-green-700"
-          >
-            Ponto (#)
-          </Button>
-        </div>
-      </Card>
-
-      {/* Painel de direção (ataque terminado em ponto) */}
+      {/* ===== Painel: direção do ataque (ponto direto) ===== */}
       {directionPanel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <Card className="w-full max-w-md p-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="mb-1 text-lg font-bold text-slate-900">Direção do ataque</h3>
-            <p className="mb-4 text-sm text-slate-500">
-              O ataque terminou em ponto. Selecione a direção da bola.
-            </p>
+            <p className="mb-4 text-sm text-slate-500">O ataque terminou em ponto. Selecione a direção da bola.</p>
             <div className="grid grid-cols-2 gap-2">
               {possibleDirections(directionPanel.origin).map((d) => (
                 <button
@@ -418,41 +682,258 @@ export default function SmartDataEntry({
             >
               Não identificar direção
             </button>
-          </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Painel: quem levantou? (levantador defendeu) ===== */}
+      {setterChooser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-1 text-lg font-bold text-slate-900">Quem levantou?</h3>
+            <p className="mb-4 text-sm text-slate-500">O levantador defendeu a bola. Selecione quem fez o levantamento.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {setterChooser.options.map((o) => (
+                <button
+                  key={o.role}
+                  onClick={() => {
+                    setSetterChooser(null)
+                    pushTouch(possession, o.player, o.pos, "L")
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white py-4 font-semibold text-slate-800 transition hover:border-cyan-400 hover:bg-cyan-50"
+                >
+                  {ROLE_LABEL[o.role]}
+                  <span className="block text-xs text-slate-400">#{o.player}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setSetterChooser(null)}
+              className="mt-3 w-full text-center text-sm text-slate-400 hover:text-slate-600"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function renderCourt(
-  team: "A" | "B",
-  name: string,
-  court: Formation,
-  setup: TeamSetup,
-  system: string,
-  setter: number | null,
-  isServing: boolean,
-  isActive: boolean,
-  onTap: (team: "A" | "B", pos: CourtPos) => void,
-  pending: { team: "A" | "B"; player: number; pos: CourtPos | null } | null,
-  nameOf: (team: "A" | "B", num: number) => string,
-  roleOf: (team: "A" | "B", num: number) => string | undefined,
-) {
+/* ======================= Subcomponentes ======================= */
+
+const FUNDAMENTO_DETAIL: Record<Fundamento, string> = {
+  S: "Saque",
+  P: "Passe / recepção",
+  L: "Levantamento",
+  A: "Ataque",
+  B: "Bloqueio",
+  D: "Defesa",
+}
+
+function describeResult(f: Fundamento, end: "point" | "error"): string {
+  if (end === "point") {
+    if (f === "S") return "Saque ponto (ACE)"
+    if (f === "A") return "Ataque ponto"
+    if (f === "B") return "Bloqueio ponto"
+    return "Ponto"
+  }
+  if (f === "S") return "Erro de saque"
+  if (f === "A") return "Erro de ataque"
+  if (f === "B") return "Erro de bloqueio"
+  if (f === "P") return "Erro de recepção"
+  return "Erro"
+}
+
+interface DonutData {
+  title: string
+  percent: number
+  color: string
+  rows: { value: string; label: string }[]
+}
+
+function Donut({ title, percent, color, rows }: DonutData) {
+  const r = 26
+  const c = 2 * Math.PI * r
+  const clamped = Math.max(0, Math.min(100, percent))
+  const dash = (clamped / 100) * c
+  return (
+    <div className="flex flex-col items-center">
+      <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
+      <div className="flex items-center gap-2">
+        <svg viewBox="0 0 64 64" className="h-16 w-16 shrink-0 -rotate-90">
+          <circle cx="32" cy="32" r={r} fill="none" stroke="#e2e8f0" strokeWidth="7" />
+          <circle
+            cx="32"
+            cy="32"
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${c - dash}`}
+          />
+          <text
+            x="32"
+            y="32"
+            textAnchor="middle"
+            dominantBaseline="central"
+            className="rotate-90"
+            transform="rotate(90 32 32)"
+            style={{ fontSize: 15, fontWeight: 800, fill: "#1e293b" }}
+          >
+            {clamped}%
+          </text>
+        </svg>
+        <div className="leading-tight">
+          {rows.map((row) => (
+            <div key={row.label} className="mb-0.5">
+              <span className="text-sm font-black text-slate-700">{row.value}</span>
+              <span className="ml-1 text-[9px] text-slate-400">{row.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Deriva os 6 gráficos de rosca a partir das estatísticas reais da equipe. */
+function deriveDonuts(s?: TeamStats): DonutData[] {
+  const empty = !s
+  const serves = s?.serves ?? { correct: 0, errors: 0, aces: 0, zones: { "7.5": 0, "8.6": 0, "9.1": 0 } }
+  const rec = s?.reception ?? { qualityA: 0, qualityB: 0, qualityC: 0, errors: 0 }
+  const att = s?.attacks ?? { successful: 0, errors: 0, blocked: 0, defended: 0 }
+  const blk = s?.blocks ?? { successful: 0, errors: 0, positions: { O: 0, M: 0, P: 0, FS: 0 } }
+  const dist = s?.distribution ?? { O: 0, M: 0, P: 0, F: 0, S: 0 }
+
+  const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0)
+
+  // Ataque
+  const attTotal = att.successful + att.errors + att.blocked + att.defended
+  const attPts = att.successful
+  const attEff = pct(att.successful, attTotal)
+
+  // Saque
+  const serveTotal = serves.aces + serves.correct + serves.errors
+  const aceRate = pct(serves.aces, serveTotal)
+
+  // Recepção
+  const recTotal = rec.qualityA + rec.qualityB + rec.qualityC + rec.errors
+  const recPos = pct(rec.qualityA + rec.qualityB, recTotal)
+
+  // Levantamento (aprovado = ataques convertidos / distribuídos)
+  const setTotal = dist.O + dist.M + dist.P + dist.F + dist.S
+  const setEff = pct(att.successful, setTotal)
+
+  // Defesa (bolas defendidas mantendo o rally)
+  const defTotal = att.defended + att.successful + att.blocked
+  const defRate = pct(att.defended, Math.max(1, att.defended + att.successful))
+
+  // Bloqueio
+  const blkTotal = blk.successful + blk.errors
+  const blkRate = pct(blk.successful, blkTotal)
+
+  return [
+    {
+      title: "Ataque",
+      percent: empty ? 0 : attEff,
+      color: "#2563eb",
+      rows: [
+        { value: `${attEff}%`, label: "Eficiência" },
+        { value: `${attPts}`, label: "Pontos" },
+        { value: `${att.errors}`, label: "Erros" },
+        { value: `${attTotal}`, label: "Total" },
+      ],
+    },
+    {
+      title: "Saque",
+      percent: empty ? 0 : aceRate,
+      color: "#16a34a",
+      rows: [
+        { value: `${aceRate}%`, label: "Ace" },
+        { value: `${serves.aces}`, label: "Pontos" },
+        { value: `${serves.errors}`, label: "Erros" },
+        { value: `${serveTotal}`, label: "Total" },
+      ],
+    },
+    {
+      title: "Recepção",
+      percent: empty ? 0 : recPos,
+      color: "#2563eb",
+      rows: [
+        { value: `${pct(rec.qualityA, recTotal)}%`, label: "Perfeita" },
+        { value: `${pct(rec.qualityB, recTotal)}%`, label: "Positiva" },
+        { value: `${pct(rec.qualityC + rec.errors, recTotal)}%`, label: "Negativa" },
+        { value: `${recTotal}`, label: "Total" },
+      ],
+    },
+    {
+      title: "Levantamento",
+      percent: empty ? 0 : setEff,
+      color: "#7c3aed",
+      rows: [
+        { value: `${setEff}%`, label: "Aproveit." },
+        { value: `${att.successful}`, label: "Convert." },
+        { value: `${att.errors + att.blocked}`, label: "Perdidos" },
+        { value: `${setTotal}`, label: "Total" },
+      ],
+    },
+    {
+      title: "Defesa",
+      percent: empty ? 0 : defRate,
+      color: "#0d9488",
+      rows: [
+        { value: `${defRate}%`, label: "Positiva" },
+        { value: `${att.defended}`, label: "Defesas" },
+        { value: `${att.successful}`, label: "Sofridos" },
+        { value: `${defTotal}`, label: "Total" },
+      ],
+    },
+    {
+      title: "Bloqueio",
+      percent: empty ? 0 : blkRate,
+      color: "#f97316",
+      rows: [
+        { value: `${blkRate}%`, label: "Aprov." },
+        { value: `${blk.successful}`, label: "Pontos" },
+        { value: `${blk.errors}`, label: "Erros" },
+        { value: `${blkTotal}`, label: "Total" },
+      ],
+    },
+  ]
+}
+
+interface CourtViewProps {
+  team: "A" | "B"
+  name: string
+  court: Formation
+  setup: TeamSetup
+  system: string
+  setter: number | null
+  serving: boolean
+  active: boolean
+  onTap: (team: "A" | "B", pos: CourtPos) => void
+  pending: { team: "A" | "B"; player: number; pos: CourtPos | null } | null
+  roleOf: (team: "A" | "B", num: number) => PlayerRole | undefined
+}
+
+function CourtView({ team, name, court, setup, system, setter, serving, active, onTap, pending, roleOf }: CourtViewProps) {
   const isA = team === "A"
-  const bg = isA ? "bg-blue-50" : "bg-orange-50"
-  const badge = isA ? "bg-blue-600" : "bg-orange-500"
-  const border = isActive ? (isA ? "border-blue-500" : "border-orange-500") : "border-transparent"
-  // Ordem visual: rede em cima (4,3,2), fundo embaixo (5,6,1).
-  const order: CourtPos[] = [4, 3, 2, 5, 6, 1]
+  // Equipe A: fundo em cima (P1,P6,P5), rede embaixo (P2,P3,P4).
+  // Equipe B: espelhada — rede em cima (P4,P3,P2), fundo embaixo (P5,P6,P1).
+  const order: CourtPos[] = isA ? [1, 6, 5, 2, 3, 4] : [4, 3, 2, 5, 6, 1]
+  const headerBg = isA ? "bg-blue-600" : "bg-orange-500"
+  const cellBg = isA ? "bg-blue-500/90" : "bg-orange-500/90"
+  const ring = active ? (isA ? "ring-2 ring-blue-400" : "ring-2 ring-orange-400") : ""
 
   return (
-    <Card className={`overflow-hidden border-2 ${border}`}>
-      <div className={`flex items-center justify-between px-4 py-2 ${badge} text-white`}>
-        <span className="font-bold">{name}</span>
-        <span className="rounded bg-white/20 px-2 py-0.5 text-xs font-semibold">{system}</span>
+    <div className={`overflow-hidden rounded-2xl shadow-sm ${ring}`}>
+      <div className={`flex items-center justify-between px-4 py-2 ${headerBg} text-white`}>
+        <span className="font-black">{name}</span>
+        <span className="rounded bg-white/25 px-2 py-0.5 text-xs font-bold">{system}</span>
       </div>
-      <div className={`grid grid-cols-3 gap-2 p-3 ${bg}`}>
+      <div className={`grid grid-cols-3 gap-2 p-3 ${isA ? "bg-blue-100" : "bg-orange-100"}`}>
         {order.map((pos) => {
           const num = court[pos]
           const role = roleOf(team, num)
@@ -463,48 +944,32 @@ function renderCourt(
             <button
               key={pos}
               onClick={() => onTap(team, pos)}
-              className={`relative flex flex-col items-center rounded-xl border bg-white py-3 transition ${
-                selected ? "border-slate-900 ring-2 ring-slate-900" : "border-slate-200 hover:border-slate-400"
+              className={`relative flex flex-col items-center rounded-xl py-3 text-white transition ${cellBg} ${
+                selected ? "ring-2 ring-white" : ""
               }`}
             >
               {isLibero && (
-                <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">
+                <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400 text-[10px] font-black text-white">
                   L
                 </span>
               )}
-              {isServing && pos === 1 && (
-                <span className="absolute right-1 top-1 text-[8px] font-bold text-slate-400">SAQUE</span>
-              )}
-              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-lg font-extrabold text-white ${badge}`}>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-xl font-black text-slate-800">
                 {num}
               </span>
-              <span className="mt-1 text-xs font-bold text-slate-700">P{pos}</span>
-              <span className="text-[9px] leading-tight text-slate-400">
-                {isSetter ? "LEV" : role ? roleShort(role) : ""}
+              <span className="mt-1 text-xs font-black">P{pos}</span>
+              <span className="text-[9px] font-semibold opacity-90">
+                {isSetter ? "LEV" : roleShort(role)}
+                {serving && pos === 1 ? " · SAQUE" : ""}
               </span>
+              {serving && pos === 1 && (
+                <span className="mt-0.5 text-[8px] font-bold uppercase tracking-wide opacity-90">Próximo saque</span>
+              )}
             </button>
           )
         })}
       </div>
-    </Card>
+    </div>
   )
-}
-
-function roleShort(role: string): string {
-  switch (role) {
-    case "levantador":
-      return "LEV"
-    case "oposto":
-      return "OP"
-    case "ponteiro":
-      return "PO"
-    case "central":
-      return "CE"
-    case "libero":
-      return "LI"
-    default:
-      return ""
-  }
 }
 
 function formatTime(totalSeconds: number): string {

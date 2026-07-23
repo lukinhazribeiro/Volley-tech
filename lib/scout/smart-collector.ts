@@ -380,12 +380,16 @@ export function finalizeRally(
     : undefined
 
   // Se houve saque em jogo, registra a ação de saque+recepção (não-pontual).
+  // IMPORTANTE: o parser só contabiliza a recepção quando `serveZone` E
+  // `passingQuality` estão preenchidos. Por isso definimos um serveZone padrão
+  // ("8.6"), garantindo que o PASSE/RECEPÇÃO seja de fato registrado nas
+  // estatísticas — antes ele era descartado silenciosamente.
   if (serve) {
     emit({
       servingTeam,
       servingPlayer,
       serveQuality: "+",
-      serveZone: undefined,
+      serveZone: "8.6",
       passingQuality: passingQuality ?? "A",
       passingPlayer: reception?.player ?? 0,
       attackingTeam: receivingTeam,

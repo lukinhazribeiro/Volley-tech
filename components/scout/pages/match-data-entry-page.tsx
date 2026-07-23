@@ -499,6 +499,9 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
             teamBScore={currentSet.teamBScore}
             teamAPlayers={matchData.teamAPlayers}
             teamBPlayers={matchData.teamBPlayers}
+            statsA={stats.statsA}
+            statsB={stats.statsB}
+            setNumber={currentSet.number}
             onRallyExtras={handleRallyExtras}
           />
         </TabsContent>
