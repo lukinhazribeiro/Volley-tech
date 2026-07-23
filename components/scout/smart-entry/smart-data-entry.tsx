@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Trash2,
   Undo2,
@@ -127,7 +127,6 @@ export default function SmartDataEntry({
   const [pending, setPending] = useState<{ team: "A" | "B"; player: number; pos: CourtPos | null } | null>(null)
   const [negative, setNegative] = useState(false)
   const [log, setLog] = useState<LogEntry[]>([])
-  const [perfTeam, setPerfTeam] = useState<"A" | "B">("A")
 
   const [setterChooser, setSetterChooser] = useState<{ options: { role: PlayerRole; player: number; pos: CourtPos }[] } | null>(
     null,
@@ -278,8 +277,7 @@ export default function SmartDataEntry({
   }
 
   const lastLog = log[0]
-  const perfStats = perfTeam === "A" ? statsA : statsB
-  const donuts = useMemo(() => deriveDonuts(perfStats), [perfStats])
+
 
   return (
     <div className="min-h-full w-full bg-slate-100 p-2 sm:p-4">
@@ -326,25 +324,50 @@ export default function SmartDataEntry({
           </button>
         </header>
 
-        {/* ============ CORPO PRINCIPAL (3 colunas) ============ */}
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,360px)]">
-          {/* ---- Coluna 1: cronômetro + última ação + histórico ---- */}
+        {/* ============ CORPO PRINCIPAL (2 colunas) ============ */}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+          {/* ---- Coluna 1: QUADRA DE VÔLEI ---- */}
           <div className="space-y-3">
-            {/* Cronômetro */}
-            <div className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm">
-              <Timer className="h-5 w-5 text-slate-400" />
-              <div className="flex-1 leading-tight">
-                <p className="font-mono text-lg font-bold text-slate-800">{formatTime(elapsed)}</p>
-                <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Tempo de jogo</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 rounded-xl bg-white px-3 py-2 shadow-sm">
+                <Timer className="h-4 w-4 text-slate-400" />
+                <p className="font-mono text-sm font-bold text-slate-800">{formatTime(elapsed)}</p>
+                <button
+                  onClick={() => setPaused((p) => !p)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+                >
+                  {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                </button>
               </div>
               <button
-                onClick={() => setPaused((p) => !p)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+                onClick={() => setEditMode(true)}
+                className="flex items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-500 hover:border-slate-400 hover:text-slate-700"
               >
-                {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                <Settings className="h-4 w-4" /> Formação / Atletas
               </button>
             </div>
 
+            <VolleyCourt
+              teamAName={teamAName}
+              teamBName={teamBName}
+              courtA={courtA}
+              courtB={courtB}
+              setupA={setupA}
+              setupB={setupB}
+              systemA={describeSystem(setupA)}
+              systemB={describeSystem(setupB)}
+              setterA={setterA}
+              setterB={setterB}
+              servingTeam={servingTeam}
+              possession={possession}
+              onTap={selectPlayer}
+              pending={pending}
+              roleOf={roleOf}
+            />
+          </div>
+
+          {/* ---- Coluna 2: última ação + histórico ---- */}
+          <div className="space-y-3">
             {/* Última ação */}
             <div className="rounded-2xl border-l-4 border-blue-600 bg-white p-4 shadow-sm">
               <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">Última ação</p>
@@ -373,7 +396,7 @@ export default function SmartDataEntry({
                 <p className="text-sm text-slate-400">Registre a sequência das ações do rally.</p>
               ) : (
                 <ol className="space-y-3">
-                  {log.slice(0, 8).map((e) => (
+                  {log.slice(0, 6).map((e) => (
                     <li key={e.id} className="flex items-center gap-3">
                       <span
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
@@ -411,71 +434,6 @@ export default function SmartDataEntry({
                 </div>
               )}
             </div>
-          </div>
-
-          {/* ---- Coluna 2: DESEMPENHO GERAL ---- */}
-          <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-black tracking-tight text-slate-800">DESEMPENHO GERAL</h2>
-              <div className="flex overflow-hidden rounded-lg border border-slate-200 text-xs font-bold">
-                <button
-                  onClick={() => setPerfTeam("A")}
-                  className={`px-3 py-1 ${perfTeam === "A" ? "bg-blue-600 text-white" : "text-slate-500"}`}
-                >
-                  {teamAName}
-                </button>
-                <button
-                  onClick={() => setPerfTeam("B")}
-                  className={`px-3 py-1 ${perfTeam === "B" ? "bg-orange-500 text-white" : "text-slate-500"}`}
-                >
-                  {teamBName}
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3">
-              {donuts.map((d) => (
-                <Donut key={d.title} {...d} />
-              ))}
-            </div>
-          </div>
-
-          {/* ---- Coluna 3: quadras ---- */}
-          <div className="space-y-3">
-            <button
-              onClick={() => setEditMode(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white py-2 text-sm font-bold text-slate-500 hover:border-slate-400 hover:text-slate-700"
-            >
-              <Settings className="h-4 w-4" /> Formação / Atletas
-            </button>
-            <CourtView
-              team="A"
-              name={teamAName}
-              court={courtA}
-              setup={setupA}
-              system={describeSystem(setupA)}
-              setter={setterA}
-              serving={servingTeam === "A"}
-              active={possession === "A"}
-              onTap={selectPlayer}
-              pending={pending}
-              roleOf={roleOf}
-            />
-            <div className="flex items-center justify-center">
-              <div className="h-1.5 w-32 rounded-full bg-slate-300" />
-            </div>
-            <CourtView
-              team="B"
-              name={teamBName}
-              court={courtB}
-              setup={setupB}
-              system={describeSystem(setupB)}
-              setter={setterB}
-              serving={servingTeam === "B"}
-              active={possession === "B"}
-              onTap={selectPlayer}
-              pending={pending}
-              roleOf={roleOf}
-            />
           </div>
         </div>
 
@@ -715,228 +673,140 @@ function describeResult(f: Fundamento, end: "point" | "error"): string {
   return "Erro"
 }
 
-interface DonutData {
-  title: string
-  percent: number
-  color: string
-  rows: { value: string; label: string }[]
-}
-
-function Donut({ title, percent, color, rows }: DonutData) {
-  const r = 26
-  const c = 2 * Math.PI * r
-  const clamped = Math.max(0, Math.min(100, percent))
-  const dash = (clamped / 100) * c
-  return (
-    <div className="flex flex-col items-center">
-      <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
-      <div className="flex items-center gap-2">
-        <svg viewBox="0 0 64 64" className="h-16 w-16 shrink-0 -rotate-90">
-          <circle cx="32" cy="32" r={r} fill="none" stroke="#e2e8f0" strokeWidth="7" />
-          <circle
-            cx="32"
-            cy="32"
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth="7"
-            strokeLinecap="round"
-            strokeDasharray={`${dash} ${c - dash}`}
-          />
-          <text
-            x="32"
-            y="32"
-            textAnchor="middle"
-            dominantBaseline="central"
-            className="rotate-90"
-            transform="rotate(90 32 32)"
-            style={{ fontSize: 15, fontWeight: 800, fill: "#1e293b" }}
-          >
-            {clamped}%
-          </text>
-        </svg>
-        <div className="leading-tight">
-          {rows.map((row) => (
-            <div key={row.label} className="mb-0.5">
-              <span className="text-sm font-black text-slate-700">{row.value}</span>
-              <span className="ml-1 text-[9px] text-slate-400">{row.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** Deriva os 6 gráficos de rosca a partir das estatísticas reais da equipe. */
-function deriveDonuts(s?: TeamStats): DonutData[] {
-  const empty = !s
-  const serves = s?.serves ?? { correct: 0, errors: 0, aces: 0, zones: { "7.5": 0, "8.6": 0, "9.1": 0 } }
-  const rec = s?.reception ?? { qualityA: 0, qualityB: 0, qualityC: 0, errors: 0 }
-  const att = s?.attacks ?? { successful: 0, errors: 0, blocked: 0, defended: 0 }
-  const blk = s?.blocks ?? { successful: 0, errors: 0, positions: { O: 0, M: 0, P: 0, FS: 0 } }
-  const dist = s?.distribution ?? { O: 0, M: 0, P: 0, F: 0, S: 0 }
-
-  const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0)
-
-  // Ataque
-  const attTotal = att.successful + att.errors + att.blocked + att.defended
-  const attPts = att.successful
-  const attEff = pct(att.successful, attTotal)
-
-  // Saque
-  const serveTotal = serves.aces + serves.correct + serves.errors
-  const aceRate = pct(serves.aces, serveTotal)
-
-  // Recepção
-  const recTotal = rec.qualityA + rec.qualityB + rec.qualityC + rec.errors
-  const recPos = pct(rec.qualityA + rec.qualityB, recTotal)
-
-  // Levantamento (aprovado = ataques convertidos / distribuídos)
-  const setTotal = dist.O + dist.M + dist.P + dist.F + dist.S
-  const setEff = pct(att.successful, setTotal)
-
-  // Defesa (bolas defendidas mantendo o rally)
-  const defTotal = att.defended + att.successful + att.blocked
-  const defRate = pct(att.defended, Math.max(1, att.defended + att.successful))
-
-  // Bloqueio
-  const blkTotal = blk.successful + blk.errors
-  const blkRate = pct(blk.successful, blkTotal)
-
-  return [
-    {
-      title: "Ataque",
-      percent: empty ? 0 : attEff,
-      color: "#2563eb",
-      rows: [
-        { value: `${attEff}%`, label: "Eficiência" },
-        { value: `${attPts}`, label: "Pontos" },
-        { value: `${att.errors}`, label: "Erros" },
-        { value: `${attTotal}`, label: "Total" },
-      ],
-    },
-    {
-      title: "Saque",
-      percent: empty ? 0 : aceRate,
-      color: "#16a34a",
-      rows: [
-        { value: `${aceRate}%`, label: "Ace" },
-        { value: `${serves.aces}`, label: "Pontos" },
-        { value: `${serves.errors}`, label: "Erros" },
-        { value: `${serveTotal}`, label: "Total" },
-      ],
-    },
-    {
-      title: "Recepção",
-      percent: empty ? 0 : recPos,
-      color: "#2563eb",
-      rows: [
-        { value: `${pct(rec.qualityA, recTotal)}%`, label: "Perfeita" },
-        { value: `${pct(rec.qualityB, recTotal)}%`, label: "Positiva" },
-        { value: `${pct(rec.qualityC + rec.errors, recTotal)}%`, label: "Negativa" },
-        { value: `${recTotal}`, label: "Total" },
-      ],
-    },
-    {
-      title: "Levantamento",
-      percent: empty ? 0 : setEff,
-      color: "#7c3aed",
-      rows: [
-        { value: `${setEff}%`, label: "Aproveit." },
-        { value: `${att.successful}`, label: "Convert." },
-        { value: `${att.errors + att.blocked}`, label: "Perdidos" },
-        { value: `${setTotal}`, label: "Total" },
-      ],
-    },
-    {
-      title: "Defesa",
-      percent: empty ? 0 : defRate,
-      color: "#0d9488",
-      rows: [
-        { value: `${defRate}%`, label: "Positiva" },
-        { value: `${att.defended}`, label: "Defesas" },
-        { value: `${att.successful}`, label: "Sofridos" },
-        { value: `${defTotal}`, label: "Total" },
-      ],
-    },
-    {
-      title: "Bloqueio",
-      percent: empty ? 0 : blkRate,
-      color: "#f97316",
-      rows: [
-        { value: `${blkRate}%`, label: "Aprov." },
-        { value: `${blk.successful}`, label: "Pontos" },
-        { value: `${blk.errors}`, label: "Erros" },
-        { value: `${blkTotal}`, label: "Total" },
-      ],
-    },
-  ]
-}
-
-interface CourtViewProps {
-  team: "A" | "B"
-  name: string
-  court: Formation
-  setup: TeamSetup
-  system: string
-  setter: number | null
-  serving: boolean
-  active: boolean
+interface VolleyCourtProps {
+  teamAName: string
+  teamBName: string
+  courtA: Formation
+  courtB: Formation
+  setupA: TeamSetup
+  setupB: TeamSetup
+  systemA: string
+  systemB: string
+  setterA: number | null
+  setterB: number | null
+  servingTeam: "A" | "B"
+  possession: "A" | "B"
   onTap: (team: "A" | "B", pos: CourtPos) => void
   pending: { team: "A" | "B"; player: number; pos: CourtPos | null } | null
   roleOf: (team: "A" | "B", num: number) => PlayerRole | undefined
 }
 
-function CourtView({ team, name, court, setup, system, setter, serving, active, onTap, pending, roleOf }: CourtViewProps) {
-  const isA = team === "A"
-  // Equipe A: fundo em cima (P1,P6,P5), rede embaixo (P2,P3,P4).
-  // Equipe B: espelhada — rede em cima (P4,P3,P2), fundo embaixo (P5,P6,P1).
-  const order: CourtPos[] = isA ? [1, 6, 5, 2, 3, 4] : [4, 3, 2, 5, 6, 1]
-  const headerBg = isA ? "bg-blue-600" : "bg-orange-500"
-  const cellBg = isA ? "bg-blue-500/90" : "bg-orange-500/90"
-  const ring = active ? (isA ? "ring-2 ring-blue-400" : "ring-2 ring-orange-400") : ""
+/** Quadra de vôlei realista: as duas equipes dividem a mesma quadra, separadas
+ *  pela rede central, com linhas de ataque (3m) e limites em branco. */
+function VolleyCourt({
+  teamAName,
+  teamBName,
+  courtA,
+  courtB,
+  setupA,
+  setupB,
+  systemA,
+  systemB,
+  setterA,
+  setterB,
+  servingTeam,
+  possession,
+  onTap,
+  pending,
+  roleOf,
+}: VolleyCourtProps) {
+  // Célula de posição (botão inteligente: número em destaque + P + função).
+  const Cell = ({ team, pos }: { team: "A" | "B"; pos: CourtPos }) => {
+    const isA = team === "A"
+    const court = isA ? courtA : courtB
+    const setup = isA ? setupA : setupB
+    const setter = isA ? setterA : setterB
+    const num = court[pos]
+    const role = roleOf(team, num)
+    const isLibero = setup.liberoNumber === num
+    const isSetter = setter === num
+    const serving = servingTeam === team
+    const selected = pending?.team === team && pending?.pos === pos
+    return (
+      <button
+        onClick={() => onTap(team, pos)}
+        className={`relative flex flex-col items-center justify-center rounded-lg py-2 transition ${
+          isA ? "bg-blue-600/95 hover:bg-blue-600" : "bg-orange-500/95 hover:bg-orange-500"
+        } ${selected ? "ring-2 ring-white" : ""}`}
+      >
+        {isLibero && (
+          <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400 text-[9px] font-black text-white">
+            L
+          </span>
+        )}
+        {serving && pos === 1 && (
+          <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-300 text-[9px] font-black text-slate-900">
+            S
+          </span>
+        )}
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-black text-slate-800">
+          {num}
+        </span>
+        <span className="mt-0.5 text-[11px] font-black text-white">P{pos}</span>
+        <span className="text-[8px] font-semibold uppercase text-white/80">{isSetter ? "LEV" : roleShort(role)}</span>
+      </button>
+    )
+  }
+
+  const activeRing = (team: "A" | "B") =>
+    possession === team ? (team === "A" ? "ring-4 ring-blue-400" : "ring-4 ring-orange-400") : "ring-0"
 
   return (
-    <div className={`overflow-hidden rounded-2xl shadow-sm ${ring}`}>
-      <div className={`flex items-center justify-between px-4 py-2 ${headerBg} text-white`}>
-        <span className="font-black">{name}</span>
-        <span className="rounded bg-white/25 px-2 py-0.5 text-xs font-bold">{system}</span>
+    <div className="overflow-hidden rounded-2xl border-4 border-slate-200 bg-emerald-700 shadow-md">
+      {/* Cabeçalho equipe A */}
+      <div className={`flex items-center justify-between bg-blue-600 px-4 py-1.5 text-white ${activeRing("A")}`}>
+        <span className="text-sm font-black">{teamAName}</span>
+        <span className="rounded bg-white/25 px-2 py-0.5 text-[10px] font-bold">{systemA}</span>
       </div>
-      <div className={`grid grid-cols-3 gap-2 p-3 ${isA ? "bg-blue-100" : "bg-orange-100"}`}>
-        {order.map((pos) => {
-          const num = court[pos]
-          const role = roleOf(team, num)
-          const isLibero = setup.liberoNumber === num
-          const isSetter = setter === num
-          const selected = pending?.team === team && pending?.pos === pos
-          return (
-            <button
-              key={pos}
-              onClick={() => onTap(team, pos)}
-              className={`relative flex flex-col items-center rounded-xl py-3 text-white transition ${cellBg} ${
-                selected ? "ring-2 ring-white" : ""
-              }`}
-            >
-              {isLibero && (
-                <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400 text-[10px] font-black text-white">
-                  L
-                </span>
-              )}
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-xl font-black text-slate-800">
-                {num}
-              </span>
-              <span className="mt-1 text-xs font-black">P{pos}</span>
-              <span className="text-[9px] font-semibold opacity-90">
-                {isSetter ? "LEV" : roleShort(role)}
-                {serving && pos === 1 ? " · SAQUE" : ""}
-              </span>
-              {serving && pos === 1 && (
-                <span className="mt-0.5 text-[8px] font-bold uppercase tracking-wide opacity-90">Próximo saque</span>
-              )}
-            </button>
-          )
-        })}
+
+      {/* Metade da quadra — Equipe A (fundo em cima, rede embaixo) */}
+      <div className="relative bg-emerald-600 px-3 pt-3">
+        {/* fundo: P1 P6 P5 */}
+        <div className="grid grid-cols-3 gap-2">
+          {([1, 6, 5] as CourtPos[]).map((pos) => (
+            <Cell key={pos} team="A" pos={pos} />
+          ))}
+        </div>
+        {/* linha de ataque (3m) */}
+        <div className="my-2 border-t-2 border-dashed border-white/60" />
+        {/* rede: P2 P3 P4 */}
+        <div className="grid grid-cols-3 gap-2 pb-3">
+          {([2, 3, 4] as CourtPos[]).map((pos) => (
+            <Cell key={pos} team="A" pos={pos} />
+          ))}
+        </div>
+      </div>
+
+      {/* Rede central */}
+      <div className="relative flex h-6 items-center justify-center bg-slate-900">
+        <div className="h-full w-full bg-[repeating-linear-gradient(90deg,transparent,transparent_5px,rgba(255,255,255,0.35)_5px,rgba(255,255,255,0.35)_7px)]" />
+        <span className="absolute rounded bg-white/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-700">
+          Rede
+        </span>
+      </div>
+
+      {/* Metade da quadra — Equipe B (rede em cima, fundo embaixo) */}
+      <div className="relative bg-emerald-600 px-3 pt-3">
+        {/* rede: P4 P3 P2 */}
+        <div className="grid grid-cols-3 gap-2">
+          {([4, 3, 2] as CourtPos[]).map((pos) => (
+            <Cell key={pos} team="B" pos={pos} />
+          ))}
+        </div>
+        {/* linha de ataque (3m) */}
+        <div className="my-2 border-t-2 border-dashed border-white/60" />
+        {/* fundo: P5 P6 P1 */}
+        <div className="grid grid-cols-3 gap-2 pb-3">
+          {([5, 6, 1] as CourtPos[]).map((pos) => (
+            <Cell key={pos} team="B" pos={pos} />
+          ))}
+        </div>
+      </div>
+
+      {/* Cabeçalho equipe B */}
+      <div className={`flex items-center justify-between bg-orange-500 px-4 py-1.5 text-white ${activeRing("B")}`}>
+        <span className="text-sm font-black">{teamBName}</span>
+        <span className="rounded bg-white/25 px-2 py-0.5 text-[10px] font-bold">{systemB}</span>
       </div>
     </div>
   )
