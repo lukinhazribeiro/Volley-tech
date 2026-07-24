@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { ChevronDown, Menu as MenuIcon } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/scout/ui/tabs"
 import { Button } from "@/components/scout/ui/button"
 import SmartDataEntry from "@/components/scout/smart-entry/smart-data-entry"
@@ -72,6 +73,10 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
   const handleRallyExtras = (extras: unknown) => {
     setRallyExtras((prev) => [...prev, extras])
   }
+
+  // Aba ativa da coleta, controlada para permitir o menu "cortina" (dropdown)
+  // que não ocupa espaço fixo em cima do coletor.
+  const [activeTab, setActiveTab] = useState("entry")
 
   useEffect(() => {
     if (!isSynced || !roomId) return
@@ -476,15 +481,19 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         </div>
       </div>
 
-      <Tabs defaultValue="entry" className="w-full h-[calc(100%-120px)]">
-        <div className="flex items-center justify-between px-4 border-b">
-          <TabsList className="justify-start rounded-none border-b-0">
-            <TabsTrigger value="entry">Coleta de Dados</TabsTrigger>
-            <TabsTrigger value="stats">Estatísticas</TabsTrigger>
-            <TabsTrigger value="spreadsheet">Planilha</TabsTrigger>
-            <TabsTrigger value="charts">Gráficos</TabsTrigger>
-            <TabsTrigger value="transitions">Transições</TabsTrigger>
-          </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-[calc(100%-120px)]">
+        <div className="flex items-center justify-between gap-2 px-4 py-2 border-b">
+          <CurtainNav
+            value={activeTab}
+            onChange={setActiveTab}
+            options={[
+              { value: "entry", label: "Coleta de Dados" },
+              { value: "stats", label: "Estatísticas" },
+              { value: "spreadsheet", label: "Planilha" },
+              { value: "charts", label: "Gráficos" },
+              { value: "transitions", label: "Transições" },
+            ]}
+          />
           <Button onClick={handleReset} variant="outline" size="sm">
             Nova Partida
           </Button>
@@ -541,6 +550,77 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+interface CurtainNavProps {
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+}
+
+/**
+ * Menu "cortina": um botão compacto que abre um painel suspenso (dropdown) com
+ * as seções. Substitui a barra de abas horizontal que ficava fixa cobrindo o
+ * coletor — agora a navegação some após a escolha e libera a tela inteira para
+ * os dados que o analista precisa ver.
+ */
+function CurtainNav({ value, onChange, options }: CurtainNavProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const current = options.find((o) => o.value === value)?.label ?? "Menu"
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MenuIcon className="h-4 w-4" />
+        <span>{current}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full z-50 mt-2 w-56 origin-top overflow-hidden rounded-xl border border-orange-100 bg-white shadow-xl"
+        >
+          {options.map((o) => {
+            const active = o.value === value
+            return (
+              <button
+                key={o.value}
+                role="menuitem"
+                onClick={() => {
+                  onChange(o.value)
+                  setOpen(false)
+                }}
+                className={`flex w-full items-center gap-2 border-l-4 px-4 py-2.5 text-left text-sm font-semibold transition ${
+                  active
+                    ? "border-orange-600 bg-orange-50 text-orange-700"
+                    : "border-transparent text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {o.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
