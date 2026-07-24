@@ -12,6 +12,8 @@ export interface MatchAction {
   resultComplemento?: "#" | "!" | "$" | "%" | "+" | "D" | "V" | "REC"
   actionPlayer?: number
   defensivePlayer?: number
+  /** Atleta que fez o levantamento que originou este ataque (levantador automático ou outro). */
+  settingPlayer?: number
   blockingPlayer?: number
   blockingPosition?: "O" | "M" | "P" | "FS"
   transitionType?: "k1" | "k2" | "k3"
