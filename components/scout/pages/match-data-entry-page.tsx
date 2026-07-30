@@ -100,11 +100,21 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
       rallyExtras: unknown[]
     }>()
     if (saved?.matchData?.actions?.length) {
-      setMatchData(saved.matchData)
-      setSets(saved.sets ?? [])
+      // O JSON.parse devolve datas como STRING; reconvertemos para Date para
+      // evitar "startTime.getTime is not a function" na tela de finalização.
+      const revivedMatchData: MatchData = {
+        ...saved.matchData,
+        startTime: new Date(saved.matchData.startTime),
+      }
+      const revivedSets = (saved.sets ?? []).map((s) => ({
+        ...s,
+        completedAt: s.completedAt ? new Date(s.completedAt) : s.completedAt,
+      }))
+      setMatchData(revivedMatchData)
+      setSets(revivedSets)
       setCurrentSet(saved.currentSet ?? { number: 1, teamAScore: 0, teamBScore: 0 })
       setRallyExtras(saved.rallyExtras ?? [])
-      setStats(calculateMatchStats(saved.matchData.actions))
+      setStats(calculateMatchStats(revivedMatchData.actions))
       setMatchStarted(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,7 +356,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
 
   const handleSaveMatch = () => {
     const winner = sets.filter((s) => s.winner === "A").length >= 3 ? "A" : "B"
-    const totalDuration = Math.floor((new Date().getTime() - matchData.startTime.getTime()) / 1000)
+    const totalDuration = Math.floor((new Date().getTime() - new Date(matchData.startTime).getTime()) / 1000)
 
     saveMatch({
       teamAName: matchData.teamAName,
@@ -372,7 +382,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
 
   if (matchComplete || waitingSave) {
     const winner = sets.filter((s) => s.winner === "A").length >= 3 ? "A" : "B"
-    const totalDuration = Math.floor((new Date().getTime() - matchData.startTime.getTime()) / 1000)
+    const totalDuration = Math.floor((new Date().getTime() - new Date(matchData.startTime).getTime()) / 1000)
 
     return (
       <div className="w-full h-screen bg-background overflow-auto">
