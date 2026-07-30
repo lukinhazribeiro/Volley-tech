@@ -500,19 +500,20 @@ export function finalizeRally(
       }
       defenses!.push({ player: t.player, team: t.team, type })
 
-      if (atk) {
-        emit({
-          servingTeam,
-          servingPlayer,
-          attackingTeam: atk.team,
-          attackPosition: atk.attackToken ?? "P",
-          resultComplemento: code,
-          actionPlayer: atk.player,
-          defensivePlayer: t.player,
-          settingPlayer: setterBefore(i, atk.team),
-          ...(code === "REC" ? { blockingPosition: blockPosFromToken(atk.attackToken) } : {}),
-        })
-      }
+      // A defesa é SEMPRE registrada (mesmo sem um ataque anterior identificado),
+      // para que toda defesa apareça na planilha.
+      emit({
+        servingTeam,
+        servingPlayer,
+        attackingTeam: atk?.team ?? (t.team === "A" ? "B" : "A"),
+        attackPosition: atk?.attackToken ?? "P",
+        resultComplemento: code,
+        actionPlayer: atk?.player ?? 0,
+        defensivePlayer: t.player,
+        defensiveTeam: t.team,
+        settingPlayer: atk ? setterBefore(i, atk.team) : undefined,
+        ...(code === "REC" ? { blockingPosition: blockPosFromToken(atk?.attackToken) } : {}),
+      })
       continue
     }
   }
@@ -593,6 +594,39 @@ export function finalizeRally(
       actionPlayer: atk?.player ?? 0,
     })
     return { actions, pointScoredBy: attackingTeam, extras: { touches, defenses, blocks } }
+  }
+
+  // ---- Defesa como último toque -------------------------------------------
+  // Credita a defesa (a jogada terminou nela) e decide o ponto.
+  if (lastTouch.fundamento === "D") {
+    let atk: Touch | undefined
+    for (let j = touches.length - 2; j >= 0; j--) {
+      if (touches[j].fundamento === "A") {
+        atk = touches[j]
+        break
+      }
+    }
+    const hadBlockBefore = touches.slice(0, lastIdx).some((x) => x.fundamento === "B")
+    let type: DefenseType = "ataque"
+    let code: "D" | "REC" = "D"
+    if (hadBlockBefore) {
+      type = "recuperacao"
+      code = "REC"
+    }
+    defenses!.push({ player: lastTouch.player, team: lastTouch.team, type })
+    emit({
+      servingTeam,
+      servingPlayer,
+      attackingTeam: atk?.team ?? (lastTouch.team === "A" ? "B" : "A"),
+      attackPosition: atk?.attackToken ?? "P",
+      resultComplemento: code,
+      actionPlayer: atk?.player ?? 0,
+      defensivePlayer: lastTouch.player,
+      defensiveTeam: lastTouch.team,
+      ...(code === "REC" ? { blockingPosition: blockPosFromToken(atk?.attackToken) } : {}),
+    })
+    const scorer = end === "point" ? lastTouch.team : lastTouch.team === "A" ? "B" : "A"
+    return { actions, pointScoredBy: scorer, extras: { touches, defenses, blocks } }
   }
 
   // ---- Erro de recepção/passe terminal ------------------------------------

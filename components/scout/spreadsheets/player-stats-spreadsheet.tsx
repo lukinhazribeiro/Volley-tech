@@ -109,7 +109,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         action.passingPlayer &&
         action.passingPlayer > 0 &&
         receivingTeam === team &&
-        action.serveQuality && // <-- NOVO: Garante que é uma recepção de saque, não de continuação
+        action.serveZone && // Recepção de saque (inclui a recepção-erro que encerra o rally)
         !processedReceptionIds.has(action.id)
       ) {
         processedReceptionIds.add(action.id)
@@ -242,14 +242,15 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       }
 
       if (action.defensivePlayer && action.defensivePlayer > 0) {
-        // Na Recuperação, quem defende é a PRÓPRIA equipe atacante.
-        // Nas demais ações de defesa, é a equipe adversária ao ataque.
-        const defenseTeam =
-          action.resultComplemento === "REC"
+        // Usa a equipe do defensor gravada na ação (confiável); se ausente
+        // (ações antigas), cai no cálculo anterior por compatibilidade.
+        const defenseTeam: "A" | "B" =
+          action.defensiveTeam ??
+          (action.resultComplemento === "REC"
             ? (action.attackingTeam as "A" | "B")
             : action.attackingTeam === "A"
               ? "B"
-              : "A"
+              : "A")
         if (defenseTeam === team) {
           if (!playerStats[action.defensivePlayer]) {
             playerStats[action.defensivePlayer] = {

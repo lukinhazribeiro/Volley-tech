@@ -12,6 +12,8 @@ export interface MatchAction {
   resultComplemento?: "#" | "!" | "$" | "%" | "+" | "D" | "V" | "REC"
   actionPlayer?: number
   defensivePlayer?: number
+  /** Equipe do atleta que defendeu (evita adivinhação na planilha). */
+  defensiveTeam?: "A" | "B"
   /** Atleta que fez o levantamento que originou este ataque (levantador automático ou outro). */
   settingPlayer?: number
   blockingPlayer?: number
