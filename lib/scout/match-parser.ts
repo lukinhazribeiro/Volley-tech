@@ -12,6 +12,10 @@ export interface MatchAction {
   resultComplemento?: "#" | "!" | "$" | "%" | "+" | "D" | "V" | "REC"
   actionPlayer?: number
   defensivePlayer?: number
+  /** Equipe do atleta que defendeu (evita adivinhação na planilha). */
+  defensiveTeam?: "A" | "B"
+  /** Atleta que fez o levantamento que originou este ataque (levantador automático ou outro). */
+  settingPlayer?: number
   blockingPlayer?: number
   blockingPosition?: "O" | "M" | "P" | "FS"
   transitionType?: "k1" | "k2" | "k3"
@@ -102,7 +106,9 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
         stats.serves.aces++
       } else if (action.serveQuality === "-") {
         stats.serves.errors++
-      } else if (action.serveQuality === "+") {
+      } else if (action.serveQuality === "+" && action.serveZone) {
+        // Só conta o saque certo na ação real de saque em jogo (com serveZone),
+        // evitando que ações herdeiras do rally contem o mesmo saque de novo.
         stats.serves.correct++
       }
       
@@ -183,7 +189,10 @@ function processAction(action: MatchAction, statsA: TeamStats, statsB: TeamStats
     return
   }
 
-  if (action.serveQuality === "+") {
+  // Saque CERTO só é contado na ação REAL de saque em jogo (identificada por
+  // ter serveZone). As demais ações do rally herdam serveQuality "+" por padrão
+  // no emit e NÃO devem contar saque de novo (evita 1 saque virar 3).
+  if (action.serveQuality === "+" && action.serveZone) {
     servingStats.serves.correct++
   }
 

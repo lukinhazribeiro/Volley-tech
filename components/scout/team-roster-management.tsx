@@ -5,10 +5,13 @@ import { Button } from "@/components/scout/ui/button"
 import { Input } from "@/components/scout/ui/input"
 import { Card } from "@/components/scout/ui/card"
 import { X, Plus } from 'lucide-react'
+import { ROLE_OPTIONS, type PlayerRole } from "@/lib/scout/smart-collector"
 
 export interface Player {
   number: number
   name: string
+  /** Função do atleta — usada pela inteligência do coletor durante a partida. */
+  role?: PlayerRole
 }
 
 interface TeamRosterManagementProps {
@@ -29,12 +32,19 @@ export default function TeamRosterManagement({
     Array.from({ length: 14 }, (_, i) => ({ number: i + 1, name: "" }))
   )
 
-  const handlePlayerChange = (team: "A" | "B", index: number, field: "number" | "name", value: string | number) => {
+  const handlePlayerChange = (
+    team: "A" | "B",
+    index: number,
+    field: "number" | "name" | "role",
+    value: string | number,
+  ) => {
     const players = team === "A" ? [...teamAPlayers] : [...teamBPlayers]
     if (field === "number") {
-      players[index].number = Number(value)
+      players[index] = { ...players[index], number: Number(value) }
+    } else if (field === "role") {
+      players[index] = { ...players[index], role: value as PlayerRole }
     } else {
-      players[index].name = value as string
+      players[index] = { ...players[index], name: value as string }
     }
 
     if (team === "A") {
@@ -68,8 +78,16 @@ export default function TeamRosterManagement({
     }
   }
 
+  const [error, setError] = useState<string | null>(null)
+
   const handleSave = () => {
-    onRosterComplete(teamAPlayers, teamBPlayers)
+    // Cadastro NÃO é obrigatório aqui: os atletas, funções e a formação também
+    // podem ser definidos direto na quadra do coletor. Passamos adiante o que
+    // estiver preenchido (com nome), sem travar o início da coleta.
+    const activeA = teamAPlayers.filter((p) => p.name.trim())
+    const activeB = teamBPlayers.filter((p) => p.name.trim())
+    setError(null)
+    onRosterComplete(activeA, activeB)
   }
 
   return (
@@ -111,6 +129,21 @@ export default function TeamRosterManagement({
                       placeholder="Nome do jogador"
                     />
                   </div>
+                  <select
+                    aria-label="Função do atleta"
+                    value={player.role ?? ""}
+                    onChange={(e) => handlePlayerChange("A", index, "role", e.target.value)}
+                    className={`h-9 w-28 rounded-md border bg-white px-2 text-sm ${
+                      player.name.trim() && !player.role ? "border-red-400" : "border-red-200"
+                    }`}
+                  >
+                    <option value="">Função</option>
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
                   <Button
                     onClick={() => handleRemovePlayer("A", index)}
                     size="sm"
@@ -154,6 +187,21 @@ export default function TeamRosterManagement({
                       placeholder="Nome do jogador"
                     />
                   </div>
+                  <select
+                    aria-label="Função do atleta"
+                    value={player.role ?? ""}
+                    onChange={(e) => handlePlayerChange("B", index, "role", e.target.value)}
+                    className={`h-9 w-28 rounded-md border bg-white px-2 text-sm ${
+                      player.name.trim() && !player.role ? "border-red-400" : "border-blue-200"
+                    }`}
+                  >
+                    <option value="">Função</option>
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
                   <Button
                     onClick={() => handleRemovePlayer("B", index)}
                     size="sm"
@@ -167,6 +215,12 @@ export default function TeamRosterManagement({
             </div>
           </div>
         </div>
+
+        {error && (
+          <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-3 text-center text-sm font-medium text-red-700">
+            {error}
+          </div>
+        )}
 
         <div className="mt-8 flex justify-center">
           <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white font-bold px-8 py-3">

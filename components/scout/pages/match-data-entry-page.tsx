@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { ChevronDown, Menu as MenuIcon } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/scout/ui/tabs"
 import { Button } from "@/components/scout/ui/button"
-import EightFaceDataEntry from "@/components/scout/eight-face-entry/eight-face-data-entry"
+import SmartDataEntry from "@/components/scout/smart-entry/smart-data-entry"
 import ModernStatsDashboard from "@/components/scout/heatmaps/modern-stats-dashboard"
 import PlayerStatsSpreadsheet from "@/components/scout/spreadsheets/player-stats-spreadsheet"
 import MatchSetupPage from "./match-setup-page"
@@ -13,7 +14,8 @@ import { type Set, isSetComplete, getSetWinner, calculateMatchWinner } from "@/l
 import SetDisplay from "@/components/scout/set-display"
 import Card from "@/components/scout/ui/card"
 import AdvancedAnalyticsCharts from "@/components/scout/charts/advanced-analytics-charts"
-import { saveMatch } from "@/lib/scout/match-storage"
+import { saveMatch, saveInProgressMatch, getInProgressMatch, clearInProgressMatch } from "@/lib/scout/match-storage"
+import { getStoredUser } from "@/lib/auth"
 import { syncManager, type SyncMessage } from "@/lib/scout/sync-manager"
 import ConnectionStatus from "@/components/scout/connection-status"
 import { createEmptyRotation, type CourtRotation } from "@/lib/scout/rotation-manager"
@@ -64,6 +66,59 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
   const [waitingSave, setWaitingSave] = useState(false)
 
   const [stats, setStats] = useState({ statsA: createEmptyStats(), statsB: createEmptyStats() })
+
+  // Dados granulares extras do coletor inteligente (toque a toque + direção do
+  // ataque inferida). NÃO alimentam os dashboards existentes; ficam guardados
+  // separadamente para uso futuro, mantendo compatibilidade total.
+  const [rallyExtras, setRallyExtras] = useState<unknown[]>([])
+  const handleRallyExtras = (extras: unknown) => {
+    setRallyExtras((prev) => [...prev, extras])
+  }
+
+  // Aba ativa da coleta, controlada para permitir o menu "cortina" (dropdown)
+  // que não ocupa espaço fixo em cima do coletor.
+  const [activeTab, setActiveTab] = useState("entry")
+
+  // Barra superior (placar/sets/ações) em modo "cortina": inicia recolhida para
+  // liberar a visão do coletor; o analista abre quando quiser ver o placar.
+  const [barOpen, setBarOpen] = useState(false)
+
+  // ===== Persistência: autosave de TODAS as ações registradas =====
+  // Grava o estado completo (ações, sets, set atual e extras) a cada mudança.
+  useEffect(() => {
+    if (!matchStarted) return
+    saveInProgressMatch({ matchData, sets, currentSet, rallyExtras })
+  }, [matchStarted, matchData, sets, currentSet, rallyExtras])
+
+  // Restaura a partida em andamento ao montar, para não perder nada num refresh.
+  useEffect(() => {
+    if (matchStarted) return
+    const saved = getInProgressMatch<{
+      matchData: MatchData
+      sets: Set[]
+      currentSet: { number: number; teamAScore: number; teamBScore: number }
+      rallyExtras: unknown[]
+    }>()
+    if (saved?.matchData?.actions?.length) {
+      // O JSON.parse devolve datas como STRING; reconvertemos para Date para
+      // evitar "startTime.getTime is not a function" na tela de finalização.
+      const revivedMatchData: MatchData = {
+        ...saved.matchData,
+        startTime: new Date(saved.matchData.startTime),
+      }
+      const revivedSets = (saved.sets ?? []).map((s) => ({
+        ...s,
+        completedAt: s.completedAt ? new Date(s.completedAt) : s.completedAt,
+      }))
+      setMatchData(revivedMatchData)
+      setSets(revivedSets)
+      setCurrentSet(saved.currentSet ?? { number: 1, teamAScore: 0, teamBScore: 0 })
+      setRallyExtras(saved.rallyExtras ?? [])
+      setStats(calculateMatchStats(revivedMatchData.actions))
+      setMatchStarted(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!isSynced || !roomId) return
@@ -132,97 +187,109 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
     setMatchStarted(true)
   }
 
-  const handleNewAction = (action: MatchAction) => {
-    // Preserva o ponto já definido no coletor (ex.: ponto direto de rebote na
-    // face 5b+ e erro de levantamento), para que o +1 vá para a equipe correta.
+  // Enriquece uma ação com o set atual e a equipe que pontuou.
+  const enrichAction = (action: MatchAction): MatchAction => {
     let pointScoredBy: "A" | "B" | undefined = action.pointScoredBy
-    
-    // For serve actions with ace (ka)
+
     if (action.serveQuality === "ka") {
       pointScoredBy = action.servingTeam as "A" | "B"
-    }
-    // For serve actions with error (-)
-    else if (action.serveQuality === "-") {
+    } else if (action.serveQuality === "-") {
       pointScoredBy = (action.servingTeam === "A" ? "B" : "A") as "A" | "B"
-    }
-    // Rebote de passe que vira ponto direto: usa a equipe escolhida na face 5b+
-    else if (action.passingQuality === "R" && action.pointType === "point") {
+    } else if (action.passingQuality === "R" && action.pointType === "point") {
       pointScoredBy = action.pointScoredBy
-    }
-    // Erro de levantamento: ponto para a equipe adversária
-    else if (action.resultComplemento === "%") {
+    } else if (action.resultComplemento === "%") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
-    }
-    // For reception errors (D)
-    else if (action.passingQuality === "D") {
+    } else if (action.passingQuality === "D") {
       pointScoredBy = action.servingTeam as "A" | "B"
-    }
-    // For attack actions
-    else if (action.resultComplemento === "#") {
+    } else if (action.resultComplemento === "#") {
       pointScoredBy = action.attackingTeam as "A" | "B"
     } else if (action.resultComplemento === "!") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
     } else if (action.resultComplemento === "+") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
     }
-    
-    const enrichedAction: MatchAction = {
-      ...action,
-      setNumber: currentSet.number,
-      pointScoredBy,
-    }
-    
-    console.log("[v0] Action with point tracking - Set:", currentSet.number, "Point scored by:", pointScoredBy, "Action:", enrichedAction)
-    
-    const updatedActions = [...matchData.actions, enrichedAction]
 
+    return { ...action, setNumber: currentSet.number, pointScoredBy }
+  }
+
+  // Processa TODAS as ações de um rally de uma vez. Corrige o bug em que apenas
+  // a ÚLTIMA ação era salva: um rally emite várias ações em sequência síncrona,
+  // então acumulamos num array local antes de gravar o estado uma única vez —
+  // garantindo que cada saque, recepção, defesa, bloqueio e ataque fique salvo.
+  const handleNewActions = (rawActions: MatchAction[]) => {
+    if (rawActions.length === 0) return
+
+    // Enriquece todas as ações do rally e classifica a TRANSIÇÃO automaticamente.
+    const enrichedBatch = rawActions.map(enrichAction)
+    const terminal = enrichedBatch[enrichedBatch.length - 1]
+    const winner = terminal.pointScoredBy
+    if (winner) {
+      const serving = terminal.servingTeam
+      const receiving = serving === "A" ? "B" : "A"
+      // Defesas do rally (defesa/volume/recuperação), por equipe.
+      const defenseActions = enrichedBatch.filter((a) =>
+        ["D", "REC", "V"].includes(a.resultComplemento as string),
+      )
+      const winnerDefended = defenseActions.some((a) => a.defensiveTeam === winner)
+      const bothDefended =
+        defenseActions.some((a) => a.defensiveTeam === "A") &&
+        defenseActions.some((a) => a.defensiveTeam === "B")
+
+      // Regra de transição:
+      //  • K3 (continuidade): rally com defesas dos DOIS lados ou várias defesas.
+      //  • K2 (após defesa):  a equipe que pontuou defendeu antes de pontuar.
+      //  • K1 (após recepção): side-out — a equipe que RECEBEU pontuou sem defesa.
+      let transitionType: "k1" | "k2" | "k3"
+      if (bothDefended || defenseActions.length >= 2) transitionType = "k3"
+      else if (winnerDefended) transitionType = "k2"
+      else if (winner === receiving) transitionType = "k1"
+      else transitionType = "k2"
+
+      // Marca SOMENTE a ação que fecha o ponto (o painel conta 1x por rally).
+      terminal.transitionType = transitionType
+    }
+
+    let acc = matchData.actions
     let newTeamARotation = matchData.teamARotation
     let newTeamBRotation = matchData.teamBRotation
 
-    if (matchData.actions.length > 0) {
-      const previousAction = matchData.actions[matchData.actions.length - 1]
-      const currentAction = action
+    for (const enriched of enrichedBatch) {
+      if (acc.length > 0) {
+        const previousAction = acc[acc.length - 1]
+        if (previousAction.servingTeam === "A" && enriched.servingTeam === "B") {
+          newTeamBRotation = {
+            ...newTeamBRotation,
+            currentRotation: rotatePositions(newTeamBRotation.currentRotation),
+            rotationHistory: [...newTeamBRotation.rotationHistory, newTeamBRotation.currentRotation],
+          }
+        } else if (previousAction.servingTeam === "B" && enriched.servingTeam === "A") {
+          newTeamARotation = {
+            ...newTeamARotation,
+            currentRotation: rotatePositions(newTeamARotation.currentRotation),
+            rotationHistory: [...newTeamARotation.rotationHistory, newTeamARotation.currentRotation],
+          }
+        }
+      }
 
-      if (previousAction.servingTeam === "A" && currentAction.servingTeam === "B") {
-        newTeamBRotation = {
-          ...matchData.teamBRotation,
-          currentRotation: rotatePositions(matchData.teamBRotation.currentRotation),
-          rotationHistory: [...matchData.teamBRotation.rotationHistory, matchData.teamBRotation.currentRotation],
-        }
-      } else if (previousAction.servingTeam === "B" && currentAction.servingTeam === "A") {
-        newTeamARotation = {
-          ...matchData.teamARotation,
-          currentRotation: rotatePositions(matchData.teamARotation.currentRotation),
-          rotationHistory: [...matchData.teamARotation.rotationHistory, matchData.teamARotation.currentRotation],
-        }
+      acc = [...acc, enriched]
+
+      if (isSynced && roomId) {
+        syncManager.broadcast({ type: "action", data: enriched } as any)
       }
     }
 
     setMatchData({
       ...matchData,
-      actions: updatedActions,
+      actions: acc,
       teamARotation: newTeamARotation,
       teamBRotation: newTeamBRotation,
     })
 
-    if (isSynced && roomId) {
-      syncManager.broadcast({
-        type: "action",
-        data: enrichedAction,
-      } as any)
-    }
-
-    const newStats = calculateMatchStats(updatedActions)
+    const newStats = calculateMatchStats(acc)
     setStats(newStats)
 
-    const currentSetActions = updatedActions.filter((a) => {
-      const actionIndex = updatedActions.indexOf(a)
-      const setStartIndex = sets.reduce((sum, s) => {
-        return sum + (s.teamAScore + s.teamBScore)
-      }, 0)
-      return actionIndex >= setStartIndex
-    })
-
+    const setStartIndex = sets.reduce((sum, s) => sum + (s.teamAScore + s.teamBScore), 0)
+    const currentSetActions = acc.filter((_, idx) => idx >= setStartIndex)
     const currentSetStats = calculateMatchStats(currentSetActions)
 
     const updatedSet = {
@@ -233,12 +300,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
 
     if (isSetComplete(updatedSet.teamAScore, updatedSet.teamBScore)) {
       const winner = getSetWinner(updatedSet.teamAScore, updatedSet.teamBScore)
-      const completedSet = {
-        ...updatedSet,
-        winner: winner as "A" | "B",
-        completedAt: new Date(),
-      }
-
+      const completedSet = { ...updatedSet, winner: winner as "A" | "B", completedAt: new Date() }
       const newSets = [...sets, completedSet]
       setSets(newSets)
 
@@ -247,18 +309,18 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         setShowMatchSummary(true)
         setWaitingSave(true)
       } else {
-        setCurrentSet({
-          number: newSets.length + 1,
-          teamAScore: 0,
-          teamBScore: 0,
-        })
+        setCurrentSet({ number: newSets.length + 1, teamAScore: 0, teamBScore: 0 })
       }
     } else {
       setCurrentSet(updatedSet)
     }
   }
 
+  // Compatibilidade: registra uma única ação (caminhos legados/colaborativo).
+  const handleNewAction = (action: MatchAction) => handleNewActions([action])
+
   const handleReset = () => {
+    clearInProgressMatch()
     setMatchStarted(false)
     setMatchData({
       actions: [],
@@ -322,7 +384,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
 
   const handleSaveMatch = () => {
     const winner = sets.filter((s) => s.winner === "A").length >= 3 ? "A" : "B"
-    const totalDuration = Math.floor((new Date().getTime() - matchData.startTime.getTime()) / 1000)
+    const totalDuration = Math.floor((new Date().getTime() - new Date(matchData.startTime).getTime()) / 1000)
 
     saveMatch({
       teamAName: matchData.teamAName,
@@ -348,7 +410,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
 
   if (matchComplete || waitingSave) {
     const winner = sets.filter((s) => s.winner === "A").length >= 3 ? "A" : "B"
-    const totalDuration = Math.floor((new Date().getTime() - matchData.startTime.getTime()) / 1000)
+    const totalDuration = Math.floor((new Date().getTime() - new Date(matchData.startTime).getTime()) / 1000)
 
     return (
       <div className="w-full h-screen bg-background overflow-auto">
@@ -433,68 +495,114 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           </TabsContent>
         </Tabs>
 
-        <div className="fixed bottom-4 right-4 space-x-2">
-          <Button onClick={handleSaveMatch} className="bg-green-600 hover:bg-green-700">
-            Salvar Partida
-          </Button>
-          <Button onClick={handleDontSave} variant="outline">
-            Descartar
-          </Button>
+        <div className="fixed bottom-4 right-4 flex flex-col items-end gap-2">
+          <p className="rounded-lg bg-white/90 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+            {getStoredUser()
+              ? `Salvando na conta: ${getStoredUser()?.name || getStoredUser()?.email}`
+              : "Nenhuma conta logada — o jogo ficará neste dispositivo"}
+          </p>
+          <div className="flex gap-2">
+            <Button onClick={handleSaveMatch} className="bg-green-600 hover:bg-green-700">
+              Salvar e Nova Leitura
+            </Button>
+            <Button onClick={handleDontSave} variant="outline">
+              Descartar e Nova Leitura
+            </Button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="w-full h-screen bg-background">
+    <div className="flex w-full h-screen flex-col bg-background">
       {isSynced && <ConnectionStatus roomId={roomId} isSynced={isSynced} />}
 
-      <div className="border-b p-4 bg-card">
-        <div className="flex items-center justify-center mb-3">
-          <SetDisplay
-            sets={sets}
-            currentSet={currentSet}
-            teamAName={matchData.teamAName}
-            teamBName={matchData.teamBName}
+      {/* ===== Barra superior ÚNICA: menu + placar + controles (cortina) ===== */}
+      <div className="border-b bg-card">
+        {/* Linha sempre visível: menu à esquerda, placar no meio, controles à direita */}
+        <div className="flex items-center justify-between gap-2 px-3 py-2">
+          <CurtainNav
+            value={activeTab}
+            onChange={setActiveTab}
+            options={[
+              { value: "entry", label: "Coleta de Dados" },
+              { value: "stats", label: "Estatísticas" },
+              { value: "spreadsheet", label: "Planilha" },
+              { value: "charts", label: "Gráficos" },
+              { value: "transitions", label: "Transições" },
+            ]}
           />
+
+          <div className="flex items-center gap-1.5 whitespace-nowrap text-sm font-bold">
+            <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700">
+              Set {currentSet.number}
+            </span>
+            <span className="rounded bg-blue-600 px-2 py-0.5 text-white">{currentSet.teamAScore}</span>
+            <span className="text-muted-foreground">x</span>
+            <span className="rounded bg-orange-500 px-2 py-0.5 text-white">{currentSet.teamBScore}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setBarOpen((o) => !o)}
+              className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+              aria-expanded={barOpen}
+              aria-label="Placar e controles"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${barOpen ? "rotate-180" : ""}`} />
+            </button>
+            <Button onClick={handleReset} variant="outline" size="sm">
+              Nova
+            </Button>
+          </div>
         </div>
-        <div className="flex justify-center gap-2">
-          <Button onClick={handleEndSet} variant="outline" size="sm">
-            Encerrar Set
-          </Button>
-          <Button onClick={handleFinishMatch} variant="destructive" size="sm">
-            Finalizar Jogo
-          </Button>
+
+        {/* Cortina: placar completo + controles do jogo */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ${barOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
+        >
+          <div className="p-4 pt-0">
+            <div className="flex items-center justify-center mb-3">
+              <SetDisplay
+                sets={sets}
+                currentSet={currentSet}
+                teamAName={matchData.teamAName}
+                teamBName={matchData.teamBName}
+              />
+            </div>
+            <div className="flex justify-center gap-2">
+              <Button onClick={handleEndSet} variant="outline" size="sm">
+                Encerrar Set
+              </Button>
+              <Button onClick={handleFinishMatch} variant="destructive" size="sm">
+                Finalizar Jogo
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <Tabs defaultValue="entry" className="w-full h-[calc(100%-120px)]">
-        <div className="flex items-center justify-between px-4 border-b">
-          <TabsList className="justify-start rounded-none border-b-0">
-            <TabsTrigger value="entry">Coleta de Dados</TabsTrigger>
-            <TabsTrigger value="stats">Estatísticas</TabsTrigger>
-            <TabsTrigger value="spreadsheet">Planilha</TabsTrigger>
-            <TabsTrigger value="charts">Gráficos</TabsTrigger>
-            <TabsTrigger value="transitions">Transições</TabsTrigger>
-          </TabsList>
-          <Button onClick={handleReset} variant="outline" size="sm">
-            Nova Partida
-          </Button>
-        </div>
-
-        <TabsContent value="entry" className="h-[calc(100%-45px)] overflow-auto">
-          <EightFaceDataEntry
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 min-h-0">
+        <TabsContent value="entry" className="h-full overflow-auto">
+          <SmartDataEntry
             onActionComplete={handleNewAction}
+            onActionsBatch={handleNewActions}
             teamAName={matchData.teamAName}
             teamBName={matchData.teamBName}
             teamAScore={currentSet.teamAScore}
             teamBScore={currentSet.teamBScore}
             teamAPlayers={matchData.teamAPlayers}
             teamBPlayers={matchData.teamBPlayers}
+            statsA={stats.statsA}
+            statsB={stats.statsB}
+            setNumber={currentSet.number}
+            onRallyExtras={handleRallyExtras}
           />
         </TabsContent>
 
-        <TabsContent value="stats" className="h-[calc(100%-45px)] overflow-auto p-4">
+        <TabsContent value="stats" className="h-full overflow-auto p-4">
           <ModernStatsDashboard
             stats={stats}
             teamAName={matchData.teamAName}
@@ -504,7 +612,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
 
-        <TabsContent value="spreadsheet" className="h-[calc(100%-45px)] overflow-auto p-4">
+        <TabsContent value="spreadsheet" className="h-full overflow-auto p-4">
           <PlayerStatsSpreadsheet
             actions={matchData.actions}
             teamAName={matchData.teamAName}
@@ -512,7 +620,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
 
-        <TabsContent value="charts" className="h-[calc(100%-45px)] overflow-auto p-4">
+        <TabsContent value="charts" className="h-full overflow-auto p-4">
           <AdvancedAnalyticsCharts
             actions={matchData.actions}
             sets={sets}
@@ -521,7 +629,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
 
-        <TabsContent value="transitions" className="h-[calc(100%-45px)] overflow-auto p-4">
+        <TabsContent value="transitions" className="h-full overflow-auto p-4">
           <TransitionsDashboard
             actions={matchData.actions}
             teamAName={matchData.teamAName}
@@ -529,6 +637,77 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+interface CurtainNavProps {
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+}
+
+/**
+ * Menu "cortina": um botão compacto que abre um painel suspenso (dropdown) com
+ * as seções. Substitui a barra de abas horizontal que ficava fixa cobrindo o
+ * coletor — agora a navegação some após a escolha e libera a tela inteira para
+ * os dados que o analista precisa ver.
+ */
+function CurtainNav({ value, onChange, options }: CurtainNavProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const current = options.find((o) => o.value === value)?.label ?? "Menu"
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MenuIcon className="h-4 w-4" />
+        <span>{current}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full z-50 mt-2 w-56 origin-top overflow-hidden rounded-xl border border-orange-100 bg-white shadow-xl"
+        >
+          {options.map((o) => {
+            const active = o.value === value
+            return (
+              <button
+                key={o.value}
+                role="menuitem"
+                onClick={() => {
+                  onChange(o.value)
+                  setOpen(false)
+                }}
+                className={`flex w-full items-center gap-2 border-l-4 px-4 py-2.5 text-left text-sm font-semibold transition ${
+                  active
+                    ? "border-orange-600 bg-orange-50 text-orange-700"
+                    : "border-transparent text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {o.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

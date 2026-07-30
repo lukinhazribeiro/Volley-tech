@@ -18,7 +18,7 @@ interface PlayerStats {
   number: number
   position: string
   name: string
-  reception: { A: number; B: number; C: number; erro: number }
+  reception: { certo: number; erro: number }
   serve: { certo: number; erro: number; ace: number }
   attack: { ponto: number; certo: number; erro: number; O: number; P: number; M: number; FS: number }
   block: { O: number; P: number; M: number; FS: number }
@@ -109,7 +109,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         action.passingPlayer &&
         action.passingPlayer > 0 &&
         receivingTeam === team &&
-        action.serveQuality && // <-- NOVO: Garante que é uma recepção de saque, não de continuação
+        action.serveZone && // Recepção de saque (inclui a recepção-erro que encerra o rally)
         !processedReceptionIds.has(action.id)
       ) {
         processedReceptionIds.add(action.id)
@@ -119,7 +119,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             number: action.passingPlayer,
             position: playerPositions[team]?.[action.passingPlayer] || "",
             name: playerNames[team]?.[action.passingPlayer] || "",
-            reception: { A: 0, B: 0, C: 0, erro: 0 },
+            reception: { certo: 0, erro: 0 },
             serve: { certo: 0, erro: 0, ace: 0 },
             attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
               block: { O: 0, P: 0, M: 0, FS: 0 },
@@ -130,11 +130,10 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             }
           }
 
-        if (action.passingQuality === "A") playerStats[action.passingPlayer].reception.A++
-        else if (action.passingQuality === "B") playerStats[action.passingPlayer].reception.B++
-        else if (action.passingQuality === "C") playerStats[action.passingPlayer].reception.C++
-        else if (action.passingQuality === "D") playerStats[action.passingPlayer].reception.erro++
-        else if (action.passingQuality === "R") playerStats[action.passingPlayer].reception.erro++
+        // Passe/recepção BINÁRIO: positivo (A/B) = CERTO; negativo/erro (C/D/R) = ERRADO.
+        if (action.passingQuality === "A" || action.passingQuality === "B")
+          playerStats[action.passingPlayer].reception.certo++
+        else playerStats[action.passingPlayer].reception.erro++
       }
 
       if (action.servingTeam === team && action.servingPlayer) {
@@ -143,7 +142,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             number: action.servingPlayer,
             position: playerPositions[team]?.[action.servingPlayer] || "",
             name: playerNames[team]?.[action.servingPlayer] || "",
-            reception: { A: 0, B: 0, C: 0, erro: 0 },
+            reception: { certo: 0, erro: 0 },
             serve: { certo: 0, erro: 0, ace: 0 },
             attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
             block: { O: 0, P: 0, M: 0, FS: 0 },
@@ -154,9 +153,20 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           }
         }
 
-        if (action.serveQuality === "+") playerStats[action.servingPlayer].serve.certo++
-        else if (action.serveQuality === "-") playerStats[action.servingPlayer].serve.erro++
-        else if (action.serveQuality === "ka") playerStats[action.servingPlayer].serve.ace++
+        // IMPORTANTE: só conta o SAQUE na ação que realmente representa o saque.
+        // As demais ações do rally (defesa/ataque/bloqueio) herdam serveQuality
+        // "+" por padrão e o servingPlayer, o que fazia o mesmo saque ser contado
+        // várias vezes. O saque real é: terminal (ace "ka" / erro "-") OU o saque
+        // em jogo, identificado por ter serveZone preenchido.
+        const isServeAction =
+          action.serveQuality === "ka" ||
+          action.serveQuality === "-" ||
+          (action.serveQuality === "+" && !!action.serveZone)
+        if (isServeAction) {
+          if (action.serveQuality === "+") playerStats[action.servingPlayer].serve.certo++
+          else if (action.serveQuality === "-") playerStats[action.servingPlayer].serve.erro++
+          else if (action.serveQuality === "ka") playerStats[action.servingPlayer].serve.ace++
+        }
       }
 
       if (action.actionPlayer && action.actionPlayer > 0 && action.attackingTeam === team) {
@@ -165,7 +175,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             number: action.actionPlayer,
             position: playerPositions[team]?.[action.actionPlayer] || "",
             name: playerNames[team]?.[action.actionPlayer] || "",
-            reception: { A: 0, B: 0, C: 0, erro: 0 },
+            reception: { certo: 0, erro: 0 },
             serve: { certo: 0, erro: 0, ace: 0 },
             attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
             block: { O: 0, P: 0, M: 0, FS: 0 },
@@ -222,7 +232,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
               number: action.blockingPlayer,
               position: playerPositions[team]?.[action.blockingPlayer] || "",
               name: playerNames[team]?.[action.blockingPlayer] || "",
-              reception: { A: 0, B: 0, C: 0, erro: 0 },
+              reception: { certo: 0, erro: 0 },
               serve: { certo: 0, erro: 0, ace: 0 },
               attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
               block: { O: 0, P: 0, M: 0, FS: 0 },
@@ -243,21 +253,22 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       }
 
       if (action.defensivePlayer && action.defensivePlayer > 0) {
-        // Na Recuperação, quem defende é a PRÓPRIA equipe atacante.
-        // Nas demais ações de defesa, é a equipe adversária ao ataque.
-        const defenseTeam =
-          action.resultComplemento === "REC"
+        // Usa a equipe do defensor gravada na ação (confiável); se ausente
+        // (ações antigas), cai no cálculo anterior por compatibilidade.
+        const defenseTeam: "A" | "B" =
+          action.defensiveTeam ??
+          (action.resultComplemento === "REC"
             ? (action.attackingTeam as "A" | "B")
             : action.attackingTeam === "A"
               ? "B"
-              : "A"
+              : "A")
         if (defenseTeam === team) {
           if (!playerStats[action.defensivePlayer]) {
             playerStats[action.defensivePlayer] = {
               number: action.defensivePlayer,
               position: playerPositions[defenseTeam]?.[action.defensivePlayer] || "",
               name: playerNames[defenseTeam]?.[action.defensivePlayer] || "",
-              reception: { A: 0, B: 0, C: 0, erro: 0 },
+              reception: { certo: 0, erro: 0 },
               serve: { certo: 0, erro: 0, ace: 0 },
               attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
               block: { O: 0, P: 0, M: 0, FS: 0 },
@@ -275,8 +286,8 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     }
 
     const result = Object.values(playerStats).map((stat) => {
-      // Reception: A + B + C (but NOT erro)
-      const totalReceptionCorrect = stat.reception.A + stat.reception.B + stat.reception.C
+      // Recepção correta = passes certos (não conta erro).
+      const totalReceptionCorrect = stat.reception.certo
       // Serve: certo + ace (but NOT erro)
       const totalServeCorrect = stat.serve.certo + stat.serve.ace
       // Attack: ponto + certo (but NOT erro)
@@ -311,9 +322,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       stat.number,
       stat.position,
       stat.name || `Jogador ${stat.number}`,
-      stat.reception.A,
-      stat.reception.B,
-      stat.reception.C,
+      stat.reception.certo,
       stat.reception.erro,
       stat.serve.certo,
       stat.serve.erro,
@@ -344,7 +353,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "Nº", rowSpan: 2 },
           { content: "P#", rowSpan: 2 },
           { content: "NOME", rowSpan: 2 },
-          { content: "RECEPÇÃO", colSpan: 4 },
+          { content: "RECEPÇÃO", colSpan: 2 },
           { content: "SAQUE", colSpan: 3 },
           { content: "ATAQUE", colSpan: 7 },
           { content: "BLOQUEIO", colSpan: 4 },
@@ -353,7 +362,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "TE", rowSpan: 2 },
           { content: "TGP", rowSpan: 2 },
         ],
-        ["A", "B", "C", "ERRO", "CERTO", "ERRO", "ACE", "PONTO", "CERTO", "ERRO", "O", "P", "M", "F/S", "O", "P", "M", "F/S", "D", "V", "R"],
+        ["CERTO", "ERRO", "CERTO", "ERRO", "ACE", "PONTO", "CERTO", "ERRO", "O", "P", "M", "F/S", "O", "P", "M", "F/S", "D", "V", "R"],
       ],
       body: tableData,
       theme: "grid",
@@ -390,9 +399,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       stat.number,
       stat.position,
       stat.name || `Jogador ${stat.number}`,
-      stat.reception.A,
-      stat.reception.B,
-      stat.reception.C,
+      stat.reception.certo,
       stat.reception.erro,
       stat.serve.certo,
       stat.serve.erro,
@@ -423,7 +430,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "Nº", rowSpan: 2 },
           { content: "P#", rowSpan: 2 },
           { content: "NOME", rowSpan: 2 },
-          { content: "RECEPÇÃO", colSpan: 4 },
+          { content: "RECEPÇÃO", colSpan: 2 },
           { content: "SAQUE", colSpan: 3 },
           { content: "ATAQUE", colSpan: 7 },
           { content: "BLOQUEIO", colSpan: 4 },
@@ -432,7 +439,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "TE", rowSpan: 2 },
           { content: "TGP", rowSpan: 2 },
         ],
-        ["A", "B", "C", "ERRO", "CERTO", "ERRO", "ACE", "PONTO", "CERTO", "ERRO", "O", "P", "M", "F/S", "O", "P", "M", "F/S", "D", "V", "R"],
+        ["CERTO", "ERRO", "CERTO", "ERRO", "ACE", "PONTO", "CERTO", "ERRO", "O", "P", "M", "F/S", "O", "P", "M", "F/S", "D", "V", "R"],
       ],
       body: tableDataA,
       theme: "grid",
@@ -463,9 +470,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       stat.number,
       stat.position,
       stat.name || `Jogador ${stat.number}`,
-      stat.reception.A,
-      stat.reception.B,
-      stat.reception.C,
+      stat.reception.certo,
       stat.reception.erro,
       stat.serve.certo,
       stat.serve.erro,
@@ -496,7 +501,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "Nº", rowSpan: 2 },
           { content: "P#", rowSpan: 2 },
           { content: "NOME", rowSpan: 2 },
-          { content: "RECEPÇÃO", colSpan: 4 },
+          { content: "RECEPÇÃO", colSpan: 2 },
           { content: "SAQUE", colSpan: 3 },
           { content: "ATAQUE", colSpan: 7 },
           { content: "BLOQUEIO", colSpan: 4 },
@@ -505,7 +510,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "TE", rowSpan: 2 },
           { content: "TGP", rowSpan: 2 },
         ],
-        ["A", "B", "C", "ERRO", "CERTO", "ERRO", "ACE", "PONTO", "CERTO", "ERRO", "O", "P", "M", "F/S", "O", "P", "M", "F/S", "D", "V", "R"],
+        ["CERTO", "ERRO", "CERTO", "ERRO", "ACE", "PONTO", "CERTO", "ERRO", "O", "P", "M", "F/S", "O", "P", "M", "F/S", "D", "V", "R"],
       ],
       body: tableDataB,
       theme: "grid",
@@ -541,9 +546,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     const totals = stats.reduce(
       (acc, stat) => ({
         reception: {
-          A: acc.reception.A + stat.reception.A,
-          B: acc.reception.B + stat.reception.B,
-          C: acc.reception.C + stat.reception.C,
+          certo: acc.reception.certo + stat.reception.certo,
           erro: acc.reception.erro + stat.reception.erro,
         },
         serve: {
@@ -575,7 +578,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         te: acc.te + stat.te,
       }),
       {
-        reception: { A: 0, B: 0, C: 0, erro: 0 },
+        reception: { certo: 0, erro: 0 },
         serve: { certo: 0, erro: 0, ace: 0 },
         attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
         block: { O: 0, P: 0, M: 0, FS: 0 },
@@ -604,7 +607,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                 <th className="border border-gray-300 p-1" rowSpan={2}>
                   NOME
                 </th>
-                <th className="border border-gray-300 p-1" colSpan={4}>
+                <th className="border border-gray-300 p-1" colSpan={2}>
                   RECEPÇÃO
                 </th>
                 <th className="border border-gray-300 p-1" colSpan={3}>
@@ -630,9 +633,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                 </th>
               </tr>
               <tr className={`${headerColor} text-white`}>
-                <th className="border border-gray-300 p-1">A</th>
-                <th className="border border-gray-300 p-1">B</th>
-                <th className="border border-gray-300 p-1">C</th>
+                <th className="border border-gray-300 p-1">CERTO</th>
                 <th className="border border-gray-300 p-1">ERRO</th>
                 <th className="border border-gray-300 p-1">CERTO</th>
                 <th className="border border-gray-300 p-1">ERRO</th>
@@ -675,9 +676,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                       className="w-full border-0 bg-transparent px-1"
                     />
                   </td>
-                  <td className="border border-gray-300 p-1 text-center">{stat.reception.A}</td>
-                  <td className="border border-gray-300 p-1 text-center">{stat.reception.B}</td>
-                  <td className="border border-gray-300 p-1 text-center">{stat.reception.C}</td>
+                  <td className="border border-gray-300 p-1 text-center">{stat.reception.certo}</td>
                   <td className="border border-gray-300 p-1 text-center">{stat.reception.erro}</td>
                   <td className="border border-gray-300 p-1 text-center">{stat.serve.certo}</td>
                   <td className="border border-gray-300 p-1 text-center">{stat.serve.erro}</td>
@@ -705,9 +704,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                 <td className="border border-gray-300 p-1 text-center" colSpan={3}>
                   {selectedSet === "all" ? "RESULTADO GERAL" : `RESULTADO SET ${selectedSet}`}
                 </td>
-                <td className="border border-gray-300 p-1 text-center">{totals.reception.A}</td>
-                <td className="border border-gray-300 p-1 text-center">{totals.reception.B}</td>
-                <td className="border border-gray-300 p-1 text-center">{totals.reception.C}</td>
+                <td className="border border-gray-300 p-1 text-center">{totals.reception.certo}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.reception.erro}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.serve.certo}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.serve.erro}</td>

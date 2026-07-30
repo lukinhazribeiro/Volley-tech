@@ -1,5 +1,6 @@
 import type { Set } from "./set-manager"
 import type { MatchAction } from "./match-parser"
+import { getStoredUser } from "@/lib/auth"
 
 export interface StoredMatch {
   id: string
@@ -14,7 +15,22 @@ export interface StoredMatch {
   winner: "A" | "B"
 }
 
-const STORAGE_KEY = "volleyball_matches_history"
+const STORAGE_KEY_BASE = "volleyball_matches_history"
+
+/**
+ * Identifica a conta logada na hub para escopar os dados. Cada usuário só
+ * enxerga e salva os próprios jogos ("save game" por conta). Se ninguém estiver
+ * logado, usa um bucket anônimo local.
+ */
+function currentUserScope(): string {
+  const user = getStoredUser()
+  return user?.id || user?.email || "anon"
+}
+
+/** Chave do histórico de partidas escopada por conta logada. */
+function storageKey(): string {
+  return `${STORAGE_KEY_BASE}::${currentUserScope()}`
+}
 
 function isStorageAvailable(): boolean {
   try {
@@ -38,7 +54,7 @@ export function saveMatch(match: Omit<StoredMatch, "id">): StoredMatch {
     }
     const existingMatches = getMatches()
     const updatedMatches = [storedMatch, ...existingMatches]
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedMatches))
+    localStorage.setItem(storageKey(), JSON.stringify(updatedMatches))
     console.log("[v0] Match saved successfully:", storedMatch.id)
     return storedMatch
   } catch (error) {
@@ -47,12 +63,54 @@ export function saveMatch(match: Omit<StoredMatch, "id">): StoredMatch {
   }
 }
 
+const IN_PROGRESS_KEY_BASE = "volleyball_match_in_progress"
+
+/** Chave da partida em andamento escopada por conta logada. */
+function inProgressKey(): string {
+  return `${IN_PROGRESS_KEY_BASE}::${currentUserScope()}`
+}
+
+/**
+ * Autosave da partida em andamento: grava TODO o estado (ações, sets, set
+ * atual e extras de rally) a cada mudança, para que nada seja perdido em caso
+ * de recarregar a página ou fechar o navegador sem querer.
+ */
+export function saveInProgressMatch(snapshot: unknown): void {
+  try {
+    if (!isStorageAvailable()) return
+    localStorage.setItem(inProgressKey(), JSON.stringify(snapshot))
+  } catch (error) {
+    console.error("[v0] Error autosaving in-progress match:", error)
+  }
+}
+
+export function getInProgressMatch<T = unknown>(): T | null {
+  try {
+    if (!isStorageAvailable()) return null
+    const data = localStorage.getItem(inProgressKey())
+    if (!data) return null
+    return JSON.parse(data) as T
+  } catch (error) {
+    console.error("[v0] Error reading in-progress match:", error)
+    return null
+  }
+}
+
+export function clearInProgressMatch(): void {
+  try {
+    if (!isStorageAvailable()) return
+    localStorage.removeItem(inProgressKey())
+  } catch (error) {
+    console.error("[v0] Error clearing in-progress match:", error)
+  }
+}
+
 export function getMatches(): StoredMatch[] {
   try {
     if (!isStorageAvailable()) {
       return []
     }
-    const data = localStorage.getItem(STORAGE_KEY)
+    const data = localStorage.getItem(storageKey())
     if (!data) return []
     return JSON.parse(data)
   } catch (error) {
@@ -71,7 +129,7 @@ export function deleteMatch(id: string): void {
     if (!isStorageAvailable()) return
     const matches = getMatches()
     const filtered = matches.filter((m) => m.id !== id)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
+    localStorage.setItem(storageKey(), JSON.stringify(filtered))
     console.log("[v0] Match deleted:", id)
   } catch (error) {
     console.error("[v0] Error deleting match:", error)
