@@ -219,13 +219,41 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
   const handleNewActions = (rawActions: MatchAction[]) => {
     if (rawActions.length === 0) return
 
+    // Enriquece todas as ações do rally e classifica a TRANSIÇÃO automaticamente.
+    const enrichedBatch = rawActions.map(enrichAction)
+    const terminal = enrichedBatch[enrichedBatch.length - 1]
+    const winner = terminal.pointScoredBy
+    if (winner) {
+      const serving = terminal.servingTeam
+      const receiving = serving === "A" ? "B" : "A"
+      // Defesas do rally (defesa/volume/recuperação), por equipe.
+      const defenseActions = enrichedBatch.filter((a) =>
+        ["D", "REC", "V"].includes(a.resultComplemento as string),
+      )
+      const winnerDefended = defenseActions.some((a) => a.defensiveTeam === winner)
+      const bothDefended =
+        defenseActions.some((a) => a.defensiveTeam === "A") &&
+        defenseActions.some((a) => a.defensiveTeam === "B")
+
+      // Regra de transição:
+      //  • K3 (continuidade): rally com defesas dos DOIS lados ou várias defesas.
+      //  • K2 (após defesa):  a equipe que pontuou defendeu antes de pontuar.
+      //  • K1 (após recepção): side-out — a equipe que RECEBEU pontuou sem defesa.
+      let transitionType: "k1" | "k2" | "k3"
+      if (bothDefended || defenseActions.length >= 2) transitionType = "k3"
+      else if (winnerDefended) transitionType = "k2"
+      else if (winner === receiving) transitionType = "k1"
+      else transitionType = "k2"
+
+      // Marca SOMENTE a ação que fecha o ponto (o painel conta 1x por rally).
+      terminal.transitionType = transitionType
+    }
+
     let acc = matchData.actions
     let newTeamARotation = matchData.teamARotation
     let newTeamBRotation = matchData.teamBRotation
 
-    for (const raw of rawActions) {
-      const enriched = enrichAction(raw)
-
+    for (const enriched of enrichedBatch) {
       if (acc.length > 0) {
         const previousAction = acc[acc.length - 1]
         if (previousAction.servingTeam === "A" && enriched.servingTeam === "B") {

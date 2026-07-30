@@ -130,25 +130,23 @@ export default function AdvancedAnalyticsCharts({ actions, teamAName, teamBName,
 
   const calculateReceptionStats = (team: "A" | "B") => {
     const teamActions = getTeamActions(team)
-    const receivingTeam = team === "A" ? "B" : "A"
     const receptionActions = teamActions.filter((a) => a.servingTeam !== team && a.passingQuality)
 
-    const stats = {
-      A: receptionActions.filter((a) => a.passingQuality === "A").length,
-      B: receptionActions.filter((a) => a.passingQuality === "B").length,
-      C: receptionActions.filter((a) => a.passingQuality === "C").length,
-      D: receptionActions.filter((a) => a.passingQuality === "D").length,
+    // Passe/recepção BINÁRIO: positivo (A/B/C antigos) = CERTO; erro (D/R) = ERRADO.
+    return {
+      certo: receptionActions.filter((a) => ["A", "B", "C"].includes(a.passingQuality as string)).length,
+      errado: receptionActions.filter((a) => a.passingQuality === "D" || a.passingQuality === "R").length,
     }
-
-    const total = stats.A + stats.B + stats.C + stats.D
-    return stats
   }
 
   const calculateServeStats = (team: "A" | "B") => {
-    // Apenas ações em que a equipe efetivamente sacou
+    // Apenas ações em que a equipe efetivamente sacou.
     const serveActions = filteredActions.filter((a) => a.servingTeam === team)
     return {
-      correct: serveActions.filter((a) => a.serveQuality === "+").length,
+      // Saque certo só conta na ação REAL de saque em jogo (com serveZone). As
+      // demais ações do rally herdam serveQuality "+" e contariam o mesmo saque
+      // várias vezes (1 saque virava 3).
+      correct: serveActions.filter((a) => a.serveQuality === "+" && a.serveZone).length,
       error: serveActions.filter((a) => a.serveQuality === "-").length,
       ace: serveActions.filter((a) => a.serveQuality === "ka").length,
     }
@@ -237,38 +235,18 @@ export default function AdvancedAnalyticsCharts({ actions, teamAName, teamBName,
   const blockStats = calculateBlockStats(selectedTeam)
   const defenseStats = calculateDefenseStats(selectedTeam)
 
+  const receptionTotal = receptionStats.certo + receptionStats.errado
   const receptionRegions: RegionData[] = [
     {
-      name: "A",
-      value: receptionStats.A,
-      percentage:
-        receptionStats.A + receptionStats.B + receptionStats.C + receptionStats.D > 0
-          ? Math.round(
-              (receptionStats.A / (receptionStats.A + receptionStats.B + receptionStats.C + receptionStats.D)) * 100,
-            )
-          : 0,
+      name: "Certo",
+      value: receptionStats.certo,
+      percentage: receptionTotal > 0 ? Math.round((receptionStats.certo / receptionTotal) * 100) : 0,
       color: COLORS.success,
     },
     {
-      name: "B+C",
-      value: receptionStats.B + receptionStats.C,
-      percentage:
-        receptionStats.A + receptionStats.B + receptionStats.C + receptionStats.D > 0
-          ? Math.round(
-              ((receptionStats.B + receptionStats.C) / (receptionStats.A + receptionStats.B + receptionStats.C + receptionStats.D)) * 100,
-            )
-          : 0,
-      color: COLORS.warning,
-    },
-    {
-      name: "Erro",
-      value: receptionStats.D,
-      percentage:
-        receptionStats.A + receptionStats.B + receptionStats.C + receptionStats.D > 0
-          ? Math.round(
-              (receptionStats.D / (receptionStats.A + receptionStats.B + receptionStats.C + receptionStats.D)) * 100,
-            )
-          : 0,
+      name: "Errado",
+      value: receptionStats.errado,
+      percentage: receptionTotal > 0 ? Math.round((receptionStats.errado / receptionTotal) * 100) : 0,
       color: COLORS.error,
     },
   ]
