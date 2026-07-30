@@ -15,6 +15,7 @@ import SetDisplay from "@/components/scout/set-display"
 import Card from "@/components/scout/ui/card"
 import AdvancedAnalyticsCharts from "@/components/scout/charts/advanced-analytics-charts"
 import { saveMatch, saveInProgressMatch, getInProgressMatch, clearInProgressMatch } from "@/lib/scout/match-storage"
+import { getStoredUser } from "@/lib/auth"
 import { syncManager, type SyncMessage } from "@/lib/scout/sync-manager"
 import ConnectionStatus from "@/components/scout/connection-status"
 import { createEmptyRotation, type CourtRotation } from "@/lib/scout/rotation-manager"
@@ -456,13 +457,20 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           </TabsContent>
         </Tabs>
 
-        <div className="fixed bottom-4 right-4 space-x-2">
-          <Button onClick={handleSaveMatch} className="bg-green-600 hover:bg-green-700">
-            Salvar Partida
-          </Button>
-          <Button onClick={handleDontSave} variant="outline">
-            Descartar
-          </Button>
+        <div className="fixed bottom-4 right-4 flex flex-col items-end gap-2">
+          <p className="rounded-lg bg-white/90 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+            {getStoredUser()
+              ? `Salvando na conta: ${getStoredUser()?.name || getStoredUser()?.email}`
+              : "Nenhuma conta logada — o jogo ficará neste dispositivo"}
+          </p>
+          <div className="flex gap-2">
+            <Button onClick={handleSaveMatch} className="bg-green-600 hover:bg-green-700">
+              Salvar e Nova Leitura
+            </Button>
+            <Button onClick={handleDontSave} variant="outline">
+              Descartar e Nova Leitura
+            </Button>
+          </div>
         </div>
       </div>
     )
