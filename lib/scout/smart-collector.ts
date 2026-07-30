@@ -370,7 +370,8 @@ export function finalizeRally(
   const lastTouch = touches[touches.length - 1]
 
   // Recepção: primeiro passe após o saque, feito pela equipe adversária ao saque.
-  const reception = touches.find((t) => t.fundamento === "P" && t.team !== servingTeam)
+  const receptionIdx = touches.findIndex((t) => t.fundamento === "P" && t.team !== servingTeam)
+  const reception = receptionIdx >= 0 ? touches[receptionIdx] : undefined
 
   // ---- Caso 1: rally decidido no próprio saque (ace ou erro) -------------
   const serveIsTerminal = lastTouch.fundamento === "S"
@@ -398,15 +399,14 @@ export function finalizeRally(
   // Base do saque (em jogo) + recepção, quando existirem.
   const receivingTeam: "A" | "B" = servingTeam === "A" ? "B" : "A"
 
-  // PASSE = RECEPÇÃO, agora BINÁRIO (regra do usuário): não existe mais A/B/C.
-  //   positivo  => "A" (passe/recepção CERTO)
-  //   negativo  => "C" (passe/recepção ERRADO, mas o rally só encerra pelos
-  //                     botões Ponto/Erro; um erro terminal usa "D").
-  const passingQuality: "A" | "C" | undefined = reception
-    ? reception.positive
-      ? "A"
-      : "C"
-    : undefined
+  // PASSE = RECEPÇÃO, lido pela CONTINUIDADE (regra do usuário):
+  //   • tem toque depois (o rally continua) OU termina em ponto => CERTO ("A")
+  //   • é o último toque e o rally termina em ERRO              => ERRADO ("D")
+  let passingQuality: "A" | "D" | undefined
+  if (reception) {
+    const hasContinuity = receptionIdx < touches.length - 1
+    passingQuality = hasContinuity || end === "point" ? "A" : "D"
+  }
 
   // Zona do saque = posição de quadra de quem recebeu (P5=7.5, P6=8.6, P1=9.1).
   const serveZone = reception ? serveZoneFromCourtPos(reception.courtPos) : "8.6"
@@ -427,12 +427,11 @@ export function finalizeRally(
   }
 
   // ---- Toques intermediários: BLOQUEIOS e DEFESAS (transição) -------------
-  // Regras da inteligência do jogo:
+  // Regras da inteligência do jogo (classificação pelo TOQUE ANTERIOR):
   //  • Todo BLOQUEIO conta como bloqueio POSITIVO (mesmo sem encerrar o rally).
-  //  • DEFESA de ataque      => reagir a um ataque adversário.
-  //  • DEFESA de recuperação => quando houve BLOQUEIO antes (bola tocada no bloqueio).
-  //  • DEFESA de volume       => a bola defendida volta DIRETO para a outra quadra
-  //                              (próximo toque já é do adversário).
+  //  • DEFESA depois de ATAQUE   => defesa de ataque.
+  //  • DEFESA depois de BLOQUEIO => recuperação.
+  //  • DEFESA depois de PASSE     => volume.
   const defenses: RallyResult["extras"]["defenses"] = []
   const blocks: RallyResult["extras"]["blocks"] = []
 
@@ -476,7 +475,10 @@ export function finalizeRally(
       continue
     }
 
-    // ----- Defesa: classifica o tipo -----
+    // ----- Defesa: classifica pelo TOQUE IMEDIATAMENTE ANTERIOR -----
+    //   anterior = ATAQUE  (A) -> defesa de ataque   (código "D")
+    //   anterior = BLOQUEIO(B) -> recuperação        (código "REC")
+    //   anterior = PASSE   (P) -> volume             (código "V")
     if (t.fundamento === "D") {
       let atk: Touch | undefined
       for (let j = i - 1; j >= 0; j--) {
@@ -485,16 +487,14 @@ export function finalizeRally(
           break
         }
       }
-      const hadBlockBefore = touches.slice(0, i).some((x) => x.fundamento === "B")
-      const next = touches[i + 1]
-      const ballWentDirectlyOver = !!next && next.team !== t.team
+      const prev = touches[i - 1]
 
       let type: DefenseType = "ataque"
       let code: "D" | "REC" | "V" = "D"
-      if (hadBlockBefore) {
+      if (prev?.fundamento === "B") {
         type = "recuperacao"
         code = "REC"
-      } else if (ballWentDirectlyOver) {
+      } else if (prev?.fundamento === "P") {
         type = "volume"
         code = "V"
       }
@@ -606,12 +606,16 @@ export function finalizeRally(
         break
       }
     }
-    const hadBlockBefore = touches.slice(0, lastIdx).some((x) => x.fundamento === "B")
+    // Classifica pelo toque imediatamente anterior (mesma regra do meio do rally).
+    const prev = touches[lastIdx - 1]
     let type: DefenseType = "ataque"
-    let code: "D" | "REC" = "D"
-    if (hadBlockBefore) {
+    let code: "D" | "REC" | "V" = "D"
+    if (prev?.fundamento === "B") {
       type = "recuperacao"
       code = "REC"
+    } else if (prev?.fundamento === "P") {
+      type = "volume"
+      code = "V"
     }
     defenses!.push({ player: lastTouch.player, team: lastTouch.team, type })
     emit({
@@ -629,10 +633,10 @@ export function finalizeRally(
     return { actions, pointScoredBy: scorer, extras: { touches, defenses, blocks } }
   }
 
-  // ---- Erro de recepção/passe terminal ------------------------------------
-  // Quando o rally encerra num PASSE com erro, é erro de recepção: ponto do
-  // adversário (normalmente a equipe que sacou).
-  if (lastTouch.fundamento === "P" && end === "error") {
+  // ---- Erro de passe terminal (passe de continuidade, NÃO a recepção) -----
+  // A recepção do saque já foi emitida no bloco do saque com a leitura de
+  // continuidade; aqui tratamos apenas um passe posterior que encerra em erro.
+  if (lastTouch.fundamento === "P" && end === "error" && lastTouch !== reception) {
     const passTeam = lastTouch.team
     const scorer = passTeam === "A" ? "B" : "A"
     emit({
