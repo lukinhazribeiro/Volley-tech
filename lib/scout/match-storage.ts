@@ -47,6 +47,43 @@ export function saveMatch(match: Omit<StoredMatch, "id">): StoredMatch {
   }
 }
 
+const IN_PROGRESS_KEY = "volleyball_match_in_progress"
+
+/**
+ * Autosave da partida em andamento: grava TODO o estado (ações, sets, set
+ * atual e extras de rally) a cada mudança, para que nada seja perdido em caso
+ * de recarregar a página ou fechar o navegador sem querer.
+ */
+export function saveInProgressMatch(snapshot: unknown): void {
+  try {
+    if (!isStorageAvailable()) return
+    localStorage.setItem(IN_PROGRESS_KEY, JSON.stringify(snapshot))
+  } catch (error) {
+    console.error("[v0] Error autosaving in-progress match:", error)
+  }
+}
+
+export function getInProgressMatch<T = unknown>(): T | null {
+  try {
+    if (!isStorageAvailable()) return null
+    const data = localStorage.getItem(IN_PROGRESS_KEY)
+    if (!data) return null
+    return JSON.parse(data) as T
+  } catch (error) {
+    console.error("[v0] Error reading in-progress match:", error)
+    return null
+  }
+}
+
+export function clearInProgressMatch(): void {
+  try {
+    if (!isStorageAvailable()) return
+    localStorage.removeItem(IN_PROGRESS_KEY)
+  } catch (error) {
+    console.error("[v0] Error clearing in-progress match:", error)
+  }
+}
+
 export function getMatches(): StoredMatch[] {
   try {
     if (!isStorageAvailable()) {

@@ -282,47 +282,6 @@ export default function SmartDataEntry({
     <div className="min-h-full w-full bg-slate-100 p-2 sm:p-4">
       <div className="mx-auto max-w-[1120px] space-y-3">
         {/* ============ CABEÇALHO + PLACAR ============ */}
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-3 shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white font-black">
-              V
-            </div>
-            <div className="leading-tight">
-              <p className="text-base font-black tracking-tight text-slate-900">
-                VOLLEY <span className="text-orange-500">TECH</span>
-              </p>
-              <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
-                Inteligência para decisões vencedoras
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center overflow-hidden rounded-xl shadow-sm">
-            <div className="bg-blue-700 px-3 py-2 text-right text-white sm:px-4">
-              <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">{teamAName}</p>
-            </div>
-            <div className="bg-blue-700 px-3 py-1.5 text-3xl font-black text-white">{teamAScore}</div>
-            <div className="bg-white px-3 py-1 text-center">
-              <p className="text-[10px] font-bold uppercase text-slate-400">Set {setNumber}</p>
-              <p className="text-xs font-bold text-slate-700">
-                {teamAScore} - {teamBScore}
-              </p>
-            </div>
-            <div className="bg-orange-500 px-3 py-1.5 text-3xl font-black text-white">{teamBScore}</div>
-            <div className="bg-orange-500 px-3 py-2 text-left text-white sm:px-4">
-              <p className="text-[10px] font-bold uppercase tracking-wide opacity-90">{teamBName}</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setEditMode(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
-            aria-label="Editar formação e atletas"
-          >
-            <Settings className="h-5 w-5" />
-          </button>
-        </header>
-
         {/* ============ CORPO PRINCIPAL (2 colunas) ============ */}
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
           {/* ---- Coluna 1: QUADRA DE VÔLEI ---- */}

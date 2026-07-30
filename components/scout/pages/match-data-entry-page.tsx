@@ -14,7 +14,7 @@ import { type Set, isSetComplete, getSetWinner, calculateMatchWinner } from "@/l
 import SetDisplay from "@/components/scout/set-display"
 import Card from "@/components/scout/ui/card"
 import AdvancedAnalyticsCharts from "@/components/scout/charts/advanced-analytics-charts"
-import { saveMatch } from "@/lib/scout/match-storage"
+import { saveMatch, saveInProgressMatch, getInProgressMatch, clearInProgressMatch } from "@/lib/scout/match-storage"
 import { syncManager, type SyncMessage } from "@/lib/scout/sync-manager"
 import ConnectionStatus from "@/components/scout/connection-status"
 import { createEmptyRotation, type CourtRotation } from "@/lib/scout/rotation-manager"
@@ -81,6 +81,33 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
   // Barra superior (placar/sets/ações) em modo "cortina": inicia recolhida para
   // liberar a visão do coletor; o analista abre quando quiser ver o placar.
   const [barOpen, setBarOpen] = useState(false)
+
+  // ===== Persistência: autosave de TODAS as ações registradas =====
+  // Grava o estado completo (ações, sets, set atual e extras) a cada mudança.
+  useEffect(() => {
+    if (!matchStarted) return
+    saveInProgressMatch({ matchData, sets, currentSet, rallyExtras })
+  }, [matchStarted, matchData, sets, currentSet, rallyExtras])
+
+  // Restaura a partida em andamento ao montar, para não perder nada num refresh.
+  useEffect(() => {
+    if (matchStarted) return
+    const saved = getInProgressMatch<{
+      matchData: MatchData
+      sets: Set[]
+      currentSet: { number: number; teamAScore: number; teamBScore: number }
+      rallyExtras: unknown[]
+    }>()
+    if (saved?.matchData?.actions?.length) {
+      setMatchData(saved.matchData)
+      setSets(saved.sets ?? [])
+      setCurrentSet(saved.currentSet ?? { number: 1, teamAScore: 0, teamBScore: 0 })
+      setRallyExtras(saved.rallyExtras ?? [])
+      setStats(calculateMatchStats(saved.matchData.actions))
+      setMatchStarted(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!isSynced || !roomId) return
@@ -276,6 +303,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
   }
 
   const handleReset = () => {
+    clearInProgressMatch()
     setMatchStarted(false)
     setMatchData({
       actions: [],
@@ -466,34 +494,48 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
     <div className="flex w-full h-screen flex-col bg-background">
       {isSynced && <ConnectionStatus roomId={roomId} isSynced={isSynced} />}
 
-      {/* ===== Barra superior em CORTINA (retrátil) ===== */}
+      {/* ===== Barra superior ÚNICA: menu + placar + controles (cortina) ===== */}
       <div className="border-b bg-card">
-        {/* Faixa sempre visível: placar compacto + botão para abrir/fechar */}
-        <div className="flex items-center justify-between gap-3 px-4 py-2">
-          <div className="flex items-center gap-3">
-            <span className="rounded-md bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700">
+        {/* Linha sempre visível: menu à esquerda, placar no meio, controles à direita */}
+        <div className="flex items-center justify-between gap-2 px-3 py-2">
+          <CurtainNav
+            value={activeTab}
+            onChange={setActiveTab}
+            options={[
+              { value: "entry", label: "Coleta de Dados" },
+              { value: "stats", label: "Estatísticas" },
+              { value: "spreadsheet", label: "Planilha" },
+              { value: "charts", label: "Gráficos" },
+              { value: "transitions", label: "Transições" },
+            ]}
+          />
+
+          <div className="flex items-center gap-1.5 whitespace-nowrap text-sm font-bold">
+            <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700">
               Set {currentSet.number}
             </span>
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <span className="truncate max-w-[120px] text-blue-600">{matchData.teamAName}</span>
-              <span className="rounded bg-blue-600 px-2 py-0.5 text-white">{currentSet.teamAScore}</span>
-              <span className="text-muted-foreground">x</span>
-              <span className="rounded bg-orange-500 px-2 py-0.5 text-white">{currentSet.teamBScore}</span>
-              <span className="truncate max-w-[120px] text-orange-500">{matchData.teamBName}</span>
-            </div>
+            <span className="rounded bg-blue-600 px-2 py-0.5 text-white">{currentSet.teamAScore}</span>
+            <span className="text-muted-foreground">x</span>
+            <span className="rounded bg-orange-500 px-2 py-0.5 text-white">{currentSet.teamBScore}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setBarOpen((o) => !o)}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
-            aria-expanded={barOpen}
-          >
-            {barOpen ? "Recolher" : "Placar e controles"}
-            <ChevronDown className={`h-4 w-4 transition-transform ${barOpen ? "rotate-180" : ""}`} />
-          </button>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setBarOpen((o) => !o)}
+              className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+              aria-expanded={barOpen}
+              aria-label="Placar e controles"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${barOpen ? "rotate-180" : ""}`} />
+            </button>
+            <Button onClick={handleReset} variant="outline" size="sm">
+              Nova
+            </Button>
+          </div>
         </div>
 
-        {/* Conteúdo da cortina: placar completo + controles do jogo */}
+        {/* Cortina: placar completo + controles do jogo */}
         <div
           className={`overflow-hidden transition-all duration-300 ${barOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
         >
@@ -519,24 +561,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 min-h-0">
-        <div className="flex items-center justify-between gap-2 px-4 py-2 border-b">
-          <CurtainNav
-            value={activeTab}
-            onChange={setActiveTab}
-            options={[
-              { value: "entry", label: "Coleta de Dados" },
-              { value: "stats", label: "Estatísticas" },
-              { value: "spreadsheet", label: "Planilha" },
-              { value: "charts", label: "Gráficos" },
-              { value: "transitions", label: "Transições" },
-            ]}
-          />
-          <Button onClick={handleReset} variant="outline" size="sm">
-            Nova Partida
-          </Button>
-        </div>
-
-        <TabsContent value="entry" className="h-[calc(100%-45px)] overflow-auto">
+        <TabsContent value="entry" className="h-full overflow-auto">
           <SmartDataEntry
             onActionComplete={handleNewAction}
             teamAName={matchData.teamAName}
@@ -552,7 +577,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
 
-        <TabsContent value="stats" className="h-[calc(100%-45px)] overflow-auto p-4">
+        <TabsContent value="stats" className="h-full overflow-auto p-4">
           <ModernStatsDashboard
             stats={stats}
             teamAName={matchData.teamAName}
@@ -562,7 +587,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
 
-        <TabsContent value="spreadsheet" className="h-[calc(100%-45px)] overflow-auto p-4">
+        <TabsContent value="spreadsheet" className="h-full overflow-auto p-4">
           <PlayerStatsSpreadsheet
             actions={matchData.actions}
             teamAName={matchData.teamAName}
@@ -570,7 +595,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
 
-        <TabsContent value="charts" className="h-[calc(100%-45px)] overflow-auto p-4">
+        <TabsContent value="charts" className="h-full overflow-auto p-4">
           <AdvancedAnalyticsCharts
             actions={matchData.actions}
             sets={sets}
@@ -579,7 +604,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
           />
         </TabsContent>
 
-        <TabsContent value="transitions" className="h-[calc(100%-45px)] overflow-auto p-4">
+        <TabsContent value="transitions" className="h-full overflow-auto p-4">
           <TransitionsDashboard
             actions={matchData.actions}
             teamAName={matchData.teamAName}
