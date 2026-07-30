@@ -78,6 +78,10 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
   // que não ocupa espaço fixo em cima do coletor.
   const [activeTab, setActiveTab] = useState("entry")
 
+  // Barra superior (placar/sets/ações) em modo "cortina": inicia recolhida para
+  // liberar a visão do coletor; o analista abre quando quiser ver o placar.
+  const [barOpen, setBarOpen] = useState(false)
+
   useEffect(() => {
     if (!isSynced || !roomId) return
 
@@ -459,29 +463,62 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
   }
 
   return (
-    <div className="w-full h-screen bg-background">
+    <div className="flex w-full h-screen flex-col bg-background">
       {isSynced && <ConnectionStatus roomId={roomId} isSynced={isSynced} />}
 
-      <div className="border-b p-4 bg-card">
-        <div className="flex items-center justify-center mb-3">
-          <SetDisplay
-            sets={sets}
-            currentSet={currentSet}
-            teamAName={matchData.teamAName}
-            teamBName={matchData.teamBName}
-          />
+      {/* ===== Barra superior em CORTINA (retrátil) ===== */}
+      <div className="border-b bg-card">
+        {/* Faixa sempre visível: placar compacto + botão para abrir/fechar */}
+        <div className="flex items-center justify-between gap-3 px-4 py-2">
+          <div className="flex items-center gap-3">
+            <span className="rounded-md bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700">
+              Set {currentSet.number}
+            </span>
+            <div className="flex items-center gap-2 text-sm font-bold">
+              <span className="truncate max-w-[120px] text-blue-600">{matchData.teamAName}</span>
+              <span className="rounded bg-blue-600 px-2 py-0.5 text-white">{currentSet.teamAScore}</span>
+              <span className="text-muted-foreground">x</span>
+              <span className="rounded bg-orange-500 px-2 py-0.5 text-white">{currentSet.teamBScore}</span>
+              <span className="truncate max-w-[120px] text-orange-500">{matchData.teamBName}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBarOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+            aria-expanded={barOpen}
+          >
+            {barOpen ? "Recolher" : "Placar e controles"}
+            <ChevronDown className={`h-4 w-4 transition-transform ${barOpen ? "rotate-180" : ""}`} />
+          </button>
         </div>
-        <div className="flex justify-center gap-2">
-          <Button onClick={handleEndSet} variant="outline" size="sm">
-            Encerrar Set
-          </Button>
-          <Button onClick={handleFinishMatch} variant="destructive" size="sm">
-            Finalizar Jogo
-          </Button>
+
+        {/* Conteúdo da cortina: placar completo + controles do jogo */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ${barOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
+        >
+          <div className="p-4 pt-0">
+            <div className="flex items-center justify-center mb-3">
+              <SetDisplay
+                sets={sets}
+                currentSet={currentSet}
+                teamAName={matchData.teamAName}
+                teamBName={matchData.teamBName}
+              />
+            </div>
+            <div className="flex justify-center gap-2">
+              <Button onClick={handleEndSet} variant="outline" size="sm">
+                Encerrar Set
+              </Button>
+              <Button onClick={handleFinishMatch} variant="destructive" size="sm">
+                Finalizar Jogo
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-[calc(100%-120px)]">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 min-h-0">
         <div className="flex items-center justify-between gap-2 px-4 py-2 border-b">
           <CurtainNav
             value={activeTab}
