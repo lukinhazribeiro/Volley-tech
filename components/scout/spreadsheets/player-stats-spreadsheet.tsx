@@ -153,9 +153,20 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           }
         }
 
-        if (action.serveQuality === "+") playerStats[action.servingPlayer].serve.certo++
-        else if (action.serveQuality === "-") playerStats[action.servingPlayer].serve.erro++
-        else if (action.serveQuality === "ka") playerStats[action.servingPlayer].serve.ace++
+        // IMPORTANTE: só conta o SAQUE na ação que realmente representa o saque.
+        // As demais ações do rally (defesa/ataque/bloqueio) herdam serveQuality
+        // "+" por padrão e o servingPlayer, o que fazia o mesmo saque ser contado
+        // várias vezes. O saque real é: terminal (ace "ka" / erro "-") OU o saque
+        // em jogo, identificado por ter serveZone preenchido.
+        const isServeAction =
+          action.serveQuality === "ka" ||
+          action.serveQuality === "-" ||
+          (action.serveQuality === "+" && !!action.serveZone)
+        if (isServeAction) {
+          if (action.serveQuality === "+") playerStats[action.servingPlayer].serve.certo++
+          else if (action.serveQuality === "-") playerStats[action.servingPlayer].serve.erro++
+          else if (action.serveQuality === "ka") playerStats[action.servingPlayer].serve.ace++
+        }
       }
 
       if (action.actionPlayer && action.actionPlayer > 0 && action.attackingTeam === team) {
