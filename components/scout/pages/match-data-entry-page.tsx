@@ -176,97 +176,81 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
     setMatchStarted(true)
   }
 
-  const handleNewAction = (action: MatchAction) => {
-    // Preserva o ponto já definido no coletor (ex.: ponto direto de rebote na
-    // face 5b+ e erro de levantamento), para que o +1 vá para a equipe correta.
+  // Enriquece uma ação com o set atual e a equipe que pontuou.
+  const enrichAction = (action: MatchAction): MatchAction => {
     let pointScoredBy: "A" | "B" | undefined = action.pointScoredBy
-    
-    // For serve actions with ace (ka)
+
     if (action.serveQuality === "ka") {
       pointScoredBy = action.servingTeam as "A" | "B"
-    }
-    // For serve actions with error (-)
-    else if (action.serveQuality === "-") {
+    } else if (action.serveQuality === "-") {
       pointScoredBy = (action.servingTeam === "A" ? "B" : "A") as "A" | "B"
-    }
-    // Rebote de passe que vira ponto direto: usa a equipe escolhida na face 5b+
-    else if (action.passingQuality === "R" && action.pointType === "point") {
+    } else if (action.passingQuality === "R" && action.pointType === "point") {
       pointScoredBy = action.pointScoredBy
-    }
-    // Erro de levantamento: ponto para a equipe adversária
-    else if (action.resultComplemento === "%") {
+    } else if (action.resultComplemento === "%") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
-    }
-    // For reception errors (D)
-    else if (action.passingQuality === "D") {
+    } else if (action.passingQuality === "D") {
       pointScoredBy = action.servingTeam as "A" | "B"
-    }
-    // For attack actions
-    else if (action.resultComplemento === "#") {
+    } else if (action.resultComplemento === "#") {
       pointScoredBy = action.attackingTeam as "A" | "B"
     } else if (action.resultComplemento === "!") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
     } else if (action.resultComplemento === "+") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
     }
-    
-    const enrichedAction: MatchAction = {
-      ...action,
-      setNumber: currentSet.number,
-      pointScoredBy,
-    }
-    
-    console.log("[v0] Action with point tracking - Set:", currentSet.number, "Point scored by:", pointScoredBy, "Action:", enrichedAction)
-    
-    const updatedActions = [...matchData.actions, enrichedAction]
 
+    return { ...action, setNumber: currentSet.number, pointScoredBy }
+  }
+
+  // Processa TODAS as ações de um rally de uma vez. Corrige o bug em que apenas
+  // a ÚLTIMA ação era salva: um rally emite várias ações em sequência síncrona,
+  // então acumulamos num array local antes de gravar o estado uma única vez —
+  // garantindo que cada saque, recepção, defesa, bloqueio e ataque fique salvo.
+  const handleNewActions = (rawActions: MatchAction[]) => {
+    if (rawActions.length === 0) return
+
+    let acc = matchData.actions
     let newTeamARotation = matchData.teamARotation
     let newTeamBRotation = matchData.teamBRotation
 
-    if (matchData.actions.length > 0) {
-      const previousAction = matchData.actions[matchData.actions.length - 1]
-      const currentAction = action
+    for (const raw of rawActions) {
+      const enriched = enrichAction(raw)
 
-      if (previousAction.servingTeam === "A" && currentAction.servingTeam === "B") {
-        newTeamBRotation = {
-          ...matchData.teamBRotation,
-          currentRotation: rotatePositions(matchData.teamBRotation.currentRotation),
-          rotationHistory: [...matchData.teamBRotation.rotationHistory, matchData.teamBRotation.currentRotation],
+      if (acc.length > 0) {
+        const previousAction = acc[acc.length - 1]
+        if (previousAction.servingTeam === "A" && enriched.servingTeam === "B") {
+          newTeamBRotation = {
+            ...newTeamBRotation,
+            currentRotation: rotatePositions(newTeamBRotation.currentRotation),
+            rotationHistory: [...newTeamBRotation.rotationHistory, newTeamBRotation.currentRotation],
+          }
+        } else if (previousAction.servingTeam === "B" && enriched.servingTeam === "A") {
+          newTeamARotation = {
+            ...newTeamARotation,
+            currentRotation: rotatePositions(newTeamARotation.currentRotation),
+            rotationHistory: [...newTeamARotation.rotationHistory, newTeamARotation.currentRotation],
+          }
         }
-      } else if (previousAction.servingTeam === "B" && currentAction.servingTeam === "A") {
-        newTeamARotation = {
-          ...matchData.teamARotation,
-          currentRotation: rotatePositions(matchData.teamARotation.currentRotation),
-          rotationHistory: [...matchData.teamARotation.rotationHistory, matchData.teamARotation.currentRotation],
-        }
+      }
+
+      acc = [...acc, enriched]
+
+      if (isSynced && roomId) {
+        syncManager.broadcast({ type: "action", data: enriched } as any)
       }
     }
 
     setMatchData({
       ...matchData,
-      actions: updatedActions,
+      actions: acc,
       teamARotation: newTeamARotation,
       teamBRotation: newTeamBRotation,
     })
 
-    if (isSynced && roomId) {
-      syncManager.broadcast({
-        type: "action",
-        data: enrichedAction,
-      } as any)
-    }
-
-    const newStats = calculateMatchStats(updatedActions)
+    const newStats = calculateMatchStats(acc)
     setStats(newStats)
 
-    const currentSetActions = updatedActions.filter((a) => {
-      const actionIndex = updatedActions.indexOf(a)
-      const setStartIndex = sets.reduce((sum, s) => {
-        return sum + (s.teamAScore + s.teamBScore)
-      }, 0)
-      return actionIndex >= setStartIndex
-    })
-
+    const setStartIndex = sets.reduce((sum, s) => sum + (s.teamAScore + s.teamBScore), 0)
+    const currentSetActions = acc.filter((_, idx) => idx >= setStartIndex)
     const currentSetStats = calculateMatchStats(currentSetActions)
 
     const updatedSet = {
@@ -277,12 +261,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
 
     if (isSetComplete(updatedSet.teamAScore, updatedSet.teamBScore)) {
       const winner = getSetWinner(updatedSet.teamAScore, updatedSet.teamBScore)
-      const completedSet = {
-        ...updatedSet,
-        winner: winner as "A" | "B",
-        completedAt: new Date(),
-      }
-
+      const completedSet = { ...updatedSet, winner: winner as "A" | "B", completedAt: new Date() }
       const newSets = [...sets, completedSet]
       setSets(newSets)
 
@@ -291,16 +270,15 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         setShowMatchSummary(true)
         setWaitingSave(true)
       } else {
-        setCurrentSet({
-          number: newSets.length + 1,
-          teamAScore: 0,
-          teamBScore: 0,
-        })
+        setCurrentSet({ number: newSets.length + 1, teamAScore: 0, teamBScore: 0 })
       }
     } else {
       setCurrentSet(updatedSet)
     }
   }
+
+  // Compatibilidade: registra uma única ação (caminhos legados/colaborativo).
+  const handleNewAction = (action: MatchAction) => handleNewActions([action])
 
   const handleReset = () => {
     clearInProgressMatch()
@@ -564,6 +542,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
         <TabsContent value="entry" className="h-full overflow-auto">
           <SmartDataEntry
             onActionComplete={handleNewAction}
+            onActionsBatch={handleNewActions}
             teamAName={matchData.teamAName}
             teamBName={matchData.teamBName}
             teamAScore={currentSet.teamAScore}

@@ -40,6 +40,8 @@ import {
 
 interface SmartDataEntryProps {
   onActionComplete: (action: MatchAction) => void
+  /** Registra todas as ações de um rally de uma vez (evita perder ações). */
+  onActionsBatch?: (actions: MatchAction[]) => void
   teamAName: string
   teamBName: string
   teamAScore: number
@@ -100,6 +102,7 @@ function roleShort(role?: PlayerRole): string {
 
 export default function SmartDataEntry({
   onActionComplete,
+  onActionsBatch,
   teamAName,
   teamBName,
   teamAScore,
@@ -255,7 +258,10 @@ export default function SmartDataEntry({
     if (touches.length === 0) return
     const lastF = touches[touches.length - 1].fundamento
     const result = finalizeRally(touches, end)
-    result.actions.forEach((a) => onActionComplete(a))
+    // Prefere o registro em LOTE para que TODAS as ações do rally sejam salvas
+    // (saque, recepção, defesas, bloqueios e ataque), não apenas a última.
+    if (onActionsBatch) onActionsBatch(result.actions)
+    else result.actions.forEach((a) => onActionComplete(a))
     onRallyExtras?.(result.extras)
     finalizeDisplay(end, lastF)
 
