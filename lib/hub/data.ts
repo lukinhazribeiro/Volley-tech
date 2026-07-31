@@ -260,6 +260,17 @@ export async function listAllEntries(): Promise<HubHistoryEntry[]> {
   return (data ?? []) as HubHistoryEntry[]
 }
 
+export async function listEntriesForTeam(team: string): Promise<HubHistoryEntry[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("hub_history_entries")
+    .select("*")
+    .eq("team", team)
+    .order("season", { ascending: true })
+    .order("match_date", { ascending: true })
+  return (data ?? []) as HubHistoryEntry[]
+}
+
 export async function listImports(limit = 10): Promise<HubImport[]> {
   const supabase = createClient()
   const { data } = await supabase
