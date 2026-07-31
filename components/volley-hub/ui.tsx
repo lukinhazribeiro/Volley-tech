@@ -1,6 +1,6 @@
 "use client"
 
-import type { ComponentType, ReactNode } from "react"
+import type { ReactNode } from "react"
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react"
 import type { Trend } from "@/lib/hub/stats"
 
@@ -51,34 +51,11 @@ export function TrendBadge({ trend }: { trend: Trend }) {
   )
 }
 
-export function EmptyState({
-  title,
-  description,
-  icon: Icon,
-}: {
-  title: string
-  description: string
-  icon?: ComponentType<{ className?: string }>
-}) {
+export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
     <div className="rounded-2xl border border-dashed border-[var(--hub-border)] bg-[var(--hub-surface)]/50 p-8 text-center">
-      {Icon && (
-        <Icon className="mx-auto mb-3 h-8 w-8 text-[var(--hub-muted)]" />
-      )}
       <p className="font-medium text-[var(--hub-text)]">{title}</p>
       <p className="mt-1 text-sm text-[var(--hub-muted)]">{description}</p>
-    </div>
-  )
-}
-
-/** Barra de percentual de um fundamento (alias semântico de StatBar sem label). */
-export function FundamentalBar({ value }: { value: number }) {
-  return (
-    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--hub-bg-deep)]">
-      <div
-        className="h-full rounded-full bg-[var(--hub-accent)]"
-        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
-      />
     </div>
   )
 }
