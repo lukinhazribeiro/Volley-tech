@@ -11,9 +11,10 @@ import {
   logImport,
 } from "@/lib/hub/data"
 import { parseVHA, importVHA } from "@/lib/hub/vha"
+import { buildCandidatesFromScoutView } from "@/lib/hub/scout-view-source"
 import type { MatchResult } from "@/lib/hub/types"
 
-type Mode = "local" | "vha"
+type Mode = "local" | "scout-view" | "vha"
 type Phase = "loading" | "review" | "vha-pick" | "saving" | "done" | "error"
 
 export function ImportWizard({
@@ -25,7 +26,7 @@ export function ImportWizard({
   onClose: () => void
   onDone: () => void
 }) {
-  const [phase, setPhase] = useState<Phase>(mode === "local" ? "loading" : "vha-pick")
+  const [phase, setPhase] = useState<Phase>(mode === "vha" ? "vha-pick" : "loading")
   const [results, setResults] = useState<MatchResult[]>([])
   // Decisão do usuário por índice: athleteId escolhido, "new" ou "skip".
   const [decisions, setDecisions] = useState<Record<number, string>>({})
@@ -33,15 +34,20 @@ export function ImportWizard({
   const [summary, setSummary] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Import local: gera candidatos e roda a associação inteligente.
+  // Import de scout (local ou Scout View IA): gera candidatos e roda a associação.
   useEffect(() => {
-    if (mode !== "local") return
+    if (mode === "vha") return
     ;(async () => {
       try {
-        const candidates = buildCandidatesFromLocalMatches()
+        const candidates =
+          mode === "scout-view"
+            ? await buildCandidatesFromScoutView()
+            : buildCandidatesFromLocalMatches()
         if (candidates.length === 0) {
           setError(
-            "Nenhuma atleta com nome foi encontrada nas partidas salvas. Cadastre os nomes no elenco ao configurar a partida no Scout Volleyball.",
+            mode === "scout-view"
+              ? "Nenhuma atleta com nome foi encontrada nas análises salvas no Scout View IA. Cadastre os nomes no elenco ao configurar a partida."
+              : "Nenhuma atleta com nome foi encontrada nas partidas salvas. Cadastre os nomes no elenco ao configurar a partida no Scout Volleyball.",
           )
           setPhase("error")
           return
@@ -99,13 +105,17 @@ export function ImportWizard({
         toInsert.push({ athleteId, candidate: r.candidate })
       }
 
+      const source = mode === "scout-view" ? "scout_view" : "scout_local"
       let inserted = 0
       // Insere agrupando por atleta para respeitar a checagem de duplicidade.
       for (const item of toInsert) {
-        inserted += await insertHistoryEntries([{ athleteId: item.athleteId, candidate: item.candidate }])
+        inserted += await insertHistoryEntries([
+          { athleteId: item.athleteId, candidate: item.candidate, source },
+        ])
       }
 
-      await logImport("local", `Scout Volleyball (${toInsert.length} atleta(s))`, inserted)
+      const originLabel = mode === "scout-view" ? "Scout View IA" : "Scout Volleyball"
+      await logImport(source, `${originLabel} (${toInsert.length} atleta(s))`, inserted)
       setSummary(`${inserted} capítulo(s) adicionado(s) para ${toInsert.length} atleta(s).`)
       setPhase("done")
     } catch (e) {
@@ -134,7 +144,11 @@ export function ImportWizard({
       <div className="hub-theme max-h-[85vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--hub-border)] bg-[var(--hub-surface)] p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--hub-text)]">
-            {mode === "local" ? "Importar do Scout Volleyball" : "Importar arquivo .vha"}
+            {mode === "local"
+              ? "Importar do Scout Volleyball"
+              : mode === "scout-view"
+                ? "Importar do Scout View IA"
+                : "Importar arquivo .vha"}
           </h2>
           <button
             onClick={onClose}

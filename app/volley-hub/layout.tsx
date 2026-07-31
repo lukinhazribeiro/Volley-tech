@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { HubNav } from "@/components/volley-hub/hub-nav"
+import { HubShell } from "@/components/volley-hub/hub-shell"
 
 export const metadata: Metadata = {
   title: "Volley Hub — Inteligência Esportiva",
@@ -24,8 +24,7 @@ export default async function VolleyHubLayout({
 
   return (
     <div className="hub-theme min-h-screen bg-[var(--hub-bg)] text-[var(--hub-text)]">
-      <HubNav />
-      <div className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 sm:px-6">{children}</div>
+      <HubShell>{children}</HubShell>
     </div>
   )
 }
