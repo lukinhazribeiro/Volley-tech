@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Activity, Target, ClipboardCheck, Video, Users, LogOut, ShieldCheck } from "lucide-react"
+import { Activity, Target, ClipboardCheck, Video, Users, LogOut, ShieldCheck, BrainCircuit } from "lucide-react"
 import { AppCard } from "@/components/hub/app-card"
 import { TrialBanner } from "@/components/hub/trial-banner"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
@@ -60,6 +60,17 @@ const apps = [
     status: "On-line",
     features: ["Atletas", "Financeiro", "Frequência"],
     image: "/images/hub-gestao-clube.svg",
+  },
+  {
+    title: "Volley Hub",
+    subtitle: "Inteligência esportiva",
+    description:
+      "Centro de inteligência que recebe, organiza e interpreta os dados dos módulos. Linha do tempo, evolução, avaliação inteligente e histórico portátil (.vha).",
+    href: "/volley-hub",
+    icon: BrainCircuit,
+    status: "On-line",
+    features: ["Linha do tempo", "Evolução", "Relatórios PDF"],
+    image: "/images/hub-highlight.jpg",
   },
 ]
 
