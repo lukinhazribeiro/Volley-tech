@@ -155,6 +155,51 @@ export async function loadVideoScoutCandidates(): Promise<ImportCandidate[]> {
   return buildCandidatesFromVideoMatches(history)
 }
 
+// ----------------------- Seleção de jogos para importar -----------------------
+
+export interface ImportableMatch {
+  id: string
+  title: string
+  subtitle: string
+  /** true quando há nomes de atletas para associar. */
+  hasRoster: boolean
+}
+
+/** Lista as partidas do Scout Volleyball (localStorage) disponíveis para importar. */
+export function listLocalImportMatches(): { matches: StoredMatch[]; items: ImportableMatch[] } {
+  const matches = getMatches()
+  const items = matches.map((m) => {
+    const rosterCount = (m.teamAPlayers?.length ?? 0) + (m.teamBPlayers?.length ?? 0)
+    return {
+      id: m.id,
+      title: `${m.teamAName} x ${m.teamBName}`,
+      subtitle: `${m.category || "Sem categoria"} · ${new Date(m.completedAt).toLocaleDateString("pt-BR")}`,
+      hasRoster: rosterCount > 0,
+    }
+  })
+  return { matches, items }
+}
+
+/** Lista as partidas do Scout View IA (nuvem) disponíveis para importar. */
+export async function listVideoImportMatches(): Promise<{
+  entries: MatchHistoryEntry[]
+  items: ImportableMatch[]
+}> {
+  const entries = await loadVideoHistory()
+  const items = entries.map((e) => {
+    const named =
+      (e.match?.teamA?.players?.filter((p) => p.name?.trim()).length ?? 0) +
+      (e.match?.teamB?.players?.filter((p) => p.name?.trim()).length ?? 0)
+    return {
+      id: e.id,
+      title: `${e.teamAName} x ${e.teamBName}`,
+      subtitle: `${new Date(e.savedAt).toLocaleDateString("pt-BR")} · ${e.totalAcoes} ações`,
+      hasRoster: named > 0,
+    }
+  })
+  return { entries, items }
+}
+
 // ----------------------- Associação de atletas -----------------------
 
 /**
@@ -242,6 +287,29 @@ export async function createAthlete(input: {
   return data!.id as string
 }
 
+/**
+ * Exclui uma atleta do Hub. Os capítulos de histórico e os aliases associados
+ * são removidos automaticamente (ON DELETE CASCADE). Não afeta os dados de
+ * origem nos módulos de Scout.
+ */
+export async function deleteAthlete(athleteId: string): Promise<void> {
+  const supabase = createClient()
+  const { data: userRes } = await supabase.auth.getUser()
+  const userId = userRes.user?.id
+  if (!userId) throw new Error("Sessão não encontrada. Faça login para usar o Volley Tech.")
+
+  // Remove primeiro os registros dependentes (não dependemos de ON DELETE CASCADE).
+  await supabase.from("hub_history_entries").delete().eq("owner_id", userId).eq("athlete_id", athleteId)
+  await supabase.from("hub_athlete_aliases").delete().eq("owner_id", userId).eq("athlete_id", athleteId)
+
+  const { error } = await supabase
+    .from("hub_athletes")
+    .delete()
+    .eq("id", athleteId)
+    .eq("owner_id", userId)
+  if (error) throw error
+}
+
 /** Grava a associação aprendida para nunca repetir o processo. */
 export async function saveAlias(input: {
   athleteId: string
@@ -273,31 +341,55 @@ export async function saveAlias(input: {
 export async function insertHistoryEntries(
   entries: Array<{ athleteId: string; candidate: ImportCandidate; source?: string }>,
 ): Promise<number> {
+  if (entries.length === 0) return 0
   const supabase = createClient()
   const { data: userRes } = await supabase.auth.getUser()
   const userId = userRes.user?.id
-  if (!userId) throw new Error("Sessão não encontrada.")
+  if (!userId) throw new Error("Sessão não encontrada. Faça login para usar o Volley Tech.")
 
-  const rows = entries.map(({ athleteId, candidate, source }) => ({
-    owner_id: userId,
-    athlete_id: athleteId,
-    source: source ?? "scout_local",
-    team: candidate.team || null,
-    category: candidate.category || null,
-    competition: candidate.competition || null,
-    season: candidate.season || null,
-    match_date: candidate.matchDate,
-    player_number: candidate.playerNumber,
-    position: candidate.position || null,
-    stats: candidate.stats,
-    raw: candidate.raw,
-    fingerprint: candidate.fingerprint,
-  }))
-
-  const { data, error } = await supabase
+  // Deduplicação feita na aplicação (não dependemos de índice único parcial, que
+  // o PostgREST não consegue inferir num upsert): buscamos os fingerprints já
+  // existentes das atletas envolvidas e ignoramos o que já foi importado.
+  const athleteIds = Array.from(new Set(entries.map((e) => e.athleteId)))
+  const { data: existing } = await supabase
     .from("hub_history_entries")
-    .upsert(rows, { onConflict: "owner_id,athlete_id,fingerprint", ignoreDuplicates: true })
-    .select("id")
+    .select("athlete_id, fingerprint")
+    .eq("owner_id", userId)
+    .in("athlete_id", athleteIds)
+
+  const seen = new Set(
+    (existing ?? [])
+      .filter((r) => r.fingerprint)
+      .map((r) => `${r.athlete_id}:${r.fingerprint}`),
+  )
+
+  const rows = entries
+    .filter(({ athleteId, candidate }) => {
+      if (!candidate.fingerprint) return true // sem fingerprint => sempre insere
+      const key = `${athleteId}:${candidate.fingerprint}`
+      if (seen.has(key)) return false // já existe no banco ou já no lote atual
+      seen.add(key)
+      return true
+    })
+    .map(({ athleteId, candidate, source }) => ({
+      owner_id: userId,
+      athlete_id: athleteId,
+      source: source ?? "scout_local",
+      team: candidate.team || null,
+      category: candidate.category || null,
+      competition: candidate.competition || null,
+      season: candidate.season || null,
+      match_date: candidate.matchDate,
+      player_number: candidate.playerNumber,
+      position: candidate.position || null,
+      stats: candidate.stats,
+      raw: candidate.raw,
+      fingerprint: candidate.fingerprint,
+    }))
+
+  if (rows.length === 0) return 0
+
+  const { data, error } = await supabase.from("hub_history_entries").insert(rows).select("id")
   if (error) throw error
   return data?.length ?? 0
 }

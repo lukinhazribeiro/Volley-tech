@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import {
   ResponsiveContainer,
   LineChart,
@@ -14,13 +14,13 @@ import {
 } from "recharts"
 import { AthletePicker } from "./athlete-picker"
 import { HubCard, EvolutionRow, IptvBadge, EmptyState } from "./ui"
-import { getAthlete, listEntriesForAthlete } from "@/lib/hub/data"
+import { getAthlete, listEntriesForAthlete, deleteAthlete } from "@/lib/hub/data"
 import { buildChapters, evolutionSeries, overallTrend } from "@/lib/hub/aggregate"
 import { aggregateFundamentals, FUNDAMENTALS, FUNDAMENTAL_LABELS, successRate, trendFrom } from "@/lib/hub/stats"
 import { computeIPTV, generateEvaluation } from "@/lib/hub/intelligence"
 import { exportAthletePdf } from "@/lib/hub/export-pdf"
 import { Button } from "@/components/ui/button"
-import { FileDown, Sparkles } from "lucide-react"
+import { FileDown, Sparkles, Trash2 } from "lucide-react"
 
 const FUND_COLORS: Record<string, string> = {
   ataque: "var(--chart-1)",
@@ -33,11 +33,28 @@ const FUND_COLORS: Record<string, string> = {
 export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
   const [athleteId, setAthleteId] = useState<string | undefined>(initialAthleteId)
   const [exporting, setExporting] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const { mutate } = useSWRConfig()
 
   const { data, isLoading } = useSWR(athleteId ? ["iptv-atleta", athleteId] : null, async () => {
     const [athlete, entries] = await Promise.all([getAthlete(athleteId!), listEntriesForAthlete(athleteId!)])
     return { athlete, entries }
   })
+
+  async function handleDelete() {
+    if (!athleteId) return
+    setDeleting(true)
+    try {
+      await deleteAthlete(athleteId)
+      // Atualiza a lista do seletor de atletas e limpa a seleção atual.
+      await mutate("hub-athletes-picker")
+      setConfirmingDelete(false)
+      setAthleteId(undefined)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const chapters = data ? buildChapters(data.entries) : []
   const overall = data ? aggregateFundamentals(data.entries.map((e) => e.stats)) : null
@@ -102,7 +119,30 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
                     "Sem dados de posição"}
                 </p>
               </div>
-              <IptvBadge value={computeIPTV(overall)} trend={trend} label="IPTV geral" />
+              <div className="flex items-center gap-3">
+                <IptvBadge value={computeIPTV(overall)} trend={trend} label="IPTV geral" />
+                {confirmingDelete ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Excluir?</span>
+                    <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+                      {deleting ? "Excluindo..." : "Sim, excluir"}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setConfirmingDelete(true)}
+                    aria-label="Excluir atleta"
+                    title="Excluir atleta do histórico"
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
             </div>
           </HubCard>
 

@@ -1,21 +1,26 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { X, CheckCircle2, AlertTriangle, Loader2, UserPlus } from "lucide-react"
+import { X, CheckCircle2, AlertTriangle, Loader2, UserPlus, Calendar } from "lucide-react"
 import {
   buildCandidatesFromLocalMatches,
-  loadVideoScoutCandidates,
+  buildCandidatesFromVideoMatches,
+  listLocalImportMatches,
+  listVideoImportMatches,
   matchCandidates,
   createAthlete,
   saveAlias,
   insertHistoryEntries,
   logImport,
+  type ImportableMatch,
 } from "@/lib/hub/data"
+import type { StoredMatch } from "@/lib/scout/match-storage"
+import type { MatchHistoryEntry } from "@/lib/video-scout/history"
 import { parseVHA, importVHA } from "@/lib/hub/vha"
 import type { ImportCandidate, MatchResult } from "@/lib/hub/types"
 
 type Mode = "local" | "video" | "vha"
-type Phase = "loading" | "review" | "vha-pick" | "saving" | "done" | "error"
+type Phase = "loading" | "pick-matches" | "review" | "vha-pick" | "saving" | "done" | "error"
 
 const MODE_LABEL: Record<Mode, string> = {
   local: "Importar do Scout Volleyball",
@@ -33,6 +38,8 @@ export function ImportWizard({
   onDone: () => void
 }) {
   const [phase, setPhase] = useState<Phase>(mode === "vha" ? "vha-pick" : "loading")
+  const [matchItems, setMatchItems] = useState<ImportableMatch[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<MatchResult[]>([])
   // Decisão do usuário por índice: athleteId escolhido, "new" ou "skip".
   const [decisions, setDecisions] = useState<Record<number, string>>({})
@@ -40,40 +47,86 @@ export function ImportWizard({
   const [summary, setSummary] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Import de módulo (Scout Volleyball ou Scout View IA): gera candidatos e roda
-  // a associação inteligente de atletas.
+  // Guarda os dados brutos das partidas para montar os candidatos ao confirmar.
+  const localMatchesRef = useRef<StoredMatch[]>([])
+  const videoEntriesRef = useRef<MatchHistoryEntry[]>([])
+
+  // Carrega a lista de jogos salvos para o usuário escolher o que importar.
   useEffect(() => {
     if (mode === "vha") return
     ;(async () => {
       try {
-        const candidates: ImportCandidate[] =
-          mode === "video" ? await loadVideoScoutCandidates() : buildCandidatesFromLocalMatches()
-        if (candidates.length === 0) {
-          setError(
-            mode === "video"
-              ? "Nenhuma atleta com nome foi encontrada no histórico do Scout View IA. Preencha os nomes do elenco no painel de análise antes de importar."
-              : "Nenhuma atleta com nome foi encontrada nas partidas salvas. Cadastre os nomes no elenco ao configurar a partida no Scout Volleyball.",
-          )
-          setPhase("error")
-          return
+        if (mode === "local") {
+          const { matches, items } = listLocalImportMatches()
+          localMatchesRef.current = matches
+          setMatchItems(items)
+        } else {
+          const { entries, items } = await listVideoImportMatches()
+          videoEntriesRef.current = entries
+          setMatchItems(items)
         }
-        const matched = await matchCandidates(candidates)
-        setResults(matched)
-        // Pré-preenche decisões: exact/new já resolvidos; ambíguos aguardam.
-        const initial: Record<number, string> = {}
-        matched.forEach((r, i) => {
-          if (r.status === "exact") initial[i] = r.athleteId!
-          else if (r.status === "new") initial[i] = "new"
-          else initial[i] = "" // ambíguo: pendente
-        })
-        setDecisions(initial)
-        setPhase("review")
+        setPhase("pick-matches")
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Falha ao ler o histórico local.")
+        setError(e instanceof Error ? e.message : "Falha ao ler os jogos salvos.")
         setPhase("error")
       }
     })()
   }, [mode])
+
+  function toggle(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    setSelectedIds((prev) => {
+      if (prev.size === matchItems.length) return new Set()
+      return new Set(matchItems.map((m) => m.id))
+    })
+  }
+
+  // Da seleção de jogos, monta os candidatos e roda a associação inteligente.
+  async function handleContinueFromPick() {
+    setPhase("loading")
+    try {
+      let candidates: ImportCandidate[]
+      if (mode === "local") {
+        const selected = localMatchesRef.current.filter((m) => selectedIds.has(m.id))
+        candidates = buildCandidatesFromLocalMatches(selected)
+      } else {
+        const selected = videoEntriesRef.current.filter((e) => selectedIds.has(e.id))
+        candidates = buildCandidatesFromVideoMatches(selected)
+      }
+
+      if (candidates.length === 0) {
+        setError(
+          mode === "video"
+            ? "Os jogos selecionados não têm atletas com nome. Preencha os nomes do elenco no Scout View IA antes de importar."
+            : "Os jogos selecionados não têm atletas com nome. Cadastre os nomes do elenco ao configurar a partida no Scout Volleyball.",
+        )
+        setPhase("error")
+        return
+      }
+
+      const matched = await matchCandidates(candidates)
+      setResults(matched)
+      const initial: Record<number, string> = {}
+      matched.forEach((r, i) => {
+        if (r.status === "exact") initial[i] = r.athleteId!
+        else if (r.status === "new") initial[i] = "new"
+        else initial[i] = ""
+      })
+      setDecisions(initial)
+      setPhase("review")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao preparar a importação.")
+      setPhase("error")
+    }
+  }
 
   const pendingAmbiguous = results.some((r, i) => r.status === "ambiguous" && !decisions[i])
 
@@ -112,7 +165,6 @@ export function ImportWizard({
 
       const source = mode === "video" ? "scout_video" : "scout_local"
       let inserted = 0
-      // Insere agrupando por atleta para respeitar a checagem de duplicidade.
       for (const item of toInsert) {
         inserted += await insertHistoryEntries([
           { athleteId: item.athleteId, candidate: item.candidate, source },
@@ -121,7 +173,11 @@ export function ImportWizard({
 
       const originLabel = mode === "video" ? "Scout View IA" : "Scout Volleyball"
       await logImport(mode, `${originLabel} (${toInsert.length} atleta(s))`, inserted)
-      setSummary(`${inserted} capítulo(s) adicionado(s) para ${toInsert.length} atleta(s).`)
+      setSummary(
+        inserted > 0
+          ? `${inserted} capítulo(s) adicionado(s) para ${toInsert.length} atleta(s).`
+          : "Nada novo para importar — esses scouts já estavam no histórico.",
+      )
       setPhase("done")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao salvar a importação.")
@@ -169,6 +225,89 @@ export function ImportWizard({
           <div className="flex items-center gap-2 py-8 text-[var(--hub-muted)]">
             <Loader2 className="h-4 w-4 animate-spin" />
             Salvando…
+          </div>
+        )}
+
+        {phase === "pick-matches" && (
+          <div>
+            {matchItems.length === 0 ? (
+              <div className="py-8 text-center">
+                <Calendar className="mx-auto mb-3 h-10 w-10 text-[var(--hub-muted)]" />
+                <p className="font-medium text-[var(--hub-text)]">Nenhum jogo salvo encontrado</p>
+                <p className="mt-1 text-sm text-[var(--hub-muted)]">
+                  {mode === "video"
+                    ? "Salve uma análise no Scout View IA para importá-la aqui."
+                    : "Finalize e salve uma partida no Scout Volleyball para importá-la aqui."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm text-[var(--hub-muted)]">
+                    Selecione os jogos que deseja importar.
+                  </p>
+                  <button
+                    onClick={toggleAll}
+                    className="text-xs font-medium text-[var(--hub-accent)] hover:underline"
+                  >
+                    {selectedIds.size === matchItems.length ? "Limpar seleção" : "Selecionar todos"}
+                  </button>
+                </div>
+                <ul className="space-y-2">
+                  {matchItems.map((m) => {
+                    const checked = selectedIds.has(m.id)
+                    return (
+                      <li key={m.id}>
+                        <button
+                          onClick={() => toggle(m.id)}
+                          className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                            checked
+                              ? "border-[var(--hub-accent)] bg-[var(--hub-accent)]/10"
+                              : "border-[var(--hub-border)] bg-[var(--hub-bg-deep)]/40 hover:border-[var(--hub-muted)]"
+                          }`}
+                        >
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                              checked
+                                ? "border-[var(--hub-accent)] bg-[var(--hub-accent)] text-black"
+                                : "border-[var(--hub-border)]"
+                            }`}
+                          >
+                            {checked && <CheckCircle2 className="h-4 w-4" />}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-[var(--hub-text)]">
+                              {m.title}
+                            </span>
+                            <span className="block text-xs text-[var(--hub-muted)]">{m.subtitle}</span>
+                          </span>
+                          {!m.hasRoster && (
+                            <span className="shrink-0 rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] text-amber-400">
+                              sem nomes
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    onClick={onClose}
+                    className="rounded-lg border border-[var(--hub-border)] px-4 py-2 text-sm text-[var(--hub-muted)] hover:text-[var(--hub-text)]"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleContinueFromPick}
+                    disabled={selectedIds.size === 0}
+                    className="rounded-lg bg-[var(--hub-accent)] px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Continuar ({selectedIds.size})
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
