@@ -7,6 +7,9 @@
 
 import { createClient } from "@/lib/supabase/client"
 import { getMatches, type StoredMatch, type StoredPlayer } from "@/lib/scout/match-storage"
+import { loadHistory as loadVideoHistory, type MatchHistoryEntry } from "@/lib/video-scout/history"
+import type { MatchState } from "@/lib/video-scout/match"
+import type { Fundamento, Resultado } from "@/lib/video-scout/types"
 import { extractTeamPlayerStats, type PlayerFundamentals } from "./stats"
 import type { HubAthlete, HubHistoryEntry, HubImport, ImportCandidate, MatchResult } from "./types"
 
@@ -63,6 +66,93 @@ export function buildCandidatesFromLocalMatches(matches: StoredMatch[] = getMatc
   }
 
   return candidates
+}
+
+// ----------------------- Leitura do Scout View IA -----------------------
+
+/** Só os 5 fundamentos do Hub têm equivalência direta (levantamento é ignorado). */
+const VIDEO_FUNDAMENTO_MAP: Partial<Record<Fundamento, keyof PlayerFundamentals>> = {
+  saque: "saque",
+  recepcao: "recepcao",
+  ataque: "ataque",
+  bloqueio: "bloqueio",
+  defesa: "defesa",
+}
+
+function emptyFund(): PlayerFundamentals {
+  const c = () => ({ certo: 0, erro: 0, ponto: 0, total: 0 })
+  return { ataque: c(), recepcao: c(), defesa: c(), bloqueio: c(), saque: c() }
+}
+
+function applyVideoResult(f: PlayerFundamentals, key: keyof PlayerFundamentals, resultado: Resultado) {
+  const bucket = f[key]
+  bucket.total++
+  if (resultado === "ponto") bucket.ponto++
+  else if (resultado === "erro") bucket.erro++
+  else bucket.certo++ // continuidade = ação positiva mantida em jogo
+}
+
+/**
+ * Converte o histórico do Scout View IA (partidas por vídeo, guardadas na nuvem)
+ * em candidatos de importação — um por atleta com nome. Lê apenas; nunca altera
+ * os dados do módulo de vídeo.
+ */
+export function buildCandidatesFromVideoMatches(entries: MatchHistoryEntry[]): ImportCandidate[] {
+  const candidates: ImportCandidate[] = []
+
+  for (const entry of entries) {
+    const match: MatchState = entry.match
+    if (!match?.teamA || !match?.teamB) continue
+
+    const season = new Date(entry.savedAt).getFullYear().toString()
+    const competition = `${entry.teamAName} x ${entry.teamBName}`
+    const matchDate = new Date(entry.savedAt).toISOString().slice(0, 10)
+
+    const sides = [
+      { cfg: match.teamA, side: "casa" as const },
+      { cfg: match.teamB, side: "adversario" as const },
+    ]
+
+    for (const { cfg, side } of sides) {
+      for (const player of cfg.players) {
+        const fullName = player.name?.trim()
+        if (!fullName) continue
+
+        const fundamentals = emptyFund()
+        let hasData = false
+        for (const action of match.actions) {
+          if (action.playerId !== player.id) continue
+          const key = VIDEO_FUNDAMENTO_MAP[action.fundamento]
+          if (!key) continue
+          applyVideoResult(fundamentals, key, action.resultado)
+          hasData = true
+        }
+        if (!hasData) continue
+
+        candidates.push({
+          fullName,
+          team: cfg.name,
+          category: "",
+          position: player.role ? player.role : "",
+          playerNumber: player.number,
+          competition,
+          season,
+          matchDate,
+          stats: fundamentals,
+          fingerprint: `vs:${entry.id}:${side}:${player.number}`,
+          raw: { source: "scout_video", historyId: entry.id, side, number: player.number },
+        })
+      }
+    }
+  }
+
+  return candidates
+}
+
+/** Lê o histórico do Scout View IA (nuvem) e retorna candidatos de importação. */
+export async function loadVideoScoutCandidates(): Promise<ImportCandidate[]> {
+  const history = await loadVideoHistory()
+  return buildCandidatesFromVideoMatches(history)
 }
 
 // ----------------------- Associação de atletas -----------------------

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { X, CheckCircle2, AlertTriangle, Loader2, UserPlus } from "lucide-react"
 import {
   buildCandidatesFromLocalMatches,
+  loadVideoScoutCandidates,
   matchCandidates,
   createAthlete,
   saveAlias,
@@ -11,10 +12,16 @@ import {
   logImport,
 } from "@/lib/hub/data"
 import { parseVHA, importVHA } from "@/lib/hub/vha"
-import type { MatchResult } from "@/lib/hub/types"
+import type { ImportCandidate, MatchResult } from "@/lib/hub/types"
 
-type Mode = "local" | "vha"
+type Mode = "local" | "video" | "vha"
 type Phase = "loading" | "review" | "vha-pick" | "saving" | "done" | "error"
+
+const MODE_LABEL: Record<Mode, string> = {
+  local: "Importar do Scout Volleyball",
+  video: "Importar do Scout View IA",
+  vha: "Importar arquivo .vha",
+}
 
 export function ImportWizard({
   mode,
@@ -25,7 +32,7 @@ export function ImportWizard({
   onClose: () => void
   onDone: () => void
 }) {
-  const [phase, setPhase] = useState<Phase>(mode === "local" ? "loading" : "vha-pick")
+  const [phase, setPhase] = useState<Phase>(mode === "vha" ? "vha-pick" : "loading")
   const [results, setResults] = useState<MatchResult[]>([])
   // Decisão do usuário por índice: athleteId escolhido, "new" ou "skip".
   const [decisions, setDecisions] = useState<Record<number, string>>({})
@@ -33,15 +40,19 @@ export function ImportWizard({
   const [summary, setSummary] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Import local: gera candidatos e roda a associação inteligente.
+  // Import de módulo (Scout Volleyball ou Scout View IA): gera candidatos e roda
+  // a associação inteligente de atletas.
   useEffect(() => {
-    if (mode !== "local") return
+    if (mode === "vha") return
     ;(async () => {
       try {
-        const candidates = buildCandidatesFromLocalMatches()
+        const candidates: ImportCandidate[] =
+          mode === "video" ? await loadVideoScoutCandidates() : buildCandidatesFromLocalMatches()
         if (candidates.length === 0) {
           setError(
-            "Nenhuma atleta com nome foi encontrada nas partidas salvas. Cadastre os nomes no elenco ao configurar a partida no Scout Volleyball.",
+            mode === "video"
+              ? "Nenhuma atleta com nome foi encontrada no histórico do Scout View IA. Preencha os nomes do elenco no painel de análise antes de importar."
+              : "Nenhuma atleta com nome foi encontrada nas partidas salvas. Cadastre os nomes no elenco ao configurar a partida no Scout Volleyball.",
           )
           setPhase("error")
           return
@@ -99,13 +110,17 @@ export function ImportWizard({
         toInsert.push({ athleteId, candidate: r.candidate })
       }
 
+      const source = mode === "video" ? "scout_video" : "scout_local"
       let inserted = 0
       // Insere agrupando por atleta para respeitar a checagem de duplicidade.
       for (const item of toInsert) {
-        inserted += await insertHistoryEntries([{ athleteId: item.athleteId, candidate: item.candidate }])
+        inserted += await insertHistoryEntries([
+          { athleteId: item.athleteId, candidate: item.candidate, source },
+        ])
       }
 
-      await logImport("local", `Scout Volleyball (${toInsert.length} atleta(s))`, inserted)
+      const originLabel = mode === "video" ? "Scout View IA" : "Scout Volleyball"
+      await logImport(mode, `${originLabel} (${toInsert.length} atleta(s))`, inserted)
       setSummary(`${inserted} capítulo(s) adicionado(s) para ${toInsert.length} atleta(s).`)
       setPhase("done")
     } catch (e) {
@@ -133,9 +148,7 @@ export function ImportWizard({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="hub-theme max-h-[85vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--hub-border)] bg-[var(--hub-surface)] p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--hub-text)]">
-            {mode === "local" ? "Importar do Scout Volleyball" : "Importar arquivo .vha"}
-          </h2>
+          <h2 className="text-lg font-semibold text-[var(--hub-text)]">{MODE_LABEL[mode]}</h2>
           <button
             onClick={onClose}
             className="rounded-full p-1 text-[var(--hub-muted)] hover:bg-[var(--hub-bg-deep)] hover:text-[var(--hub-text)]"
