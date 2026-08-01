@@ -7,6 +7,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client"
+import { describeDbError } from "./data"
 import { computeIPTV, generateEvaluation } from "./intelligence"
 import { buildChapters, evolutionSeries } from "./aggregate"
 import {
@@ -171,11 +172,26 @@ export async function importVHA(vha: VHAFile): Promise<{ athleteId: string; inse
     fingerprint: h.fingerprint || `vha:${vha.athlete.fullName}:${h.season}:${h.competition}:${i}`,
   }))
 
-  const { data: insertedRows, error: insErr } = await supabase
+  // Deduplicação na aplicação (não há constraint UNIQUE para onConflict).
+  const { data: existingEntries } = await supabase
     .from("hub_history_entries")
-    .upsert(rows, { onConflict: "owner_id,athlete_id,fingerprint", ignoreDuplicates: true })
-    .select("id")
-  if (insErr) throw insErr
+    .select("fingerprint")
+    .eq("owner_id", userId)
+    .eq("athlete_id", athleteId)
+  const seen = new Set((existingEntries ?? []).map((r) => r.fingerprint).filter(Boolean))
+  const newRows = rows.filter((r) => {
+    if (!r.fingerprint) return true
+    if (seen.has(r.fingerprint)) return false
+    seen.add(r.fingerprint)
+    return true
+  })
+
+  let insertedRows: { id: string }[] = []
+  if (newRows.length > 0) {
+    const { data, error: insErr } = await supabase.from("hub_history_entries").insert(newRows).select("id")
+    if (insErr) throw describeDbError(insErr, "Falha ao salvar os capítulos do arquivo .vha.")
+    insertedRows = data ?? []
+  }
 
   await supabase.from("hub_imports").insert({
     owner_id: userId,

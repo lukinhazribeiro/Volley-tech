@@ -21,6 +21,22 @@ function norm(s: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, "")
 }
 
+/**
+ * Erros do Supabase (PostgrestError) são objetos simples, não instâncias de
+ * Error — por isso a UI mostrava mensagem genérica. Este helper extrai a
+ * mensagem real (com código/dica do Postgres) para exibir ao usuário.
+ */
+export function describeDbError(error: unknown, fallback: string): Error {
+  if (error instanceof Error) return error
+  if (error && typeof error === "object") {
+    const e = error as { message?: string; details?: string; hint?: string; code?: string }
+    const parts = [e.message, e.details, e.hint].filter(Boolean)
+    const msg = parts.length ? parts.join(" — ") : fallback
+    return new Error(e.code ? `${msg} (código ${e.code})` : msg)
+  }
+  return new Error(fallback)
+}
+
 // ----------------------- Leitura de scouts locais -----------------------
 
 /**
@@ -283,14 +299,13 @@ export async function createAthlete(input: {
     })
     .select("id")
     .single()
-  if (error) throw error
+  if (error) throw describeDbError(error, "Falha ao criar a atleta.")
   return data!.id as string
 }
 
 /**
- * Exclui uma atleta do Hub. Os capítulos de histórico e os aliases associados
- * são removidos automaticamente (ON DELETE CASCADE). Não afeta os dados de
- * origem nos módulos de Scout.
+ * Exclui uma atleta do Hub, junto com seus capítulos de histórico e aliases.
+ * Não afeta os dados de origem nos módulos de Scout.
  */
 export async function deleteAthlete(athleteId: string): Promise<void> {
   const supabase = createClient()
@@ -298,16 +313,20 @@ export async function deleteAthlete(athleteId: string): Promise<void> {
   const userId = userRes.user?.id
   if (!userId) throw new Error("Sessão não encontrada. Faça login para usar o Volley Tech.")
 
-  // Remove primeiro os registros dependentes (não dependemos de ON DELETE CASCADE).
-  await supabase.from("hub_history_entries").delete().eq("owner_id", userId).eq("athlete_id", athleteId)
-  await supabase.from("hub_athlete_aliases").delete().eq("owner_id", userId).eq("athlete_id", athleteId)
+  console.log("[v0] deleteAthlete:", athleteId)
 
-  const { error } = await supabase
-    .from("hub_athletes")
-    .delete()
-    .eq("id", athleteId)
-    .eq("owner_id", userId)
-  if (error) throw error
+  // Remove primeiro os registros dependentes (garantia extra além do cascade).
+  const del1 = await supabase.from("hub_history_entries").delete().eq("owner_id", userId).eq("athlete_id", athleteId)
+  if (del1.error) throw describeDbError(del1.error, "Falha ao remover os capítulos da atleta.")
+
+  const del2 = await supabase.from("hub_athlete_aliases").delete().eq("owner_id", userId).eq("athlete_id", athleteId)
+  if (del2.error) throw describeDbError(del2.error, "Falha ao remover as associações da atleta.")
+
+  const { error } = await supabase.from("hub_athletes").delete().eq("id", athleteId).eq("owner_id", userId)
+  if (error) {
+    console.log("[v0] deleteAthlete ERRO:", JSON.stringify(error))
+    throw describeDbError(error, "Falha ao excluir a atleta.")
+  }
 }
 
 /** Grava a associação aprendida para nunca repetir o processo. */
@@ -389,8 +408,12 @@ export async function insertHistoryEntries(
 
   if (rows.length === 0) return 0
 
+  console.log("[v0] insertHistoryEntries: inserindo", rows.length, "linha(s)", rows[0])
   const { data, error } = await supabase.from("hub_history_entries").insert(rows).select("id")
-  if (error) throw error
+  if (error) {
+    console.log("[v0] insertHistoryEntries ERRO:", JSON.stringify(error))
+    throw describeDbError(error, "Falha ao salvar os capítulos no histórico.")
+  }
   return data?.length ?? 0
 }
 
@@ -400,12 +423,14 @@ export async function logImport(kind: string, label: string, count: number): Pro
   const { data: userRes } = await supabase.auth.getUser()
   const userId = userRes.user?.id
   if (!userId) return
-  await supabase.from("hub_imports").insert({
+  // Log do Dashboard: nunca deve derrubar uma importação bem-sucedida.
+  const { error } = await supabase.from("hub_imports").insert({
     owner_id: userId,
     kind,
     label,
     entries_count: count,
   })
+  if (error) console.log("[v0] logImport falhou (ignorado):", JSON.stringify(error))
 }
 
 // ----------------------- Consultas -----------------------

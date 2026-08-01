@@ -35,6 +35,7 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
   const [exporting, setExporting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
   const { mutate } = useSWRConfig()
 
   const { data, isLoading } = useSWR(athleteId ? ["iptv-atleta", athleteId] : null, async () => {
@@ -45,12 +46,15 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
   async function handleDelete() {
     if (!athleteId) return
     setDeleting(true)
+    setDeleteError("")
     try {
       await deleteAthlete(athleteId)
       // Atualiza a lista do seletor de atletas e limpa a seleção atual.
       await mutate("hub-athletes-picker")
       setConfirmingDelete(false)
       setAthleteId(undefined)
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Não foi possível excluir a atleta.")
     } finally {
       setDeleting(false)
     }
@@ -144,6 +148,11 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
                 )}
               </div>
             </div>
+            {deleteError && (
+              <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+                {deleteError}
+              </p>
+            )}
           </HubCard>
 
           {/* Evolução — gráfico */}
