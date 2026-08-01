@@ -102,7 +102,7 @@ export async function exportAthletePdf(athlete: HubAthlete, entries: HubHistoryE
   doc.setTextColor(...C.orange)
   doc.setFont("helvetica", "bold")
   doc.setFontSize(8)
-  doc.text("VOLLEY TECH  ·  VOLLEY HUB", textX, y + 22)
+  doc.text("VOLLEY TECH  ·  INTELIGÊNCIA ESPORTIVA", textX, y + 22)
   doc.setTextColor(...C.white)
   doc.setFontSize(20)
   doc.text("Perfil da Atleta", textX, y + 46)
@@ -262,12 +262,12 @@ export async function exportAthletePdf(athlete: HubAthlete, entries: HubHistoryE
     doc.setFont("helvetica", "normal")
     doc.setFontSize(7)
     doc.setTextColor(...C.slate400)
-    doc.text("Volley Tech · Volley Hub", footTextX, pageH - 16)
+    doc.text("Volley Tech · Inteligência Esportiva", footTextX, pageH - 16)
     doc.text(`Página ${p} de ${pageCount}`, pageW - M, pageH - 16, { align: "right" })
   }
 
   const safe = athlete.full_name.trim().replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "atleta"
-  doc.save(`volley-hub-${safe}.pdf`)
+  doc.save(`volley-tech-${safe}.pdf`)
 }
 
 function bestFundamental(pcts: Record<string, number>): string {

@@ -49,7 +49,7 @@ export function HubTimeline() {
       ) : chapters.length === 0 ? (
         <EmptyState
           title="Sem capítulos"
-          description="Esta atleta ainda não tem histórico importado no Volley Hub."
+          description="Esta atleta ainda não tem histórico importado no Volley Tech."
         />
       ) : (
         <div>

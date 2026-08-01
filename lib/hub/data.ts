@@ -225,7 +225,7 @@ export async function createAthlete(input: {
   const supabase = createClient()
   const { data: userRes } = await supabase.auth.getUser()
   const userId = userRes.user?.id
-  if (!userId) throw new Error("Sessão não encontrada. Faça login para usar o Volley Hub.")
+  if (!userId) throw new Error("Sessão não encontrada. Faça login para usar o Volley Tech.")
 
   const { data, error } = await supabase
     .from("hub_athletes")

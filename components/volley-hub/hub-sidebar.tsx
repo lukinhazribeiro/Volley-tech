@@ -15,15 +15,14 @@ import {
   User,
   Users2,
   FileText,
-  Crown,
   LogOut,
   ShieldCheck,
   Menu,
   X,
-  BrainCircuit,
   ExternalLink,
   type LucideIcon,
 } from "lucide-react"
+import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
 import { VOLLEY_MODULES } from "@/lib/hub/modules"
 import { clearStoredUser, getStoredUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/client"
@@ -87,8 +86,10 @@ export function HubSidebar() {
           <Menu className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2">
-          <BrainCircuit className="h-5 w-5 text-[var(--hub-accent)]" />
-          <span className="font-semibold tracking-tight">Volley Hub</span>
+          <VolleyTechLogo className="h-6 w-6" />
+          <span className="font-semibold tracking-tight">
+            Volley <span className="text-[var(--hub-accent)]">Tech</span>
+          </span>
         </div>
       </header>
 
@@ -110,12 +111,10 @@ export function HubSidebar() {
         {/* Logo + fechar (mobile) */}
         <div className="flex items-center justify-between px-5 pb-4 pt-5">
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--hub-accent)]/15">
-              <BrainCircuit className="h-5 w-5 text-[var(--hub-accent)]" />
-            </span>
+            <VolleyTechLogo className="h-10 w-10" />
             <span className="leading-tight">
               <span className="block font-bold tracking-tight">
-                VOLLEY <span className="text-[var(--hub-accent)]">HUB</span>
+                VOLLEY <span className="text-[var(--hub-accent)]">TECH</span>
               </span>
               <span className="block text-[10px] uppercase tracking-widest text-[var(--hub-muted)]">
                 Centro de inteligência
@@ -209,9 +208,9 @@ export function HubSidebar() {
           </button>
         </nav>
 
-        {/* Identidade + Card Plano Premium */}
+        {/* Identidade do usuário */}
         <div className="border-t border-[var(--hub-border)] p-4">
-          <div className="mb-3 flex items-center gap-3 px-1">
+          <div className="flex items-center gap-3 px-1">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--hub-accent)]/15 text-sm font-semibold text-[var(--hub-accent)]">
               {displayName.charAt(0).toUpperCase()}
             </span>
@@ -219,19 +218,6 @@ export function HubSidebar() {
               <p className="truncate text-sm font-medium text-[var(--hub-text)]">{displayName}</p>
               <p className="text-xs text-[var(--hub-muted)]">Treinador</p>
             </div>
-          </div>
-          <div className="rounded-2xl border border-[var(--hub-accent)]/30 bg-[var(--hub-surface)] p-4">
-            <div className="mb-1 flex items-center gap-2">
-              <Crown className="h-4 w-4 text-[var(--hub-accent)]" />
-              <span className="text-sm font-semibold text-[var(--hub-text)]">Plano Premium</span>
-            </div>
-            <p className="mb-3 text-xs text-[var(--hub-muted)]">Inteligência completa do voleibol.</p>
-            <Link
-              href="/subscription"
-              className="flex w-full items-center justify-center rounded-lg bg-[var(--hub-accent)] px-3 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90"
-            >
-              Gerenciar plano
-            </Link>
           </div>
         </div>
       </aside>

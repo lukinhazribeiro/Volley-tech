@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { HubShell } from "@/components/volley-hub/hub-shell"
 
 export const metadata: Metadata = {
-  title: "Volley Hub — Inteligência Esportiva",
+  title: "Volley Tech — Inteligência Esportiva",
   description:
     "Centro de inteligência da Volley Tech: histórico permanente, linha do tempo, evolução, avaliação inteligente e histórico portátil (.vha) de atletas e equipes.",
 }

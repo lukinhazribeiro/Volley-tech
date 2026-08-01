@@ -90,7 +90,7 @@ export function HubHistoryView() {
       ) : byAthlete.length === 0 ? (
         <EmptyState
           title="Nenhum histórico importado"
-          description="Use uma das ferramentas acima para trazer scouts para o Volley Hub."
+          description="Use uma das ferramentas acima para trazer scouts para o Volley Tech."
         />
       ) : (
         <div className="space-y-4">

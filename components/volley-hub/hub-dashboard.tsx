@@ -133,7 +133,7 @@ export function HubDashboard() {
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Bem-vindo ao <span className="text-[var(--hub-accent)]">Volley Hub</span>, {firstName}!
+            Bem-vindo ao <span className="text-[var(--hub-accent)]">Volley Tech</span>, {firstName}!
           </h1>
           <p className="mt-1 text-sm text-[var(--hub-muted)]">
             Sua central de inteligência e histórico no voleibol.

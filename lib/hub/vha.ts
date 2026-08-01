@@ -122,7 +122,7 @@ export async function importVHA(vha: VHAFile): Promise<{ athleteId: string; inse
   const supabase = createClient()
   const { data: userRes } = await supabase.auth.getUser()
   const userId = userRes.user?.id
-  if (!userId) throw new Error("Sessão não encontrada. Faça login para usar o Volley Hub.")
+  if (!userId) throw new Error("Sessão não encontrada. Faça login para usar o Volley Tech.")
 
   // Localizar atleta existente
   const { data: athletes } = await supabase.from("hub_athletes").select("*")

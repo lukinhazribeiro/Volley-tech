@@ -175,7 +175,7 @@ export function ImportWizard({
         {phase === "vha-pick" && (
           <div className="py-6">
             <p className="mb-4 text-sm text-[var(--hub-muted)]">
-              Selecione um arquivo .vha. O Volley Hub localizará a atleta e acrescentará os capítulos —
+              Selecione um arquivo .vha. O Volley Tech localizará a atleta e acrescentará os capítulos —
               sem sobrescrever nada.
             </p>
             <input
