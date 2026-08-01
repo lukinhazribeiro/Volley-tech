@@ -16,7 +16,8 @@ import {
   Users2,
   FileText,
   Crown,
-  ArrowLeft,
+  LogOut,
+  ShieldCheck,
   Menu,
   X,
   BrainCircuit,
@@ -24,6 +25,9 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { VOLLEY_MODULES } from "@/lib/hub/modules"
+import { clearStoredUser, getStoredUser } from "@/lib/auth"
+import { createClient } from "@/lib/supabase/client"
+import { isAdminEmail } from "@/lib/subscription"
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   "scout-volleyball": Activity,
@@ -44,11 +48,29 @@ const hubItems: { href: string; label: string; icon: LucideIcon; exact?: boolean
 export function HubSidebar() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [displayName, setDisplayName] = useState("Treinador")
+  const [isAdmin, setIsAdmin] = useState(false)
 
   // Fecha a cortina ao navegar (mobile).
   useEffect(() => {
     setOpen(false)
   }, [pathname])
+
+  useEffect(() => {
+    const u = getStoredUser()
+    setDisplayName(u?.name || u?.email?.split("@")[0] || "Treinador")
+    setIsAdmin(isAdminEmail(u?.email))
+  }, [])
+
+  async function handleSignOut() {
+    try {
+      await createClient().auth.signOut()
+    } catch {
+      // ignora erro de signOut
+    }
+    clearStoredUser()
+    window.location.assign("/")
+  }
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(href + "/")
@@ -87,7 +109,7 @@ export function HubSidebar() {
       >
         {/* Logo + fechar (mobile) */}
         <div className="flex items-center justify-between px-5 pb-4 pt-5">
-          <Link href="/volley-hub" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--hub-accent)]/15">
               <BrainCircuit className="h-5 w-5 text-[var(--hub-accent)]" />
             </span>
@@ -110,11 +132,11 @@ export function HubSidebar() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-4">
-          {/* Dashboard */}
+          {/* Dashboard (página inicial do Hub) */}
           <Link
-            href="/volley-hub"
+            href="/"
             className={`mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-              isActive("/volley-hub", true)
+              isActive("/", true)
                 ? "bg-[var(--hub-accent)] text-black"
                 : "text-[var(--hub-muted)] hover:bg-[var(--hub-surface)] hover:text-[var(--hub-text)]"
             }`}
@@ -165,21 +187,39 @@ export function HubSidebar() {
             )
           })}
 
-          {/* Voltar ao hub principal */}
+          {/* Conta */}
           <p className="px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--hub-muted)]">
-            Configurações
+            Conta
           </p>
-          <Link
-            href="/"
-            className="mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--hub-muted)] transition-colors hover:bg-[var(--hub-surface)] hover:text-[var(--hub-text)]"
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--hub-muted)] transition-colors hover:bg-[var(--hub-surface)] hover:text-[var(--hub-text)]"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Admin
+            </Link>
+          )}
+          <button
+            onClick={handleSignOut}
+            className="mb-0.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--hub-muted)] transition-colors hover:bg-[var(--hub-surface)] hover:text-[var(--hub-text)]"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar ao Hub
-          </Link>
+            <LogOut className="h-4 w-4" />
+            Sair
+          </button>
         </nav>
 
-        {/* Card Plano Premium */}
+        {/* Identidade + Card Plano Premium */}
         <div className="border-t border-[var(--hub-border)] p-4">
+          <div className="mb-3 flex items-center gap-3 px-1">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--hub-accent)]/15 text-sm font-semibold text-[var(--hub-accent)]">
+              {displayName.charAt(0).toUpperCase()}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-[var(--hub-text)]">{displayName}</p>
+              <p className="text-xs text-[var(--hub-muted)]">Treinador</p>
+            </div>
+          </div>
           <div className="rounded-2xl border border-[var(--hub-accent)]/30 bg-[var(--hub-surface)] p-4">
             <div className="mb-1 flex items-center gap-2">
               <Crown className="h-4 w-4 text-[var(--hub-accent)]" />
