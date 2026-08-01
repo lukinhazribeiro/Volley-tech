@@ -70,7 +70,7 @@ const apps = [
     icon: BrainCircuit,
     status: "On-line",
     features: ["Linha do tempo", "Evolução", "Relatórios PDF"],
-    image: "/images/hub-volley-hub.png",
+    image: "/images/hub-highlight.jpg",
   },
 ]
 
