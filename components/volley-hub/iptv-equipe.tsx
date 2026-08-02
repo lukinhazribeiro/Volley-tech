@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import {
   ResponsiveContainer,
   BarChart,
@@ -12,19 +12,24 @@ import {
   Tooltip,
 } from "recharts"
 import { HubCard, EvolutionRow, IptvBadge, EmptyState } from "./ui"
-import { listTeams, listEntriesForTeam } from "@/lib/hub/data"
+import { listTeams, listEntriesForTeam, listAthletes, deleteAthlete } from "@/lib/hub/data"
 import { buildChapters, overallTrend } from "@/lib/hub/aggregate"
 import { aggregateFundamentals, FUNDAMENTALS, FUNDAMENTAL_LABELS, successRate, trendFrom } from "@/lib/hub/stats"
 import { computeIPTV, generateEvaluation } from "@/lib/hub/intelligence"
 import { Button } from "@/components/ui/button"
-import { FileDown, Sparkles, Filter } from "lucide-react"
+import { FileDown, Sparkles, Filter, Trash2 } from "lucide-react"
 
 export function IptvEquipe() {
   const [team, setTeam] = useState<string>("")
   const [season, setSeason] = useState<string>("all")
   const [competition, setCompetition] = useState<string>("all")
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState("")
+  const { mutate } = useSWRConfig()
 
   const { data: teams } = useSWR("hub-teams", listTeams)
+  const { data: athletes } = useSWR("hub-athletes-picker", listAthletes)
   const { data: entries, isLoading } = useSWR(team ? ["hub-team-entries", team] : null, () =>
     listEntriesForTeam(team),
   )
@@ -32,6 +37,48 @@ export function IptvEquipe() {
   const filtered = (entries ?? []).filter(
     (e) => (season === "all" || e.season === season) && (competition === "all" || e.competition === competition),
   )
+
+  // Ranking por jogador: agrega os capítulos de cada atleta e calcula o IPTV.
+  const nameById = new Map((athletes ?? []).map((a) => [a.id, a]))
+  const byAthlete = new Map<string, typeof filtered>()
+  for (const e of filtered) {
+    if (!e.athlete_id) continue
+    const list = byAthlete.get(e.athlete_id) ?? []
+    list.push(e)
+    byAthlete.set(e.athlete_id, list)
+  }
+  const players = Array.from(byAthlete.entries())
+    .map(([id, list]) => {
+      const agg = aggregateFundamentals(list.map((e) => e.stats))
+      const athlete = nameById.get(id)
+      const fallback = list[0]?.player_number != null ? `Atleta ${list[0].player_number}` : "Atleta"
+      return {
+        id,
+        name: athlete?.full_name ?? fallback,
+        position: athlete?.position ?? "",
+        iptv: computeIPTV(agg),
+        chapters: list.length,
+      }
+    })
+    .sort((a, b) => b.iptv - a.iptv)
+
+  async function handleDeletePlayer(id: string) {
+    setDeletingId(id)
+    setDeleteError("")
+    try {
+      await deleteAthlete(id)
+      setConfirmingId(null)
+      await Promise.all([
+        mutate(["hub-team-entries", team]),
+        mutate("hub-teams"),
+        mutate("hub-athletes-picker"),
+      ])
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Não foi possível excluir a atleta.")
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const seasons = Array.from(new Set((entries ?? []).map((e) => e.season).filter(Boolean))) as string[]
   const competitions = Array.from(new Set((entries ?? []).map((e) => e.competition).filter(Boolean))) as string[]
@@ -196,6 +243,65 @@ export function IptvEquipe() {
                 )
               })}
             </div>
+          </HubCard>
+
+          <HubCard
+            title="Atletas da equipe"
+            description="IPTV individual de cada jogador. Use a lixeira para remover uma atleta do histórico."
+          >
+            {deleteError && (
+              <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+                {deleteError}
+              </p>
+            )}
+            {players.length === 0 ? (
+              <p className="text-sm text-[var(--hub-muted)]">Sem atletas para os filtros selecionados.</p>
+            ) : (
+              <ul className="divide-y divide-[var(--hub-border)]">
+                {players.map((p, idx) => (
+                  <li key={p.id} className="flex items-center gap-3 py-3">
+                    <span className="w-6 text-sm font-semibold text-[var(--hub-muted)]">{idx + 1}º</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-[var(--hub-text)]">{p.name}</p>
+                      <p className="text-xs text-[var(--hub-muted)]">
+                        {[p.position, `${p.chapters} capítulo(s)`].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    <IptvBadge value={p.iptv} label="IPTV" />
+                    {confirmingId === p.id ? (
+                      <span className="flex items-center gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeletePlayer(p.id)}
+                          disabled={deletingId === p.id}
+                        >
+                          {deletingId === p.id ? "Excluindo..." : "Excluir"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConfirmingId(null)}
+                          disabled={deletingId === p.id}
+                        >
+                          Cancelar
+                        </Button>
+                      </span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setConfirmingId(p.id)}
+                        aria-label={`Excluir ${p.name}`}
+                        title="Excluir atleta do histórico"
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </HubCard>
 
           <HubCard

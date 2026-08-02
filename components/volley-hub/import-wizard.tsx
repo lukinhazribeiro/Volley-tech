@@ -5,6 +5,7 @@ import { X, CheckCircle2, AlertTriangle, Loader2, UserPlus, Calendar } from "luc
 import {
   buildCandidatesFromLocalMatches,
   buildCandidatesFromVideoMatches,
+  groupCandidatesByAthlete,
   listLocalImportMatches,
   listVideoImportMatches,
   matchCandidates,
@@ -50,6 +51,8 @@ export function ImportWizard({
   // Guarda os dados brutos das partidas para montar os candidatos ao confirmar.
   const localMatchesRef = useRef<StoredMatch[]>([])
   const videoEntriesRef = useRef<MatchHistoryEntry[]>([])
+  // Capítulos (um por jogo) de cada atleta, alinhado por índice com `results`.
+  const groupsRef = useRef<ImportCandidate[][]>([])
 
   // Carrega a lista de jogos salvos para o usuário escolher o que importar.
   useEffect(() => {
@@ -112,7 +115,12 @@ export function ImportWizard({
         return
       }
 
-      const matched = await matchCandidates(candidates)
+      // Agrupa por atleta (um por jogador, com todos os capítulos) para nunca
+      // duplicar quando o mesmo jogador aparece em vários jogos.
+      const groups = groupCandidatesByAthlete(candidates)
+      groupsRef.current = groups.map((g) => g.entries)
+
+      const matched = await matchCandidates(groups.map((g) => g.representative))
       setResults(matched)
       const initial: Record<number, string> = {}
       matched.forEach((r, i) => {
@@ -133,21 +141,33 @@ export function ImportWizard({
   async function handleConfirmLocal() {
     setPhase("saving")
     try {
-      const toInsert: Array<{ athleteId: string; candidate: MatchResult["candidate"] }> = []
+      const source = mode === "video" ? "scout_video" : "scout_local"
+      // Dedup por nome dentro do próprio lote: garante UMA atleta por nome mesmo
+      // quando várias linhas "novas" têm o mesmo nome.
+      const createdByName = new Map<string, string>()
+      let inserted = 0
+      let athletesTouched = 0
 
       for (let i = 0; i < results.length; i++) {
         const r = results[i]
         const decision = decisions[i]
         if (decision === "skip" || !decision) continue
 
+        const nameKey = r.candidate.fullName.trim().toLowerCase()
         let athleteId: string
         if (decision === "new") {
-          athleteId = await createAthlete({
-            fullName: r.candidate.fullName,
-            team: r.candidate.team,
-            category: r.candidate.category,
-            position: r.candidate.position,
-          })
+          const reused = createdByName.get(nameKey)
+          if (reused) {
+            athleteId = reused
+          } else {
+            athleteId = await createAthlete({
+              fullName: r.candidate.fullName,
+              team: r.candidate.team,
+              category: r.candidate.category,
+              position: r.candidate.position,
+            })
+            createdByName.set(nameKey, athleteId)
+          }
         } else {
           athleteId = decision
         }
@@ -160,22 +180,17 @@ export function ImportWizard({
           category: r.candidate.category,
         })
 
-        toInsert.push({ athleteId, candidate: r.candidate })
-      }
-
-      const source = mode === "video" ? "scout_video" : "scout_local"
-      let inserted = 0
-      for (const item of toInsert) {
-        inserted += await insertHistoryEntries([
-          { athleteId: item.athleteId, candidate: item.candidate, source },
-        ])
+        // Insere TODOS os capítulos (um por jogo) desta atleta.
+        const entries = groupsRef.current[i] ?? [r.candidate]
+        inserted += await insertHistoryEntries(entries.map((candidate) => ({ athleteId, candidate, source })))
+        athletesTouched++
       }
 
       const originLabel = mode === "video" ? "Scout View IA" : "Scout Volleyball"
-      await logImport(mode, `${originLabel} (${toInsert.length} atleta(s))`, inserted)
+      await logImport(mode, `${originLabel} (${athletesTouched} atleta(s))`, inserted)
       setSummary(
         inserted > 0
-          ? `${inserted} capítulo(s) adicionado(s) para ${toInsert.length} atleta(s).`
+          ? `${inserted} capítulo(s) adicionado(s) para ${athletesTouched} atleta(s).`
           : "Nada novo para importar — esses scouts já estavam no histórico.",
       )
       setPhase("done")

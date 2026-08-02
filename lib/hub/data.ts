@@ -241,37 +241,54 @@ export async function matchCandidates(candidates: ImportCandidate[]): Promise<Ma
   }>
 
   return candidates.map((candidate) => {
-    // 1) alias aprendido (nome+equipe+categoria)
-    const alias = allAliases.find(
-      (a) =>
-        norm(a.full_name) === norm(candidate.fullName) &&
-        norm(a.team) === norm(candidate.team) &&
-        norm(a.category) === norm(candidate.category),
-    )
+    // 1) alias aprendido por nome (independente de equipe/categoria) — o mesmo
+    //    nome sempre aponta para a mesma atleta, somando os dados.
+    const alias = allAliases.find((a) => norm(a.full_name) === norm(candidate.fullName))
     if (alias) {
       return { candidate, status: "exact" as const, athleteId: alias.athlete_id, suggestions: [] }
     }
 
-    // 2) correspondência exata por nome+equipe+categoria
-    const exact = allAthletes.find(
-      (a) =>
-        norm(a.full_name) === norm(candidate.fullName) &&
-        norm(a.team) === norm(candidate.team) &&
-        norm(a.category) === norm(candidate.category),
-    )
-    if (exact) {
-      return { candidate, status: "exact" as const, athleteId: exact.id, suggestions: [] }
-    }
-
-    // 3) mesmo nome mas equipe/categoria diferente => ambíguo
+    // 2) atletas existentes com o mesmo nome (normalizado, sem acento/caixa).
     const sameName = allAthletes.filter((a) => norm(a.full_name) === norm(candidate.fullName))
-    if (sameName.length > 0) {
+    if (sameName.length === 1) {
+      // Exatamente uma atleta com esse nome => vincula e soma os dados.
+      return { candidate, status: "exact" as const, athleteId: sameName[0].id, suggestions: [] }
+    }
+    if (sameName.length > 1) {
+      // Mais de uma atleta com o mesmo nome => deixa o usuário escolher.
       return { candidate, status: "ambiguous" as const, suggestions: sameName }
     }
 
-    // 4) novo atleta
+    // 3) nenhuma atleta com esse nome => nova.
     return { candidate, status: "new" as const, suggestions: [] }
   })
+}
+
+/**
+ * Agrupa candidatos (um por jogador por jogo) em um por atleta, usando o nome
+ * normalizado. Assim, importar vários jogos do mesmo jogador cria UMA atleta
+ * com vários capítulos — nunca duplicatas.
+ */
+export function groupCandidatesByAthlete(
+  candidates: ImportCandidate[],
+): Array<{ representative: ImportCandidate; entries: ImportCandidate[] }> {
+  const groups = new Map<string, { representative: ImportCandidate; entries: ImportCandidate[] }>()
+  for (const c of candidates) {
+    const key = norm(c.fullName)
+    if (!key) continue
+    const existing = groups.get(key)
+    if (existing) {
+      existing.entries.push(c)
+      // Completa dados faltantes no representante (ex.: vídeo sem categoria).
+      const r = existing.representative
+      if (!r.team && c.team) r.team = c.team
+      if (!r.category && c.category) r.category = c.category
+      if (!r.position && c.position) r.position = c.position
+    } else {
+      groups.set(key, { representative: { ...c }, entries: [c] })
+    }
+  }
+  return Array.from(groups.values())
 }
 
 // ----------------------- Gravação -----------------------
