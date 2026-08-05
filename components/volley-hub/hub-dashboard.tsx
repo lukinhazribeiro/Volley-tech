@@ -21,6 +21,8 @@ import { computeIPTV } from "@/lib/hub/intelligence"
 import { aggregateFundamentals } from "@/lib/hub/stats"
 import { VOLLEY_MODULES } from "@/lib/hub/modules"
 import { getStoredUser } from "@/lib/auth"
+import { useLanguage } from "@/lib/i18n/provider"
+import { LanguageSwitcher } from "./language-switcher"
 import { HubCard, EmptyState, TrendBadge } from "./ui"
 import type { HubAthlete, HubHistoryEntry, HubImport } from "@/lib/hub/types"
 
@@ -37,6 +39,7 @@ const ALL = "__all__"
 
 export function HubDashboard() {
   const router = useRouter()
+  const { t } = useLanguage()
   const { data, isLoading } = useSWR("hub-dashboard", loadDashboard)
   const [firstName, setFirstName] = useState("Treinador")
   const [season, setSeason] = useState<string>(ALL)
@@ -120,11 +123,11 @@ export function HubDashboard() {
   const recentImports = imports.slice(0, 3)
 
   const kpis = [
-    { label: "Atletas", value: athletes.length, icon: Users },
-    { label: "Competições", value: competicoes, icon: Trophy },
-    { label: "Scouts registrados", value: filtered.length, icon: Activity },
-    { label: "IPTV médio da equipe", value: iptvMedio, icon: ArrowUpRight, accent: true },
-    { label: "Históricos importados", value: imports.length, icon: FolderOpen },
+    { label: t("dashboard.kpi.athletes"), value: athletes.length, icon: Users },
+    { label: t("dashboard.kpi.competitions"), value: competicoes, icon: Trophy },
+    { label: t("dashboard.kpi.scouts"), value: filtered.length, icon: Activity },
+    { label: t("dashboard.kpi.avgIptv"), value: iptvMedio, icon: ArrowUpRight, accent: true },
+    { label: t("dashboard.kpi.imports"), value: imports.length, icon: FolderOpen },
   ]
 
   return (
@@ -133,25 +136,24 @@ export function HubDashboard() {
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Bem-vindo ao <span className="text-[var(--hub-accent)]">Volley Tech</span>, {firstName}!
+            {t("dashboard.welcome")} <span className="text-[var(--hub-accent)]">Volley Tech</span>, {firstName}!
           </h1>
-          <p className="mt-1 text-sm text-[var(--hub-muted)]">
-            Sua central de inteligência e histórico no voleibol.
-          </p>
+          <p className="mt-1 text-sm text-[var(--hub-muted)]">{t("dashboard.subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <LanguageSwitcher />
           <label className="flex items-center gap-2 rounded-xl border border-[var(--hub-border)] bg-[var(--hub-surface)] px-3 py-2 text-sm">
             <Calendar className="h-4 w-4 text-[var(--hub-muted)]" />
             <select
               value={season}
               onChange={(e) => setSeason(e.target.value)}
               className="bg-transparent text-[var(--hub-text)] outline-none"
-              aria-label="Temporada"
+              aria-label={t("dashboard.season")}
             >
-              <option value={ALL}>Todas as temporadas</option>
+              <option value={ALL}>{t("dashboard.allSeasons")}</option>
               {seasons.map((s) => (
                 <option key={s} value={s}>
-                  Temporada {s}
+                  {t("dashboard.season")} {s}
                 </option>
               ))}
             </select>
@@ -162,12 +164,12 @@ export function HubDashboard() {
               value={team}
               onChange={(e) => setTeam(e.target.value)}
               className="bg-transparent text-[var(--hub-text)] outline-none"
-              aria-label="Equipe"
+              aria-label={t("dashboard.team")}
             >
-              <option value={ALL}>Todas as equipes</option>
-              {teams.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              <option value={ALL}>{t("dashboard.allTeams")}</option>
+              {teams.map((tm) => (
+                <option key={tm} value={tm}>
+                  {tm}
                 </option>
               ))}
             </select>
@@ -203,7 +205,7 @@ export function HubDashboard() {
       {/* Módulos Volley Tech */}
       <div className="mb-4 flex items-end justify-between">
         <h2 className="text-lg font-semibold tracking-tight">
-          Módulos <span className="text-[var(--hub-accent)]">Volley Tech</span>
+          {t("nav.modules")} <span className="text-[var(--hub-accent)]">Volley Tech</span>
         </h2>
       </div>
       <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -226,16 +228,16 @@ export function HubDashboard() {
               </span>
               <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-emerald-300 backdrop-blur">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                On-line
+                {t("dashboard.online")}
               </span>
             </div>
             <div className="p-4">
               <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: m.accent }}>
-                {m.tag}
+                {t(`module.${m.key}.tag`)}
               </p>
               <h3 className="mt-1 font-semibold tracking-tight">{m.title}</h3>
               <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-[var(--hub-muted)]">
-                {m.description}
+                {t(`module.${m.key}.description`)}
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {m.features.map((f) => (
@@ -248,7 +250,7 @@ export function HubDashboard() {
                 ))}
               </div>
               <span className="mt-3 flex items-center gap-1 text-sm font-medium text-[var(--hub-accent)]">
-                Abrir módulo
+                {t("dashboard.openModule")}
                 <ArrowUpRight className="h-4 w-4" />
               </span>
             </div>
@@ -258,11 +260,11 @@ export function HubDashboard() {
 
       {/* Seções inferiores */}
       {isLoading ? (
-        <p className="text-sm text-[var(--hub-muted)]">Carregando…</p>
+        <p className="text-sm text-[var(--hub-muted)]">{t("common.loading")}</p>
       ) : entries.length === 0 ? (
         <EmptyState
-          title="Nenhum histórico ainda"
-          description="Importe scouts do Scout Volleyball, do Scout View IA ou um arquivo .vha para começar a construir a linha do tempo das atletas."
+          title={t("dashboard.noHistoryTitle")}
+          description={t("dashboard.noHistoryDesc")}
         />
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
@@ -271,19 +273,19 @@ export function HubDashboard() {
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Upload className="h-4 w-4 text-[var(--hub-accent)]" />
-                <h3 className="font-semibold">Últimas importações</h3>
+                <h3 className="font-semibold">{t("dashboard.latestImports")}</h3>
               </div>
               <ArrowRight className="h-4 w-4 text-[var(--hub-muted)]" />
             </div>
             {recentImports.length === 0 ? (
-              <p className="text-sm text-[var(--hub-muted)]">Sem importações registradas.</p>
+              <p className="text-sm text-[var(--hub-muted)]">{t("dashboard.noImports")}</p>
             ) : (
               <ul className="space-y-2">
                 {recentImports.map((imp) => (
                   <li key={imp.id} className="flex items-center justify-between text-sm">
                     <span className="truncate text-[var(--hub-text)]">{imp.label || imp.kind}</span>
                     <span className="ml-2 shrink-0 text-xs text-[var(--hub-muted)]">
-                      {imp.entries_count} reg.
+                      {imp.entries_count} {t("dashboard.records")}
                     </span>
                   </li>
                 ))}
@@ -296,24 +298,24 @@ export function HubDashboard() {
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-[var(--hub-accent)]" />
-                <h3 className="font-semibold">Linha do tempo</h3>
+                <h3 className="font-semibold">{t("nav.timeline")}</h3>
               </div>
               <ArrowRight className="h-4 w-4 text-[var(--hub-muted)]" />
             </div>
             {timeline.length === 0 ? (
-              <p className="text-sm text-[var(--hub-muted)]">Sem temporadas no recorte.</p>
+              <p className="text-sm text-[var(--hub-muted)]">{t("dashboard.noSeasonsCut")}</p>
             ) : (
               <ul className="space-y-2.5">
-                {timeline.map((t) => (
-                  <li key={t.season} className="flex items-center gap-3 text-sm">
-                    <span className="w-14 shrink-0 text-[var(--hub-muted)]">{t.season}</span>
+                {timeline.map((row) => (
+                  <li key={row.season} className="flex items-center gap-3 text-sm">
+                    <span className="w-14 shrink-0 text-[var(--hub-muted)]">{row.season}</span>
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--hub-bg-deep)]">
                       <div
                         className="h-full rounded-full bg-[var(--hub-accent)]"
-                        style={{ width: `${Math.min(100, t.iptv)}%` }}
+                        style={{ width: `${Math.min(100, row.iptv)}%` }}
                       />
                     </div>
-                    <span className="w-8 shrink-0 text-right font-semibold tabular-nums">{t.iptv}</span>
+                    <span className="w-8 shrink-0 text-right font-semibold tabular-nums">{row.iptv}</span>
                   </li>
                 ))}
               </ul>
@@ -325,12 +327,12 @@ export function HubDashboard() {
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-[var(--hub-accent)]" />
-                <h3 className="font-semibold">Atletas em destaque</h3>
+                <h3 className="font-semibold">{t("dashboard.highlightsHeading")}</h3>
               </div>
               <ArrowRight className="h-4 w-4 text-[var(--hub-muted)]" />
             </div>
             {highlights.length === 0 ? (
-              <p className="text-sm text-[var(--hub-muted)]">Sem atletas no recorte selecionado.</p>
+              <p className="text-sm text-[var(--hub-muted)]">{t("dashboard.noAthletesCut")}</p>
             ) : (
               <ul className="space-y-3">
                 {highlights.map((h) => (
@@ -365,18 +367,17 @@ export function HubDashboard() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[var(--hub-surface)] via-[var(--hub-surface)]/85 to-transparent" />
         <div className="relative max-w-lg">
-          <h3 className="text-xl font-bold leading-tight tracking-tight sm:text-2xl">
-            Dados que <span className="text-[var(--hub-accent)]">transformam</span> desempenho.
+          <h3 className="text-xl font-bold leading-tight tracking-tight sm:text-2xl text-balance">
+            {t("dashboard.bannerTitle")}
           </h3>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--hub-muted)]">
-            Acompanhe a evolução das atletas e equipes ao longo do tempo e tome decisões baseadas em dados
-            reais e inteligentes.
+          <p className="mt-2 text-sm leading-relaxed text-[var(--hub-muted)] text-pretty">
+            {t("dashboard.bannerDesc")}
           </p>
           <Link
             href="/volley-hub/relatorios"
             className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[var(--hub-accent)] px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
           >
-            Ver relatórios completos
+            {t("dashboard.bannerCta")}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

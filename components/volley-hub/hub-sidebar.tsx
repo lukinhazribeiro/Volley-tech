@@ -27,6 +27,7 @@ import { VOLLEY_MODULES } from "@/lib/hub/modules"
 import { clearStoredUser, getStoredUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/client"
 import { isAdminEmail } from "@/lib/subscription"
+import { useLanguage } from "@/lib/i18n/provider"
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   "scout-volleyball": Activity,
@@ -36,16 +37,17 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   gestao: Users,
 }
 
-const hubItems: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
-  { href: "/volley-hub/linha-do-tempo", label: "Linha do Tempo", icon: GitBranch },
-  { href: "/volley-hub/historico", label: "Históricos", icon: History },
-  { href: "/volley-hub/iptv-atleta", label: "IPTV Atleta", icon: User },
-  { href: "/volley-hub/iptv-equipe", label: "IPTV Equipe", icon: Users2 },
-  { href: "/volley-hub/relatorios", label: "Relatórios", icon: FileText },
+const hubItems: { href: string; labelKey: string; icon: LucideIcon; exact?: boolean }[] = [
+  { href: "/volley-hub/linha-do-tempo", labelKey: "nav.timeline", icon: GitBranch },
+  { href: "/volley-hub/historico", labelKey: "nav.history", icon: History },
+  { href: "/volley-hub/iptv-atleta", labelKey: "nav.iptvAthlete", icon: User },
+  { href: "/volley-hub/iptv-equipe", labelKey: "nav.iptvTeam", icon: Users2 },
+  { href: "/volley-hub/relatorios", labelKey: "nav.reports", icon: FileText },
 ]
 
 export function HubSidebar() {
   const pathname = usePathname()
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [displayName, setDisplayName] = useState("Treinador")
   const [isAdmin, setIsAdmin] = useState(false)
@@ -81,7 +83,7 @@ export function HubSidebar() {
         <button
           onClick={() => setOpen(true)}
           className="rounded-lg border border-[var(--hub-border)] p-2 text-[var(--hub-text)] hover:border-[var(--hub-accent)]"
-          aria-label="Abrir menu"
+          aria-label={t("nav.openMenu")}
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -117,7 +119,7 @@ export function HubSidebar() {
                 VOLLEY <span className="text-[var(--hub-accent)]">TECH</span>
               </span>
               <span className="block text-[10px] uppercase tracking-widest text-[var(--hub-muted)]">
-                Centro de inteligência
+                {t("nav.centerOfIntelligence")}
               </span>
             </span>
           </Link>
@@ -141,12 +143,12 @@ export function HubSidebar() {
             }`}
           >
             <LayoutDashboard className="h-4 w-4" />
-            Dashboard
+            {t("nav.dashboard")}
           </Link>
 
           {/* Módulos Volley Tech (aponta para os módulos existentes) */}
           <p className="px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--hub-muted)]">
-            Módulos
+            {t("nav.modules")}
           </p>
           {VOLLEY_MODULES.map((m) => {
             const Icon = MODULE_ICONS[m.key] ?? Activity
@@ -165,7 +167,7 @@ export function HubSidebar() {
 
           {/* Funções do Hub */}
           <p className="px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--hub-muted)]">
-            Hub
+            {t("nav.hub")}
           </p>
           {hubItems.map((item) => {
             const active = isActive(item.href, item.exact)
@@ -181,14 +183,14 @@ export function HubSidebar() {
                 }`}
               >
                 <Icon className="h-4 w-4" />
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             )
           })}
 
           {/* Conta */}
           <p className="px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--hub-muted)]">
-            Conta
+            {t("nav.account")}
           </p>
           {isAdmin && (
             <Link
@@ -196,7 +198,7 @@ export function HubSidebar() {
               className="mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--hub-muted)] transition-colors hover:bg-[var(--hub-surface)] hover:text-[var(--hub-text)]"
             >
               <ShieldCheck className="h-4 w-4" />
-              Admin
+              {t("nav.admin")}
             </Link>
           )}
           <button
@@ -204,7 +206,7 @@ export function HubSidebar() {
             className="mb-0.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--hub-muted)] transition-colors hover:bg-[var(--hub-surface)] hover:text-[var(--hub-text)]"
           >
             <LogOut className="h-4 w-4" />
-            Sair
+            {t("nav.signOut")}
           </button>
         </nav>
 
@@ -216,7 +218,7 @@ export function HubSidebar() {
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-[var(--hub-text)]">{displayName}</p>
-              <p className="text-xs text-[var(--hub-muted)]">Treinador</p>
+              <p className="text-xs text-[var(--hub-muted)]">{t("nav.coach")}</p>
             </div>
           </div>
         </div>
