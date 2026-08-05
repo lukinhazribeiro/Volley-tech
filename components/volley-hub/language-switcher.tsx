@@ -22,7 +22,7 @@ export function LanguageSwitcher() {
   const current = LOCALE_META[locale]
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative" data-no-translate>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
