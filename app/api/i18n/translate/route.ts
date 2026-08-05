@@ -21,6 +21,44 @@ function hash(s: string): string {
   return createHash("sha1").update(s).digest("hex")
 }
 
+// Códigos de idioma para o endpoint público do Google Tradutor.
+const GOOGLE_LANG: Record<Locale, string> = {
+  pt: "pt",
+  en: "en",
+  es: "es",
+  it: "it",
+  ja: "ja",
+}
+
+/**
+ * Fallback gratuito: traduz uma frase pelo endpoint público do Google Tradutor
+ * (sem chave, sem custo). Usado quando a IA está indisponível/bloqueada ou não
+ * cobriu a frase. Retorna null em caso de falha.
+ */
+async function googleTranslate(text: string, locale: Locale): Promise<string | null> {
+  try {
+    const url =
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=pt&tl=${GOOGLE_LANG[locale]}` +
+      `&dt=t&q=${encodeURIComponent(text)}`
+    const res = await fetch(url, {
+      headers: { "user-agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as unknown
+    // Formato: [[[ "tradução", "original", ... ], ...], ...]
+    if (!Array.isArray(data) || !Array.isArray(data[0])) return null
+    const segments = data[0] as unknown[]
+    const out = segments
+      .map((seg) => (Array.isArray(seg) ? (seg[0] as string) : ""))
+      .join("")
+      .trim()
+    return out.length > 0 ? out : null
+  } catch {
+    return null
+  }
+}
+
 const BodySchema = z.object({
   locale: z.string(),
   texts: z.array(z.string()).max(400),
@@ -88,7 +126,8 @@ export async function POST(req: Request) {
     missing.push(...stillMissing)
   }
 
-  // 3) IA (AI Gateway) apenas para o que restou; grava no cache.
+  // 3) IA (AI Gateway) para o que restou. Grava só o que foi traduzido.
+  const translatedByEngine = new Map<string, string>()
   if (missing.length > 0) {
     try {
       const numbered = missing.map((s, i) => `${i + 1}. ${s}`).join("\n")
@@ -113,24 +152,39 @@ export async function POST(req: Request) {
       })
 
       const byIndex = new Map(object.translations.map((t) => [t.index, t.text]))
-      const rowsToInsert: { locale: string; source_hash: string; source: string; translated: string }[] = []
       missing.forEach((src, i) => {
         const t = byIndex.get(i + 1)
-        if (t != null && t.length > 0) {
-          result[src] = t
-          rowsToInsert.push({ locale, source_hash: hash(src), source: src, translated: t })
-        } else {
-          result[src] = src // fallback: mantém o original
-        }
+        if (t != null && t.length > 0) translatedByEngine.set(src, t)
       })
-
-      if (rowsToInsert.length > 0) {
-        await supabase.from("i18n_cache").upsert(rowsToInsert, { onConflict: "locale,source_hash" })
-      }
     } catch (e) {
-      console.log("[v0] i18n translate IA falhou:", e instanceof Error ? e.message : String(e))
-      // Fallback: devolve o texto original para não quebrar a tela.
-      for (const src of missing) result[src] = src
+      console.log("[v0] i18n IA indisponível, usando fallback gratuito:", e instanceof Error ? e.message : String(e))
+    }
+
+    // 3b) Fallback gratuito (Google) para o que a IA não cobriu.
+    const stillMissing = missing.filter((src) => !translatedByEngine.has(src))
+    if (stillMissing.length > 0) {
+      const settled = await Promise.all(
+        stillMissing.map(async (src) => [src, await googleTranslate(src, locale)] as const),
+      )
+      for (const [src, t] of settled) {
+        if (t != null && t.length > 0) translatedByEngine.set(src, t)
+      }
+    }
+
+    // Aplica os resultados e grava no cache apenas o que foi traduzido.
+    const rowsToInsert: { locale: string; source_hash: string; source: string; translated: string }[] = []
+    for (const src of missing) {
+      const t = translatedByEngine.get(src)
+      if (t != null && t.length > 0) {
+        result[src] = t
+        rowsToInsert.push({ locale, source_hash: hash(src), source: src, translated: t })
+      } else {
+        result[src] = src // último recurso: mantém o original, sem cachear.
+      }
+    }
+
+    if (rowsToInsert.length > 0) {
+      await supabase.from("i18n_cache").upsert(rowsToInsert, { onConflict: "locale,source_hash" })
     }
   }
 

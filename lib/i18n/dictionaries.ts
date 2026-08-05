@@ -78,6 +78,13 @@ const pt: Dict = {
   "common.export": "Exportar",
   "common.chapters": "capítulo(s)",
 
+  // Autenticação (termos comuns de UI)
+  "auth.signIn": "Entrar",
+  "auth.signUp": "Criar conta",
+  "auth.email": "Email",
+  "auth.password": "Senha",
+  "auth.logout": "Sair",
+
   // Idioma
   "language.label": "Idioma",
   "language.choose": "Escolher idioma",
@@ -149,6 +156,11 @@ const en: Dict = {
   "common.export": "Export",
   "common.chapters": "chapter(s)",
 
+  "auth.signIn": "Sign in",
+  "auth.signUp": "Create account",
+  "auth.email": "Email",
+  "auth.password": "Password",
+  "auth.logout": "Sign out",
   "language.label": "Language",
   "language.choose": "Choose language",
 }
@@ -219,6 +231,11 @@ const es: Dict = {
   "common.export": "Exportar",
   "common.chapters": "capítulo(s)",
 
+  "auth.signIn": "Entrar",
+  "auth.signUp": "Crear cuenta",
+  "auth.email": "Correo electrónico",
+  "auth.password": "Contraseña",
+  "auth.logout": "Salir",
   "language.label": "Idioma",
   "language.choose": "Elegir idioma",
 }
@@ -289,6 +306,11 @@ const it: Dict = {
   "common.export": "Esporta",
   "common.chapters": "capitolo/i",
 
+  "auth.signIn": "Accedi",
+  "auth.signUp": "Crea account",
+  "auth.email": "Email",
+  "auth.password": "Password",
+  "auth.logout": "Esci",
   "language.label": "Lingua",
   "language.choose": "Scegli la lingua",
 }
@@ -359,6 +381,11 @@ const ja: Dict = {
   "common.export": "エクスポート",
   "common.chapters": "章",
 
+  "auth.signIn": "ログイン",
+  "auth.signUp": "アカウント作成",
+  "auth.email": "メール",
+  "auth.password": "パスワード",
+  "auth.logout": "ログアウト",
   "language.label": "言語",
   "language.choose": "言語を選択",
 }
