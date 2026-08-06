@@ -10,7 +10,7 @@ import { getMatches, type StoredMatch, type StoredPlayer } from "@/lib/scout/mat
 import { loadHistory as loadVideoHistory, type MatchHistoryEntry } from "@/lib/video-scout/history"
 import type { MatchState } from "@/lib/video-scout/match"
 import type { Fundamento, Resultado } from "@/lib/video-scout/types"
-import { extractTeamPlayerStats, scoredPoints, type PlayerFundamentals } from "./stats"
+import { extractTeamPlayerStats, positiveActions, type PlayerFundamentals } from "./stats"
 import type { HubAthlete, HubHistoryEntry, HubImport, ImportCandidate, MatchResult } from "./types"
 
 function norm(s: string | null | undefined): string {
@@ -61,12 +61,12 @@ export function buildCandidatesFromLocalMatches(matches: StoredMatch[] = getMatc
       for (const p of players) if (p.name?.trim()) namesByNumber[p.number] = p.name.trim()
 
       const summaries = extractTeamPlayerStats(match.actions, team, namesByNumber)
-      // Total de pontos da EQUIPE nesta partida — base do TGP (participação).
-      const teamPoints = summaries.reduce((sum, s) => sum + scoredPoints(s.fundamentals), 0)
+      // TP total da EQUIPE nesta partida — base do TGP (mesma fórmula do Scout).
+      const teamTP = summaries.reduce((sum, s) => sum + positiveActions(s.fundamentals), 0)
       for (const s of summaries) {
         const fullName = s.name?.trim()
         if (!fullName) continue // só associa atletas com nome
-        const tgp = teamPoints > 0 ? Math.round((scoredPoints(s.fundamentals) / teamPoints) * 100) : null
+        const tgp = teamTP > 0 ? Math.round((positiveActions(s.fundamentals) / teamTP) * 100) : null
         candidates.push({
           fullName,
           team: name,
@@ -153,11 +153,11 @@ export function buildCandidatesFromVideoMatches(entries: MatchHistoryEntry[]): I
         perPlayer.push({ player, fundamentals })
       }
 
-      // Total de pontos da EQUIPE (lado) — base do TGP.
-      const teamPoints = perPlayer.reduce((sum, p) => sum + scoredPoints(p.fundamentals), 0)
+      // TP total da EQUIPE (lado) — base do TGP (mesma fórmula do Scout).
+      const teamTP = perPlayer.reduce((sum, p) => sum + positiveActions(p.fundamentals), 0)
 
       for (const { player, fundamentals } of perPlayer) {
-        const tgp = teamPoints > 0 ? Math.round((scoredPoints(fundamentals) / teamPoints) * 100) : null
+        const tgp = teamTP > 0 ? Math.round((positiveActions(fundamentals) / teamTP) * 100) : null
         candidates.push({
           fullName: player.name!.trim(),
           team: cfg.name,

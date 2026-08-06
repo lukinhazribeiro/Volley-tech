@@ -63,12 +63,19 @@ export function successRate(c: FundamentalCount): number {
 }
 
 /**
- * Pontos marcados por uma atleta a partir dos fundamentos:
- * ataque convertido + ace de saque + ponto de bloqueio.
- * (Base do TGP — participação nos pontos da equipe.)
+ * Total de ações positivas de uma atleta (TP), exatamente como o Scout calcula:
+ * recepção certa + (saque certo + ace) + (ataque ponto + certo) + bloqueios + defesas.
+ * No modelo do Hub isso equivale à soma de (certo + ponto) de cada fundamento.
+ *
+ * É a base do TGP: TGP = TP da atleta ÷ TP total da equipe × 100 — o mesmo
+ * percentual exibido na planilha e no relatório do Scout.
  */
-export function scoredPoints(f: PlayerFundamentals): number {
-  return f.ataque.ponto + f.saque.ponto + f.bloqueio.certo
+export function positiveActions(f: PlayerFundamentals): number {
+  let tp = 0
+  for (const key of FUNDAMENTALS) {
+    tp += f[key].certo + f[key].ponto
+  }
+  return tp
 }
 
 /**
