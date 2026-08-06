@@ -396,6 +396,9 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
       createdAt: matchData.startTime,
       completedAt: new Date(),
       winner,
+      // Persiste os elencos (nomes) para o Volley Hub poder associar atletas.
+      teamAPlayers: matchData.teamAPlayers,
+      teamBPlayers: matchData.teamBPlayers,
     })
     handleReset()
   }

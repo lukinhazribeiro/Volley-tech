@@ -2,6 +2,8 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { AuthGate } from '@/components/hub/auth-gate'
+import { LanguageProvider } from '@/lib/i18n/provider'
+import { AutoTranslate } from '@/lib/i18n/auto-translate'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -41,7 +43,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="font-sans antialiased">
-        <AuthGate>{children}</AuthGate>
+        <LanguageProvider>
+          <AutoTranslate />
+          <AuthGate>{children}</AuthGate>
+        </LanguageProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

@@ -2,6 +2,13 @@ import type { Set } from "./set-manager"
 import type { MatchAction } from "./match-parser"
 import { getStoredUser } from "@/lib/auth"
 
+/** Atleta do elenco (número + nome), persistido para associação no Volley Hub. */
+export interface StoredPlayer {
+  number: number
+  name: string
+  role?: string
+}
+
 export interface StoredMatch {
   id: string
   teamAName: string
@@ -13,6 +20,13 @@ export interface StoredMatch {
   createdAt: Date
   completedAt: Date
   winner: "A" | "B"
+  /**
+   * Elencos com os NOMES das atletas. Opcionais e não-destrutivos: partidas
+   * antigas continuam válidas sem esses campos. O Volley Hub usa esses nomes
+   * para associar atletas na importação de histórico.
+   */
+  teamAPlayers?: StoredPlayer[]
+  teamBPlayers?: StoredPlayer[]
 }
 
 const STORAGE_KEY_BASE = "volleyball_matches_history"

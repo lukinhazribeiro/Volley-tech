@@ -389,3 +389,17 @@
   .hub-spot::before,
   .group:hover .hub-sheen { display: none; }
 }
+
+/* ===================== Volley Hub — tema escuro de inteligência ===================== */
+.hub-theme {
+  --hub-bg: oklch(0.17 0.02 260);
+  --hub-bg-deep: oklch(0.13 0.02 260);
+  --hub-surface: oklch(0.21 0.02 260);
+  --hub-border: oklch(0.30 0.02 260);
+  --hub-text: oklch(0.97 0.005 260);
+  --hub-muted: oklch(0.70 0.015 260);
+  --hub-accent: oklch(0.68 0.18 40);
+}
+.hub-theme ::selection {
+  background: oklch(0.68 0.18 40 / 30%);
+}
