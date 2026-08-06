@@ -21,7 +21,10 @@ import {
   computeIPF,
   averageIPF,
   ipfSeries,
+  pillarScores,
+  metricsForPillar,
   PHYSICAL_METRICS,
+  PILLARS,
   type NewAssessment,
 } from "@/lib/hub/physical"
 import { Button } from "@/components/ui/button"
@@ -123,6 +126,36 @@ export function IpfAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
             </div>
           </HubCard>
 
+          {/* Pilares da avaliação mais recente */}
+          {assessments.length > 0 &&
+            (() => {
+              const latest = assessments[assessments.length - 1]
+              const scores = pillarScores(latest)
+              return (
+                <HubCard
+                  title="Pilares físicos"
+                  description={`Avaliação mais recente • ${new Date(latest.assessment_date).toLocaleDateString("pt-BR")}`}
+                >
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    {PILLARS.map((pillar) => {
+                      const score = scores[pillar.key]
+                      return (
+                        <div
+                          key={pillar.key}
+                          className="rounded-xl border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-4 py-3 text-center"
+                        >
+                          <p className="text-xs font-medium text-[var(--hub-muted)]">{pillar.label}</p>
+                          <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--hub-text)]">
+                            {score != null ? score : "—"}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </HubCard>
+              )
+            })()}
+
           {/* Formulário de nova avaliação */}
           {showForm && (
             <HubCard
@@ -132,9 +165,9 @@ export function IpfAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
                   Nova avaliação física
                 </span>
               }
-              description="Preencha apenas as medidas que possuir. O índice usa as métricas pontuáveis informadas."
+              description="Preencha apenas os testes que possuir. Cada pilar entra no IPF com peso igual, a partir dos testes informados."
             >
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--hub-muted)]" htmlFor="assessment_date">
                     Data da avaliação
@@ -147,24 +180,30 @@ export function IpfAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
                     className="w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 py-2 text-sm text-[var(--hub-text)] sm:max-w-xs"
                   />
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {PHYSICAL_METRICS.map((def) => (
-                    <div key={def.key}>
-                      <label className="mb-1 block text-xs font-medium text-[var(--hub-muted)]" htmlFor={def.key}>
-                        {def.label} <span className="text-[var(--hub-muted)]/70">({def.unit})</span>
-                      </label>
-                      <input
-                        id={def.key}
-                        name={def.key}
-                        type="number"
-                        step="any"
-                        inputMode="decimal"
-                        placeholder="—"
-                        className="w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 py-2 text-sm text-[var(--hub-text)]"
-                      />
+                {PILLARS.map((pillar) => (
+                  <fieldset key={pillar.key} className="rounded-xl border border-[var(--hub-border)] p-4">
+                    <legend className="px-2 text-sm font-semibold text-[var(--hub-text)]">{pillar.label}</legend>
+                    <p className="mb-3 text-xs text-[var(--hub-muted)]">{pillar.description}</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {metricsForPillar(pillar.key).map((def) => (
+                        <div key={def.key}>
+                          <label className="mb-1 block text-xs font-medium text-[var(--hub-muted)]" htmlFor={def.key}>
+                            {def.label} <span className="text-[var(--hub-muted)]/70">({def.unit})</span>
+                          </label>
+                          <input
+                            id={def.key}
+                            name={def.key}
+                            type="number"
+                            step="any"
+                            inputMode="decimal"
+                            placeholder="—"
+                            className="w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 py-2 text-sm text-[var(--hub-text)]"
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </fieldset>
+                ))}
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--hub-muted)]" htmlFor="notes">
                     Observações
