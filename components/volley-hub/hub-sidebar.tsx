@@ -78,8 +78,8 @@ export function HubSidebar() {
 
   return (
     <>
-      {/* Barra superior (apenas mobile): abre a cortina */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--hub-border)] bg-[var(--hub-bg)]/90 px-4 py-3 backdrop-blur-md lg:hidden">
+      {/* Barra superior: abre a cortina (em todas as telas) */}
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--hub-border)] bg-[var(--hub-bg)]/90 px-4 py-3 backdrop-blur-md">
         <button
           onClick={() => setOpen(true)}
           className="rounded-lg border border-[var(--hub-border)] p-2 text-[var(--hub-text)] hover:border-[var(--hub-accent)]"
@@ -95,10 +95,10 @@ export function HubSidebar() {
         </div>
       </header>
 
-      {/* Overlay da cortina (mobile) */}
+      {/* Overlay da cortina */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           onClick={() => setOpen(false)}
           aria-hidden="true"
         />
@@ -106,7 +106,7 @@ export function HubSidebar() {
 
       {/* Cortina / barra lateral */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-[var(--hub-border)] bg-[var(--hub-bg-deep)] transition-transform duration-300 lg:w-64 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-[var(--hub-border)] bg-[var(--hub-bg-deep)] shadow-2xl transition-transform duration-300 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -125,7 +125,7 @@ export function HubSidebar() {
           </Link>
           <button
             onClick={() => setOpen(false)}
-            className="rounded-lg p-1.5 text-[var(--hub-muted)] hover:text-[var(--hub-text)] lg:hidden"
+            className="rounded-lg p-1.5 text-[var(--hub-muted)] hover:text-[var(--hub-text)]"
             aria-label="Fechar menu"
           >
             <X className="h-5 w-5" />

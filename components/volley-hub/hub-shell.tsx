@@ -9,7 +9,7 @@ export function HubShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="hub-theme min-h-screen bg-[var(--hub-bg)] text-[var(--hub-text)]">
       <HubSidebar />
-      <main className="lg:pl-64">
+      <main>
         <div className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 sm:px-6 lg:pt-8">{children}</div>
       </main>
     </div>
