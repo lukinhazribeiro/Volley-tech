@@ -11,6 +11,8 @@ export interface HubAthlete {
   team: string | null
   category: string | null
   position: string | null
+  /** País da atleta (padrão "Brasil"). Base de comparação futura do VIB. */
+  country: string | null
   created_at: string
 }
 
@@ -27,6 +29,8 @@ export interface HubHistoryEntry {
   player_number: number | null
   position: string | null
   stats: PlayerFundamentals
+  /** Último TGP do capítulo: pontos da atleta ÷ pontos da equipe (0-100). Não entra no IPTV. */
+  tgp: number | null
   raw: Record<string, unknown>
   fingerprint: string | null
   created_at: string
@@ -55,6 +59,8 @@ export interface ImportCandidate {
   season: string
   matchDate: string | null
   stats: PlayerFundamentals
+  /** Último TGP do capítulo: pontos da atleta ÷ pontos da equipe (0-100). */
+  tgp: number | null
   fingerprint: string
   raw: Record<string, unknown>
 }

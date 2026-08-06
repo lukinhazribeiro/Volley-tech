@@ -15,6 +15,8 @@ import {
   User,
   Users2,
   FileText,
+  Dumbbell,
+  Gauge,
   LogOut,
   ShieldCheck,
   Menu,
@@ -42,6 +44,8 @@ const hubItems: { href: string; labelKey: string; icon: LucideIcon; exact?: bool
   { href: "/volley-hub/historico", labelKey: "nav.history", icon: History },
   { href: "/volley-hub/iptv-atleta", labelKey: "nav.iptvAthlete", icon: User },
   { href: "/volley-hub/iptv-equipe", labelKey: "nav.iptvTeam", icon: Users2 },
+  { href: "/volley-hub/ipf", labelKey: "nav.ipf", icon: Dumbbell },
+  { href: "/volley-hub/igd", labelKey: "nav.igd", icon: Gauge },
   { href: "/volley-hub/relatorios", labelKey: "nav.reports", icon: FileText },
 ]
 

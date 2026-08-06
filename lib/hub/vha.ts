@@ -80,7 +80,7 @@ export function buildVHA(athlete: HubAthlete, entries: HubHistoryEntry[]): VHAFi
     })),
     iptv: chapters.map((c) => ({
       label: c.competition || c.season || "—",
-      index: computeIPTV(c.fundamentals),
+      index: computeIPTV(c.fundamentals, athlete.position || c.entries[0]?.position),
     })),
   }
 }

@@ -68,6 +68,15 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
   const last = chapters[chapters.length - 1]
   const prev = chapters[chapters.length - 2]
 
+  // Último TGP registrado: participação nos pontos da equipe no capítulo mais
+  // recente que possua o dado. Não entra no cálculo do IPTV.
+  const lastTgpEntry = data
+    ? [...data.entries]
+        .reverse()
+        .find((e) => e.tgp != null)
+    : undefined
+  const lastTgp = lastTgpEntry?.tgp ?? null
+
   const evaluation =
     data?.athlete && last
       ? generateEvaluation({
@@ -124,7 +133,11 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <IptvBadge value={computeIPTV(overall)} trend={trend} label="IPTV geral" />
+                <IptvBadge
+                  value={computeIPTV(overall, data.athlete.position)}
+                  trend={trend}
+                  label="IPTV geral"
+                />
                 {confirmingDelete ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Excluir?</span>
@@ -151,6 +164,28 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
             {deleteError && (
               <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
                 {deleteError}
+              </p>
+            )}
+          </HubCard>
+
+          {/* Último TGP — lido automaticamente do scout mais recente; não entra no IPTV */}
+          <HubCard
+            title="Último TGP"
+            description="Participação nos pontos da equipe no scout mais recente. Atualizado automaticamente a cada novo scout. Não faz parte do cálculo do IPTV."
+          >
+            {lastTgp != null ? (
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-3xl font-semibold tabular-nums text-foreground">{lastTgp}%</span>
+                {lastTgpEntry?.competition && (
+                  <span className="text-sm text-muted-foreground">
+                    {lastTgpEntry.competition}
+                    {lastTgpEntry.season ? ` • ${lastTgpEntry.season}` : ""}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Ainda não há TGP registrado. Ele será preenchido automaticamente no próximo scout importado.
               </p>
             )}
           </HubCard>

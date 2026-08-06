@@ -63,6 +63,15 @@ export function successRate(c: FundamentalCount): number {
 }
 
 /**
+ * Pontos marcados por uma atleta a partir dos fundamentos:
+ * ataque convertido + ace de saque + ponto de bloqueio.
+ * (Base do TGP — participação nos pontos da equipe.)
+ */
+export function scoredPoints(f: PlayerFundamentals): number {
+  return f.ataque.ponto + f.saque.ponto + f.bloqueio.certo
+}
+
+/**
  * Extrai o resumo por atleta de UM time (A ou B) a partir das ações do scout.
  * A lógica de contagem espelha a planilha oficial do Scout, mas o Hub mantém
  * sua própria implementação para não criar dependência entre módulos.

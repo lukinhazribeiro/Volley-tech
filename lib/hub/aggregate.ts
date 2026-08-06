@@ -48,7 +48,8 @@ export function buildChapters(entries: HubHistoryEntry[]): TimelineChapter[] {
       competition: list[0].competition,
       entries: list,
       fundamentals,
-      iptv: computeIPTV(fundamentals),
+      // Avaliação por posição: usa a função registrada no capítulo.
+      iptv: computeIPTV(fundamentals, list[0].position),
     }
   })
 }

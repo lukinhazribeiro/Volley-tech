@@ -10,7 +10,7 @@ import { getMatches, type StoredMatch, type StoredPlayer } from "@/lib/scout/mat
 import { loadHistory as loadVideoHistory, type MatchHistoryEntry } from "@/lib/video-scout/history"
 import type { MatchState } from "@/lib/video-scout/match"
 import type { Fundamento, Resultado } from "@/lib/video-scout/types"
-import { extractTeamPlayerStats, type PlayerFundamentals } from "./stats"
+import { extractTeamPlayerStats, scoredPoints, type PlayerFundamentals } from "./stats"
 import type { HubAthlete, HubHistoryEntry, HubImport, ImportCandidate, MatchResult } from "./types"
 
 function norm(s: string | null | undefined): string {
@@ -61,9 +61,12 @@ export function buildCandidatesFromLocalMatches(matches: StoredMatch[] = getMatc
       for (const p of players) if (p.name?.trim()) namesByNumber[p.number] = p.name.trim()
 
       const summaries = extractTeamPlayerStats(match.actions, team, namesByNumber)
+      // Total de pontos da EQUIPE nesta partida — base do TGP (participação).
+      const teamPoints = summaries.reduce((sum, s) => sum + scoredPoints(s.fundamentals), 0)
       for (const s of summaries) {
         const fullName = s.name?.trim()
         if (!fullName) continue // só associa atletas com nome
+        const tgp = teamPoints > 0 ? Math.round((scoredPoints(s.fundamentals) / teamPoints) * 100) : null
         candidates.push({
           fullName,
           team: name,
@@ -74,6 +77,7 @@ export function buildCandidatesFromLocalMatches(matches: StoredMatch[] = getMatc
           season,
           matchDate: new Date(match.completedAt).toISOString().slice(0, 10),
           stats: s.fundamentals,
+          tgp,
           fingerprint: `${match.id}:${team}:${s.number}`,
           raw: { matchId: match.id, team, number: s.number },
         })
@@ -130,6 +134,8 @@ export function buildCandidatesFromVideoMatches(entries: MatchHistoryEntry[]): I
     ]
 
     for (const { cfg, side } of sides) {
+      // Fundamentos por jogador deste lado (calculados uma vez).
+      const perPlayer: Array<{ player: (typeof cfg.players)[number]; fundamentals: PlayerFundamentals }> = []
       for (const player of cfg.players) {
         const fullName = player.name?.trim()
         if (!fullName) continue
@@ -144,9 +150,16 @@ export function buildCandidatesFromVideoMatches(entries: MatchHistoryEntry[]): I
           hasData = true
         }
         if (!hasData) continue
+        perPlayer.push({ player, fundamentals })
+      }
 
+      // Total de pontos da EQUIPE (lado) — base do TGP.
+      const teamPoints = perPlayer.reduce((sum, p) => sum + scoredPoints(p.fundamentals), 0)
+
+      for (const { player, fundamentals } of perPlayer) {
+        const tgp = teamPoints > 0 ? Math.round((scoredPoints(fundamentals) / teamPoints) * 100) : null
         candidates.push({
-          fullName,
+          fullName: player.name!.trim(),
           team: cfg.name,
           category: "",
           position: player.role ? player.role : "",
@@ -155,6 +168,7 @@ export function buildCandidatesFromVideoMatches(entries: MatchHistoryEntry[]): I
           season,
           matchDate,
           stats: fundamentals,
+          tgp,
           fingerprint: `vs:${entry.id}:${side}:${player.number}`,
           raw: { source: "scout_video", historyId: entry.id, side, number: player.number },
         })
@@ -419,6 +433,7 @@ export async function insertHistoryEntries(
       player_number: candidate.playerNumber,
       position: candidate.position || null,
       stats: candidate.stats,
+      tgp: candidate.tgp,
       raw: candidate.raw,
       fingerprint: candidate.fingerprint,
     }))
