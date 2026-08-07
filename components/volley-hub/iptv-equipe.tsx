@@ -17,10 +17,11 @@ import { buildChapters, overallTrend } from "@/lib/hub/aggregate"
 import { aggregateFundamentals, FUNDAMENTALS, FUNDAMENTAL_LABELS, successRate, trendFrom } from "@/lib/hub/stats"
 import { computeIPTV, generateEvaluation } from "@/lib/hub/intelligence"
 import { Button } from "@/components/ui/button"
-import { FileDown, Sparkles, Filter, Trash2 } from "lucide-react"
+import { FileDown, Sparkles, Filter, Trash2, ChevronLeft, Users, Search } from "lucide-react"
 
 export function IptvEquipe() {
   const [team, setTeam] = useState<string>("")
+  const [teamQuery, setTeamQuery] = useState("")
   const [season, setSeason] = useState<string>("all")
   const [competition, setCompetition] = useState<string>("all")
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
@@ -111,37 +112,94 @@ export function IptvEquipe() {
     window.print()
   }
 
+  // Sem equipe selecionada: grade de equipes (mesmo modelo em cartões).
+  if (!team) {
+    const teamList = teams ?? []
+    const q = teamQuery.trim().toLowerCase()
+    const visibleTeams = q ? teamList.filter((t) => t.team.toLowerCase().includes(q)) : teamList
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--hub-text)]">Equipes registradas</h2>
+          <p className="text-sm text-[var(--hub-muted)]">
+            Clique numa equipe para ver o índice técnico, a evolução dos fundamentos e a avaliação inteligente.
+          </p>
+        </div>
+
+        {teamList.length > 6 && (
+          <div className="relative max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--hub-muted)]" />
+            <input
+              value={teamQuery}
+              onChange={(e) => setTeamQuery(e.target.value)}
+              placeholder="Buscar equipe..."
+              className="h-10 w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] pl-9 pr-3 text-sm text-[var(--hub-text)]"
+            />
+          </div>
+        )}
+
+        {visibleTeams.length === 0 ? (
+          <EmptyState
+            title={teamList.length === 0 ? "Nenhuma equipe" : "Nada encontrado"}
+            description={
+              teamList.length === 0
+                ? "Importe scouts para registrar equipes no Volley Tech."
+                : "Nenhuma equipe corresponde à busca."
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleTeams.map((t) => (
+              <button
+                key={t.team}
+                type="button"
+                onClick={() => {
+                  setTeam(t.team)
+                  setSeason("all")
+                  setCompetition("all")
+                }}
+                className="flex items-center gap-3 rounded-xl border border-[var(--hub-border)] bg-[var(--hub-surface)] p-4 text-left transition-colors hover:border-[var(--hub-accent)] hover:bg-[var(--hub-bg-deep)]"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--hub-bg-deep)]">
+                  <Users className="size-5 text-[var(--hub-accent)]" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-[var(--hub-text)]">{t.team}</span>
+                  <span className="block text-xs text-[var(--hub-muted)]">
+                    {t.athletes} atleta(s) · {t.entries} capítulo(s)
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      {/* Filtros */}
+      {/* Cabeçalho da equipe selecionada + filtros */}
       <HubCard>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <Button variant="ghost" onClick={() => setTeam("")} className="gap-2 px-2">
+            <ChevronLeft className="size-4" />
+            Todas as equipes
+          </Button>
+          {chapters.length > 0 && (
+            <Button onClick={handlePrint} variant="outline" className="gap-2 bg-transparent">
+              <FileDown className="size-4" />
+              Gerar PDF
+            </Button>
+          )}
+        </div>
         <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-48 flex-1">
-            <label className="mb-1.5 block text-sm font-medium text-[var(--hub-muted)]">Equipe</label>
-            <select
-              value={team}
-              onChange={(e) => {
-                setTeam(e.target.value)
-                setSeason("all")
-                setCompetition("all")
-              }}
-              className="h-10 w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 text-sm text-[var(--hub-text)]"
-            >
-              <option value="">Selecione uma equipe</option>
-              {(teams ?? []).map((t) => (
-                <option key={t.team} value={t.team}>
-                  {t.team} ({t.athletes} atletas)
-                </option>
-              ))}
-            </select>
-          </div>
           <div className="min-w-36">
             <label className="mb-1.5 block text-sm font-medium text-[var(--hub-muted)]">Temporada</label>
             <select
               value={season}
               onChange={(e) => setSeason(e.target.value)}
-              disabled={!team}
-              className="h-10 w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 text-sm text-[var(--hub-text)] disabled:opacity-50"
+              className="h-10 w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 text-sm text-[var(--hub-text)]"
             >
               <option value="all">Todas</option>
               {seasons.map((s) => (
@@ -156,8 +214,7 @@ export function IptvEquipe() {
             <select
               value={competition}
               onChange={(e) => setCompetition(e.target.value)}
-              disabled={!team}
-              className="h-10 w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 text-sm text-[var(--hub-text)] disabled:opacity-50"
+              className="h-10 w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 text-sm text-[var(--hub-text)]"
             >
               <option value="all">Todas</option>
               {competitions.map((c) => (
@@ -167,29 +224,16 @@ export function IptvEquipe() {
               ))}
             </select>
           </div>
-          {team && chapters.length > 0 && (
-            <Button onClick={handlePrint} variant="outline" className="gap-2 bg-transparent">
-              <FileDown className="size-4" />
-              Gerar PDF
-            </Button>
-          )}
         </div>
       </HubCard>
 
-      {!team && (
-        <EmptyState
-          title="Selecione uma equipe"
-          description="Escolha uma equipe para ver o índice técnico, a evolução dos fundamentos e a avaliação inteligente."
-        />
-      )}
+      {isLoading && <p className="text-sm text-[var(--hub-muted)]">Carregando dados da equipe...</p>}
 
-      {team && isLoading && <p className="text-sm text-[var(--hub-muted)]">Carregando dados da equipe...</p>}
-
-      {team && !isLoading && filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <EmptyState title="Sem dados" description="Não há histórico para os filtros selecionados." />
       )}
 
-      {team && !isLoading && overall && filtered.length > 0 && (
+      {!isLoading && overall && filtered.length > 0 && (
         <>
           <HubCard>
             <div className="flex flex-wrap items-center justify-between gap-4">

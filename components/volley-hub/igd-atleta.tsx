@@ -2,12 +2,13 @@
 
 import { useState } from "react"
 import useSWR from "swr"
-import { AthletePicker } from "./athlete-picker"
+import { AthleteGrid } from "./athlete-grid"
 import { HubCard, EmptyState } from "./ui"
+import { Button } from "@/components/ui/button"
 import { getAthlete, listEntriesForAthlete } from "@/lib/hub/data"
 import { listAssessments } from "@/lib/hub/physical"
 import { computeIGD, igdLabel } from "@/lib/hub/igd"
-import { Activity, Dumbbell, Target } from "lucide-react"
+import { Activity, Dumbbell, Target, ChevronLeft } from "lucide-react"
 
 /** Card de uma parcela do IGD (IPTV, IPF ou TGP). */
 function PartCard({
@@ -49,23 +50,31 @@ export function IgdAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
 
   const parts = data ? computeIGD(data.entries, data.assessments) : null
 
+  // Sem atleta selecionada: grade de todas as atletas registradas.
+  if (!athleteId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--hub-text)]">Atletas registradas</h2>
+          <p className="text-sm text-[var(--hub-muted)]">
+            Clique numa atleta para ver o Índice Geral de Desenvolvimento (IPTV + IPF + Último TGP).
+          </p>
+        </div>
+        <AthleteGrid onSelect={setAthleteId} />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="w-full sm:max-w-sm">
-        <label className="mb-1.5 block text-sm font-medium text-[var(--hub-muted)]">Atleta</label>
-        <AthletePicker value={athleteId} onChange={setAthleteId} />
-      </div>
+      <Button variant="ghost" onClick={() => setAthleteId(undefined)} className="gap-2 self-start px-2">
+        <ChevronLeft className="size-4" />
+        Todas as atletas
+      </Button>
 
-      {!athleteId && (
-        <EmptyState
-          title="Selecione uma atleta"
-          description="O IGD combina o desempenho técnico (IPTV), o físico (IPF) e o Último TGP num único índice de desenvolvimento."
-        />
-      )}
+      {isLoading && <p className="text-sm text-[var(--hub-muted)]">Calculando IGD...</p>}
 
-      {athleteId && isLoading && <p className="text-sm text-[var(--hub-muted)]">Calculando IGD...</p>}
-
-      {athleteId && !isLoading && data?.athlete && parts && (
+      {!isLoading && data?.athlete && parts && (
         <>
           {/* Índice geral */}
           <HubCard>
