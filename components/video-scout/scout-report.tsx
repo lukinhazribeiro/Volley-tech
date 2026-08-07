@@ -13,6 +13,7 @@ import {
 } from "@/lib/video-scout/types"
 import { computeBreakdowns, computeSummary, type PlayerStat } from "@/lib/video-scout/stats"
 import { exportScoutPdf } from "@/lib/video-scout/export-pdf"
+import { computeTGP } from "@/lib/tgp"
 import { ScoutCharts } from "./scout-charts"
 
 interface ScoutReportProps {
@@ -142,11 +143,10 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
   // saque, ace, passe, defesa, bloqueio, ataque, levantamento... exceto erros).
   const totTP = stats.reduce((acc, s) => acc + (s.pontos + s.positivas), 0)
   const totTE = stats.reduce((acc, s) => acc + s.erros, 0)
-  // Pontos conquistados pela equipe = base (divisor) do TGP.
-  const teamPts = stats.reduce((acc, s) => acc + s.pontos, 0)
-  // A linha de RESULTADO GERAL é a referência do jogo inteiro = 100%. Cada
-  // atleta é mostrado como seu TP sobre esses pontos da equipe (valor variável).
-  const totTGP = teamPts === 0 ? 0 : 100
+  // TG total da equipe = soma dos pontos feitos pelas atletas.
+  const teamTG = stats.reduce((acc, s) => acc + s.tg, 0)
+  // TGP geral da equipe pela mesma fórmula definitiva (agregado do jogo).
+  const totTGP = computeTGP({ tp: totTP, te: totTE, tg: teamTG })
 
   const accent = TEAM_STYLE[team].hex
 
@@ -188,6 +188,9 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
                 </th>
               ))}
               <th rowSpan={2} className="border border-blue-500 px-2 py-2 text-xs font-bold">
+                TG
+              </th>
+              <th rowSpan={2} className="border border-blue-500 px-2 py-2 text-xs font-bold">
                 TP
               </th>
               <th rowSpan={2} className="border border-blue-500 px-2 py-2 text-xs font-bold">
@@ -216,9 +219,8 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
           <tbody>
             {stats.map((s, idx) => {
               const tp = s.pontos + s.positivas
-              // TGP = TP do atleta sobre os PONTOS da equipe. Quanto mais perto de
-              // 100%, mais decisivo o atleta foi (mesmo defendendo/passando muito).
-              const tgp = teamPts === 0 ? 0 : Math.round((tp / teamPts) * 100)
+              // TGP definitivo (auto-contido por atleta) já calculado no summary.
+              const tgp = s.tgp
               return (
                 <tr
                   key={s.player.id}
@@ -243,6 +245,9 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
                       </td>
                     )
                   })}
+                  <td className="border border-slate-200 px-2 py-2 font-bold tabular-nums text-sky-600">
+                    {s.tg}
+                  </td>
                   <td className="border border-slate-200 px-2 py-2 font-bold tabular-nums text-emerald-600">
                     {tp}
                   </td>
@@ -269,6 +274,9 @@ function TeamTable({ team, stats }: { team: TeamSide; stats: PlayerStat[] }) {
                   {colTotals[c.key]}
                 </td>
               ))}
+              <td className="border border-amber-300 px-2 py-2 tabular-nums text-sky-700">
+                {teamTG}
+              </td>
               <td className="border border-amber-300 px-2 py-2 tabular-nums text-emerald-700">
                 {totTP}
               </td>
@@ -341,27 +349,22 @@ export function ScoutReport({
       "Numero",
       "Atleta",
       ...FLAT_COLS.map((c) => c.key),
+      "TG",
       "TP",
       "TE",
       "TGP_%",
     ]
-    // Pontos por equipe (base/divisor do TGP) para o cálculo da % de importância.
-    const teamPtsMap: Record<TeamSide, number> = { casa: 0, adversario: 0 }
-    summary.jogadores.forEach((s) => {
-      teamPtsMap[s.player.team] += s.pontos
-    })
     const rows = summary.jogadores.map((s) => {
       const tp = s.pontos + s.positivas
-      const teamPts = teamPtsMap[s.player.team]
-      const tgp = teamPts === 0 ? 0 : Math.round((tp / teamPts) * 100)
       return [
         TEAM_LABEL[s.player.team],
         s.player.number,
         s.player.name,
         ...FLAT_COLS.map((c) => c.get(s)),
+        s.tg,
         tp,
         s.erros,
-        tgp,
+        s.tgp,
       ]
     })
     const csv = [header, ...rows]

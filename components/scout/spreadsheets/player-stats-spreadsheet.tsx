@@ -7,6 +7,7 @@ import { Button } from "@/components/scout/ui/button"
 import { Download, Printer } from 'lucide-react'
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
+import { computeTGP } from "@/lib/tgp"
 
 interface PlayerStatsSpreadsheetProps {
   actions: MatchAction[]
@@ -25,6 +26,8 @@ interface PlayerStats {
   defense: { D: number; V: number; R: number }
   tp: number
   te: number
+  /** Total Great: pontos feitos pela atleta (ataque + ace + bloqueio). */
+  tg: number
   tgp: number
 }
 
@@ -126,6 +129,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
               defense: { D: 0, V: 0, R: 0 },
               tp: 0,
               te: 0,
+              tg: 0,
               tgp: 0,
             }
           }
@@ -149,6 +153,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             defense: { D: 0, V: 0, R: 0 },
             tp: 0,
             te: 0,
+            tg: 0,
             tgp: 0,
           }
         }
@@ -182,6 +187,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             defense: { D: 0, V: 0, R: 0 },
             tp: 0,
             te: 0,
+            tg: 0,
             tgp: 0,
           }
         }
@@ -239,6 +245,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
               defense: { D: 0, V: 0, R: 0 },
               tp: 0,
               te: 0,
+              tg: 0,
               tgp: 0,
             }
           }
@@ -275,6 +282,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
               defense: { D: 0, V: 0, R: 0 },
               tp: 0,
               te: 0,
+              tg: 0,
               tgp: 0,
             }
           }
@@ -300,7 +308,12 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
 
       stat.te = stat.reception.erro + stat.serve.erro + stat.attack.erro
 
-      stat.tgp = stat.tp > 0 ? Math.round((stat.tp / teamTotalPoints) * 100) : 0
+      // TG (Total Great) = pontos feitos pela atleta:
+      // ataque convertido + ace de saque + pontos de bloqueio.
+      stat.tg = stat.attack.ponto + stat.serve.ace + totalBlock
+
+      // TGP definitivo (fórmula única compartilhada com Scout View e Hub).
+      stat.tgp = computeTGP({ tp: stat.tp, te: stat.te, tg: stat.tg })
 
       return stat
     })
@@ -341,6 +354,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       stat.defense.D,
       stat.defense.V,
       stat.defense.R,
+      stat.tg,
       stat.tp,
       stat.te,
       `${stat.tgp}%`,
@@ -358,6 +372,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "ATAQUE", colSpan: 7 },
           { content: "BLOQUEIO", colSpan: 4 },
           { content: "DEFESA", colSpan: 3 },
+          { content: "TG", rowSpan: 2 },
           { content: "TP", rowSpan: 2 },
           { content: "TE", rowSpan: 2 },
           { content: "TGP", rowSpan: 2 },
@@ -418,6 +433,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       stat.defense.D,
       stat.defense.V,
       stat.defense.R,
+      stat.tg,
       stat.tp,
       stat.te,
       `${stat.tgp}%`,
@@ -435,6 +451,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "ATAQUE", colSpan: 7 },
           { content: "BLOQUEIO", colSpan: 4 },
           { content: "DEFESA", colSpan: 3 },
+          { content: "TG", rowSpan: 2 },
           { content: "TP", rowSpan: 2 },
           { content: "TE", rowSpan: 2 },
           { content: "TGP", rowSpan: 2 },
@@ -489,6 +506,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       stat.defense.D,
       stat.defense.V,
       stat.defense.R,
+      stat.tg,
       stat.tp,
       stat.te,
       `${stat.tgp}%`,
@@ -506,6 +524,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           { content: "ATAQUE", colSpan: 7 },
           { content: "BLOQUEIO", colSpan: 4 },
           { content: "DEFESA", colSpan: 3 },
+          { content: "TG", rowSpan: 2 },
           { content: "TP", rowSpan: 2 },
           { content: "TE", rowSpan: 2 },
           { content: "TGP", rowSpan: 2 },
@@ -574,6 +593,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           V: acc.defense.V + stat.defense.V,
           R: acc.defense.R + stat.defense.R,
         },
+        tg: acc.tg + stat.tg,
         tp: acc.tp + stat.tp,
         te: acc.te + stat.te,
       }),
@@ -583,6 +603,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
         block: { O: 0, P: 0, M: 0, FS: 0 },
         defense: { D: 0, V: 0, R: 0 },
+        tg: 0,
         tp: 0,
         te: 0,
       },
@@ -621,6 +642,9 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                 </th>
                 <th className="border border-gray-300 p-1" colSpan={3}>
                   DEFESA
+                </th>
+                <th className="border border-gray-300 p-1" rowSpan={2}>
+                  TG
                 </th>
                 <th className="border border-gray-300 p-1" rowSpan={2}>
                   TP
@@ -695,9 +719,10 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                   <td className="border border-gray-300 p-1 text-center">{stat.defense.D}</td>
                   <td className="border border-gray-300 p-1 text-center">{stat.defense.V}</td>
                   <td className="border border-gray-300 p-1 text-center">{stat.defense.R}</td>
-                  <td className="border border-gray-300 p-1 text-center font-bold">{stat.tp}</td>
-                  <td className="border border-gray-300 p-1 text-center font-bold">{stat.te}</td>
-                  <td className="border border-gray-300 p-1 text-center font-bold bg-yellow-200">{stat.tgp}%</td>
+                <td className="border border-gray-300 p-1 text-center font-bold">{stat.tg}</td>
+                <td className="border border-gray-300 p-1 text-center font-bold">{stat.tp}</td>
+                <td className="border border-gray-300 p-1 text-center font-bold">{stat.te}</td>
+                <td className="border border-gray-300 p-1 text-center font-bold bg-yellow-200">{stat.tgp}%</td>
                 </tr>
               ))}
               <tr className="bg-yellow-100 font-bold">
@@ -723,6 +748,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                 <td className="border border-gray-300 p-1 text-center">{totals.defense.D}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.defense.V}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.defense.R}</td>
+                <td className="border border-gray-300 p-1 text-center">{totals.tg}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.tp}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.te}</td>
                 <td className="border border-gray-300 p-1 text-center">-</td>
