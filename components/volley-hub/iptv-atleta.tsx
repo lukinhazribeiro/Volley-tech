@@ -12,15 +12,18 @@ import {
   Tooltip,
   Legend,
 } from "recharts"
-import { AthletePicker } from "./athlete-picker"
+import { AthleteGrid } from "./athlete-grid"
+import { GestaoLinkCard } from "./gestao-link-card"
 import { HubCard, EvolutionRow, IptvBadge, EmptyState } from "./ui"
 import { getAthlete, listEntriesForAthlete, deleteAthlete } from "@/lib/hub/data"
+import { listAssessments } from "@/lib/hub/physical"
+import { getGestaoAthlete } from "@/app/volley-hub/actions/gestao-link"
 import { buildChapters, evolutionSeries, overallTrend } from "@/lib/hub/aggregate"
 import { aggregateFundamentals, FUNDAMENTALS, FUNDAMENTAL_LABELS, successRate, trendFrom } from "@/lib/hub/stats"
 import { computeIPTV, generateEvaluation } from "@/lib/hub/intelligence"
 import { exportAthletePdf } from "@/lib/hub/export-pdf"
 import { Button } from "@/components/ui/button"
-import { FileDown, Sparkles, Trash2 } from "lucide-react"
+import { FileDown, Sparkles, Trash2, ChevronLeft } from "lucide-react"
 
 const FUND_COLORS: Record<string, string> = {
   ataque: "var(--chart-1)",
@@ -91,19 +94,37 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
     if (!data?.athlete) return
     setExporting(true)
     try {
-      await exportAthletePdf(data.athlete, data.entries)
+      const assessments = await listAssessments(data.athlete.id)
+      const gestao =
+        data.athlete.gestao_atleta_id != null ? await getGestaoAthlete(data.athlete.gestao_atleta_id) : null
+      await exportAthletePdf(data.athlete, data.entries, { assessments, gestao })
     } finally {
       setExporting(false)
     }
   }
 
+  // Sem atleta selecionada: mostra a grade de todas as atletas registradas.
+  if (!athleteId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Atletas registradas</h2>
+          <p className="text-sm text-muted-foreground">
+            Clique numa atleta para ver o perfil, a evolução e a avaliação inteligente.
+          </p>
+        </div>
+        <AthleteGrid onSelect={setAthleteId} />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:max-w-sm">
-          <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Atleta</label>
-          <AthletePicker value={athleteId} onChange={setAthleteId} />
-        </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="ghost" onClick={() => setAthleteId(undefined)} className="gap-2 self-start px-2">
+          <ChevronLeft className="size-4" />
+          Todas as atletas
+        </Button>
         {data?.athlete && chapters.length > 0 && (
           <Button onClick={handlePDF} disabled={exporting} className="gap-2">
             <FileDown className="size-4" />
@@ -111,8 +132,6 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
           </Button>
         )}
       </div>
-
-      {!athleteId && <EmptyState title="Selecione uma atleta" description="Escolha uma atleta para ver o perfil, a evolução e a avaliação inteligente." />}
 
       {athleteId && isLoading && <p className="text-sm text-muted-foreground">Carregando perfil...</p>}
 
@@ -168,10 +187,13 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
             )}
           </HubCard>
 
+          {/* Vínculo Hub↔Gestão */}
+          <GestaoLinkCard athlete={data.athlete} />
+
           {/* Último TGP — lido automaticamente do scout mais recente; não entra no IPTV */}
           <HubCard
             title="Último TGP"
-            description="Participação nos pontos da equipe no scout mais recente. Atualizado automaticamente a cada novo scout. Não faz parte do cálculo do IPTV."
+            description="TGP da atleta no scout mais recente (mesma fórmula da planilha). Atualizado automaticamente a cada novo scout. Não faz parte do cálculo do IPTV."
           >
             {lastTgp != null ? (
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
