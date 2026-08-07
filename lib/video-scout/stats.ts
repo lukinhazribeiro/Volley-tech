@@ -1,3 +1,4 @@
+import { computeTGP } from "@/lib/tgp"
 import {
   BLOQUEIO_LABEL,
   DEFESA_LABEL,
@@ -194,6 +195,10 @@ export interface PlayerStat {
   /** Ações positivas (perfeito/positivo) que não são ponto nem erro. */
   positivas: number
   erros: number
+  /** TG (Total Great) = pontos feitos pela atleta (alias de `pontos`). */
+  tg: number
+  /** TGP definitivo (0-100), mesma fórmula do Scout Volleyball e da Hub. */
+  tgp: number
   porFundamento: Record<Fundamento, { total: number; pontos: number; erros: number }>
   /** Defesas separadas por tipo: defesa de ataque, passe de volume e recuperação. */
   defesaPorTipo: Record<DefesaTipo, number>
@@ -313,12 +318,16 @@ export function computeSummary(
       const atk = pa.porFundamento.ataque
       const saque = pa.porFundamento.saque
       const recep = pa.porFundamento.recepcao
+      // TGP definitivo: TP = positivas + pontos, TE = erros, TG = pontos.
+      const tgp = computeTGP({ tp: pa.positivas + pa.pontos, te: pa.erros, tg: pa.pontos })
       return {
         player,
         total: pa.total,
         pontos: pa.pontos,
         positivas: pa.positivas,
         erros: pa.erros,
+        tg: pa.pontos,
+        tgp,
         porFundamento: pa.porFundamento,
         defesaPorTipo: pa.defesaPorTipo,
         eficienciaAtaque: efficiency(atk.pontos, atk.erros, atk.total),

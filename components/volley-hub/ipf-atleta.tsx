@@ -11,7 +11,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts"
-import { AthletePicker } from "./athlete-picker"
+import { AthleteGrid } from "./athlete-grid"
 import { HubCard, IptvBadge, EmptyState } from "./ui"
 import { getAthlete } from "@/lib/hub/data"
 import {
@@ -28,7 +28,7 @@ import {
   type NewAssessment,
 } from "@/lib/hub/physical"
 import { Button } from "@/components/ui/button"
-import { Trash2, Plus, Dumbbell } from "lucide-react"
+import { Trash2, Plus, Dumbbell, ChevronLeft } from "lucide-react"
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
@@ -86,14 +86,29 @@ export function IpfAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
     await mutate()
   }
 
+  // Sem atleta selecionada: grade de todas as atletas registradas.
+  if (!athleteId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--hub-text)]">Atletas registradas</h2>
+          <p className="text-sm text-[var(--hub-muted)]">
+            Clique numa atleta para ver o histórico físico (IPF) e cadastrar avaliações.
+          </p>
+        </div>
+        <AthleteGrid onSelect={setAthleteId} />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:max-w-sm">
-          <label className="mb-1.5 block text-sm font-medium text-[var(--hub-muted)]">Atleta</label>
-          <AthletePicker value={athleteId} onChange={setAthleteId} />
-        </div>
-        {athleteId && data?.athlete && (
+      <div className="flex items-center justify-between gap-4">
+        <Button variant="ghost" onClick={() => setAthleteId(undefined)} className="gap-2 px-2">
+          <ChevronLeft className="size-4" />
+          Todas as atletas
+        </Button>
+        {data?.athlete && (
           <Button onClick={() => setShowForm((v) => !v)} className="gap-2">
             <Plus className="size-4" />
             Nova avaliação
@@ -101,16 +116,9 @@ export function IpfAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
         )}
       </div>
 
-      {!athleteId && (
-        <EmptyState
-          title="Selecione uma atleta"
-          description="Escolha uma atleta para ver o histórico físico e cadastrar avaliações."
-        />
-      )}
+      {isLoading && <p className="text-sm text-[var(--hub-muted)]">Carregando avaliações...</p>}
 
-      {athleteId && isLoading && <p className="text-sm text-[var(--hub-muted)]">Carregando avaliações...</p>}
-
-      {athleteId && !isLoading && data?.athlete && (
+      {!isLoading && data?.athlete && (
         <>
           {/* Perfil + índice físico geral */}
           <HubCard>

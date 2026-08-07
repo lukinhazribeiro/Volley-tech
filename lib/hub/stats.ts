@@ -78,6 +78,23 @@ export function positiveActions(f: PlayerFundamentals): number {
   return tp
 }
 
+/** TE — total de erros da atleta (soma dos erros de todos os fundamentos). */
+export function errorActions(f: PlayerFundamentals): number {
+  let te = 0
+  for (const key of FUNDAMENTALS) {
+    te += f[key].erro
+  }
+  return te
+}
+
+/**
+ * TG (Total Great) — pontos feitos pela atleta:
+ * ataque convertido (ponto) + ace de saque (ponto) + pontos de bloqueio (certo).
+ */
+export function greatActions(f: PlayerFundamentals): number {
+  return f.ataque.ponto + f.saque.ponto + f.bloqueio.certo
+}
+
 /**
  * Extrai o resumo por atleta de UM time (A ou B) a partir das ações do scout.
  * A lógica de contagem espelha a planilha oficial do Scout, mas o Hub mantém
@@ -117,7 +134,8 @@ export function extractTeamPlayerStats(
     ) {
       processedReception.add(action.id)
       const p = ensure(action.passingPlayer).fundamentals.recepcao
-      const positive = ["A", "B", "C"].includes(action.passingQuality as string)
+      // Recepção binária, idêntica à planilha: A/B = certo; o resto = erro.
+      const positive = action.passingQuality === "A" || action.passingQuality === "B"
       if (positive) p.certo++
       else p.erro++
       p.total++
@@ -142,28 +160,33 @@ export function extractTeamPlayerStats(
       }
     }
 
-    // ---- Ataque ---- (mesmos códigos da planilha oficial)
-    //   "#" = ponto | "!","+","%" = erro | "D","V" = ataque certo (defendido)
+    // ---- Ataque ---- classificação ÚNICA, idêntica à planilha oficial.
+    //   "#" = ponto | "!","+","%" = erro | "D","V" = certo (defendido/volume)
+    //   "REC" com origem no bloqueio (blockingPlayer sem defensivePlayer) = certo
+    //   (ataque bloqueado mas recuperado — conta uma vez; a recuperação da defesa
+    //    traz defensivePlayer e é ignorada aqui para não duplicar).
     if (action.actionPlayer && action.actionPlayer > 0 && action.attackingTeam === team) {
       const comp = action.resultComplemento
       const a = ensure(action.actionPlayer).fundamentals.ataque
-      if (comp === "#") {
-        a.ponto++
-        a.total++
-      } else if (comp === "!" || comp === "+" || comp === "%") {
-        a.erro++
-        a.total++
-      } else if (comp === "D" || comp === "V") {
-        a.certo++
+      let outcome: "certo" | "erro" | "ponto" | null = null
+      if (comp === "#") outcome = "ponto"
+      else if (comp === "!" || comp === "+" || comp === "%") outcome = "erro"
+      else if (comp === "D" || comp === "V") outcome = "certo"
+      else if (comp === "REC" && action.blockingPlayer && !action.defensivePlayer) outcome = "certo"
+      if (outcome) {
+        a[outcome]++
         a.total++
       }
     }
 
-    // ---- Bloqueio ----
+    // ---- Bloqueio ---- só do time que bloqueia (evita contaminar números iguais).
     if (action.blockingPlayer && action.blockingPlayer > 0) {
-      const b = ensure(action.blockingPlayer).fundamentals.bloqueio
-      b.certo++
-      b.total++
+      const blockingTeam: "A" | "B" = action.attackingTeam === "A" ? "B" : "A"
+      if (blockingTeam === team) {
+        const b = ensure(action.blockingPlayer).fundamentals.bloqueio
+        b.certo++
+        b.total++
+      }
     }
 
     // ---- Defesa ---- usa defensiveTeam quando disponível

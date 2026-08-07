@@ -4,9 +4,22 @@
  */
 
 import { FUNDAMENTALS, FUNDAMENTAL_LABELS, successRate } from "./stats"
-import { computeIPTV, generateEvaluation, percentuais } from "./intelligence"
+import { computeIPTV, generateEvaluation } from "./intelligence"
 import { buildChapters } from "./aggregate"
+import { computeIGD, igdLabel } from "./igd"
+import type { PhysicalAssessment } from "./physical"
 import type { HubAthlete, HubHistoryEntry } from "./types"
+
+/** Dados extras opcionais para enriquecer o relatório (índices + cadastro). */
+export interface AthletePdfExtras {
+  assessments?: PhysicalAssessment[]
+  gestao?: {
+    nome: string
+    categoria: string | null
+    turma: string | null
+    dataNascimento: string | null
+  } | null
+}
 
 async function loadLogoDataUrl(): Promise<string | null> {
   try {
@@ -49,9 +62,14 @@ const C = {
   amber: rgb("#f59e0b"),
 }
 
-export async function exportAthletePdf(athlete: HubAthlete, entries: HubHistoryEntry[]) {
+export async function exportAthletePdf(
+  athlete: HubAthlete,
+  entries: HubHistoryEntry[],
+  extras: AthletePdfExtras = {},
+) {
   const { jsPDF } = await import("jspdf")
   const chapters = buildChapters(entries)
+  const igd = computeIGD(entries, extras.assessments ?? [])
   const overall = chapters.reduce(
     (acc, c) => {
       for (const f of FUNDAMENTALS) {
@@ -122,14 +140,42 @@ export async function exportAthletePdf(athlete: HubAthlete, entries: HubHistoryE
   doc.text(`Gerado em ${dateLabel}`, M + CW - 14, y + 46, { align: "right" })
   y += headerH + 20
 
-  // -------- KPIs --------
+  // -------- Cadastro (Gestão) — quando a atleta está vinculada --------
+  if (extras.gestao) {
+    const g = extras.gestao
+    const nasc = g.dataNascimento ? new Date(g.dataNascimento).toLocaleDateString("pt-BR") : null
+    const cad = [
+      g.categoria ? `Categoria: ${g.categoria}` : null,
+      g.turma ? `Turma: ${g.turma}` : null,
+      nasc ? `Nascimento: ${nasc}` : null,
+    ]
+      .filter(Boolean)
+      .join("    ")
+    if (cad) {
+      doc.setFillColor(...C.slate50)
+      doc.setDrawColor(...C.slate200)
+      doc.setLineWidth(0.8)
+      doc.roundedRect(M, y, CW, 30, 6, 6, "FD")
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(7.5)
+      doc.setTextColor(...C.orange)
+      doc.text("CADASTRO (GESTÃO)", M + 12, y + 12)
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(8.5)
+      doc.setTextColor(...C.slate700)
+      doc.text(cad, M + 12, y + 24)
+      y += 30 + 16
+    }
+  }
+
+  // -------- KPIs (índices consolidados) --------
   const iptv = computeIPTV(overall)
-  const pcts = percentuais(overall)
+  const fmt = (n: number | null, suffix = "") => (n != null ? `${n}${suffix}` : "—")
   const kpis: { label: string; value: string; accent: [number, number, number] }[] = [
-    { label: "IPTV geral", value: String(iptv), accent: C.orange },
-    { label: "Capítulos", value: String(chapters.length), accent: C.blue },
-    { label: "Melhor fundamento", value: bestFundamental(pcts), accent: C.emerald },
-    { label: "Ações registradas", value: String(totalActions(overall)), accent: C.amber },
+    { label: "IPTV", value: fmt(igd.iptv ?? iptv), accent: C.orange },
+    { label: "IPF", value: fmt(igd.ipf), accent: C.blue },
+    { label: "Último TGP", value: fmt(igd.tgp, "%"), accent: C.emerald },
+    { label: `IGD · ${igdLabel(igd.igd)}`, value: fmt(igd.igd), accent: C.amber },
   ]
   const kpiGap = 12
   const kpiW = (CW - kpiGap * 3) / 4
@@ -270,18 +316,3 @@ export async function exportAthletePdf(athlete: HubAthlete, entries: HubHistoryE
   doc.save(`volley-tech-${safe}.pdf`)
 }
 
-function bestFundamental(pcts: Record<string, number>): string {
-  let best = ""
-  let max = -1
-  for (const f of FUNDAMENTALS) {
-    if (pcts[f] > max) {
-      max = pcts[f]
-      best = FUNDAMENTAL_LABELS[f]
-    }
-  }
-  return max <= 0 ? "—" : best
-}
-
-function totalActions(overall: Record<string, { total: number }>): number {
-  return FUNDAMENTALS.reduce((acc, f) => acc + overall[f].total, 0)
-}

@@ -10,7 +10,14 @@ import { getMatches, type StoredMatch, type StoredPlayer } from "@/lib/scout/mat
 import { loadHistory as loadVideoHistory, type MatchHistoryEntry } from "@/lib/video-scout/history"
 import type { MatchState } from "@/lib/video-scout/match"
 import type { Fundamento, Resultado } from "@/lib/video-scout/types"
-import { extractTeamPlayerStats, positiveActions, type PlayerFundamentals } from "./stats"
+import {
+  extractTeamPlayerStats,
+  positiveActions,
+  errorActions,
+  greatActions,
+  type PlayerFundamentals,
+} from "./stats"
+import { computeTGP } from "@/lib/tgp"
 import type { HubAthlete, HubHistoryEntry, HubImport, ImportCandidate, MatchResult } from "./types"
 
 function norm(s: string | null | undefined): string {
@@ -61,12 +68,14 @@ export function buildCandidatesFromLocalMatches(matches: StoredMatch[] = getMatc
       for (const p of players) if (p.name?.trim()) namesByNumber[p.number] = p.name.trim()
 
       const summaries = extractTeamPlayerStats(match.actions, team, namesByNumber)
-      // TP total da EQUIPE nesta partida — base do TGP (mesma fórmula do Scout).
-      const teamTP = summaries.reduce((sum, s) => sum + positiveActions(s.fundamentals), 0)
       for (const s of summaries) {
         const fullName = s.name?.trim()
         if (!fullName) continue // só associa atletas com nome
-        const tgp = teamTP > 0 ? Math.round((positiveActions(s.fundamentals) / teamTP) * 100) : null
+        // TGP definitivo (fórmula única, auto-contida por atleta).
+        const tp = positiveActions(s.fundamentals)
+        const te = errorActions(s.fundamentals)
+        const tg = greatActions(s.fundamentals)
+        const tgp = tp + te > 0 ? computeTGP({ tp, te, tg }) : null
         candidates.push({
           fullName,
           team: name,
@@ -153,11 +162,12 @@ export function buildCandidatesFromVideoMatches(entries: MatchHistoryEntry[]): I
         perPlayer.push({ player, fundamentals })
       }
 
-      // TP total da EQUIPE (lado) — base do TGP (mesma fórmula do Scout).
-      const teamTP = perPlayer.reduce((sum, p) => sum + positiveActions(p.fundamentals), 0)
-
       for (const { player, fundamentals } of perPlayer) {
-        const tgp = teamTP > 0 ? Math.round((positiveActions(fundamentals) / teamTP) * 100) : null
+        // TGP definitivo (fórmula única, auto-contida por atleta).
+        const tp = positiveActions(fundamentals)
+        const te = errorActions(fundamentals)
+        const tg = greatActions(fundamentals)
+        const tgp = tp + te > 0 ? computeTGP({ tp, te, tg }) : null
         candidates.push({
           fullName: player.name!.trim(),
           team: cfg.name,
@@ -477,6 +487,30 @@ export async function getAthlete(id: string): Promise<HubAthlete | null> {
   const supabase = createClient()
   const { data } = await supabase.from("hub_athletes").select("*").eq("id", id).maybeSingle()
   return (data as HubAthlete) ?? null
+}
+
+/**
+ * Vincula (fixa) uma atleta do Hub a uma atleta da Gestão pelo ID desta última.
+ * A partir daí o vínculo é permanente até ser desfeito — novos scouts da mesma
+ * atleta do Hub continuam ligados automaticamente.
+ */
+export async function linkAthleteToGestao(athleteId: string, gestaoAtletaId: number): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from("hub_athletes")
+    .update({ gestao_atleta_id: gestaoAtletaId })
+    .eq("id", athleteId)
+  if (error) throw describeDbError(error, "Não foi possível vincular a atleta à Gestão.")
+}
+
+/** Desfaz o vínculo Hub↔Gestão de uma atleta (reversível). */
+export async function unlinkAthleteFromGestao(athleteId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from("hub_athletes")
+    .update({ gestao_atleta_id: null })
+    .eq("id", athleteId)
+  if (error) throw describeDbError(error, "Não foi possível desfazer o vínculo.")
 }
 
 export async function listEntriesForAthlete(athleteId: string): Promise<HubHistoryEntry[]> {

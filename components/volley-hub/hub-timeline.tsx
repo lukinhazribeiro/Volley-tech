@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react"
 import useSWR from "swr"
 import { useSearchParams } from "next/navigation"
-import { CalendarClock, Trophy } from "lucide-react"
+import { CalendarClock, Trophy, ChevronLeft } from "lucide-react"
 import { listAthletes, listEntriesForAthlete } from "@/lib/hub/data"
 import { buildChapters } from "@/lib/hub/aggregate"
 import { FUNDAMENTALS, FUNDAMENTAL_LABELS, successRate } from "@/lib/hub/stats"
-import { AthletePicker } from "./athlete-picker"
+import { AthleteGrid } from "./athlete-grid"
 import { HubCard, EmptyState } from "./ui"
+import { Button } from "@/components/ui/button"
 import type { HubAthlete } from "@/lib/hub/types"
 
 export function HubTimeline() {
@@ -28,25 +29,32 @@ export function HubTimeline() {
   const chapters = buildChapters(entries ?? [])
   const athlete = list.find((a) => a.id === athleteId)
 
-  return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+  // Sem atleta selecionada: grade de todas as atletas registradas.
+  if (!athleteId) {
+    return (
+      <div>
+        <div className="mb-6">
           <p className="font-mono text-xs uppercase tracking-widest text-[var(--hub-accent)]">Carreira</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Linha do Tempo</h1>
           <p className="mt-1 text-sm text-[var(--hub-muted)]">
-            Cada competição/scout é um capítulo permanente da história da atleta.
+            Clique numa atleta para ver sua trajetória, temporada a temporada.
           </p>
         </div>
-        <AthletePicker athletes={list} value={athleteId} onChange={setAthleteId} />
+        <AthleteGrid onSelect={setAthleteId} />
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <Button variant="ghost" onClick={() => setAthleteId("")} className="gap-2 px-2">
+          <ChevronLeft className="size-4" />
+          Todas as atletas
+        </Button>
       </div>
 
-      {!athleteId ? (
-        <EmptyState
-          title="Selecione uma atleta"
-          description="Escolha uma atleta para ver sua trajetória, temporada a temporada."
-        />
-      ) : chapters.length === 0 ? (
+      {chapters.length === 0 ? (
         <EmptyState
           title="Sem capítulos"
           description="Esta atleta ainda não tem histórico importado no Volley Tech."

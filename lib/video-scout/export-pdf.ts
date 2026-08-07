@@ -1,5 +1,6 @@
 import type { FundamentoBreakdown, PlayerStat, ScoutSummary } from "./stats"
 import { TEAM_LABEL, type Fundamento, type TeamSide } from "./types"
+import { computeTGP } from "@/lib/tgp"
 
 /** Carrega a logo da Volley Tech como dataURL para embutir no PDF (marca do documento). */
 async function loadLogoDataUrl(): Promise<string | null> {
@@ -293,13 +294,12 @@ export async function exportScoutPdf(params: ExportPdfParams) {
     doc.text(`PLANILHA · ${TEAM_LABEL[team].toUpperCase()}`, M, y)
     y += 8
 
-    const teamPts = stats.reduce((acc, s) => acc + s.pontos, 0)
-
     // Cabeçalho agrupado (linha de grupos + linha de subcolunas).
     const groupRow = [
       { content: "Nº", rowSpan: 2 },
       { content: "Atleta", rowSpan: 2, styles: { halign: "left" as const } },
       ...COL_GROUPS.map((g) => ({ content: g.group, colSpan: g.cols.length })),
+      { content: "TG", rowSpan: 2 },
       { content: "TP", rowSpan: 2 },
       { content: "TE", rowSpan: 2 },
       { content: "TGP", rowSpan: 2, styles: { fillColor: C.blueDark } },
@@ -308,7 +308,6 @@ export async function exportScoutPdf(params: ExportPdfParams) {
 
     const body = stats.map((s) => {
       const tp = s.pontos + s.positivas
-      const tgp = teamPts === 0 ? 0 : Math.round((tp / teamPts) * 100)
       return [
         String(s.player.number),
         s.player.name,
@@ -316,26 +315,31 @@ export async function exportScoutPdf(params: ExportPdfParams) {
           const v = c.get(s)
           return v === 0 ? "-" : String(v)
         }),
+        String(s.tg),
         String(tp),
         String(s.erros),
-        `${tgp}%`,
+        `${s.tgp}%`,
       ]
     })
 
     // Rodapé (RESULTADO GERAL).
     const colTotals = FLAT.map((c) => stats.reduce((acc, s) => acc + c.get(s), 0))
+    const teamTG = stats.reduce((acc, s) => acc + s.tg, 0)
     const totTP = stats.reduce((acc, s) => acc + s.pontos + s.positivas, 0)
     const totTE = stats.reduce((acc, s) => acc + s.erros, 0)
+    const totTGP = computeTGP({ tp: totTP, te: totTE, tg: teamTG })
     const foot = [
       { content: "RESULTADO GERAL", colSpan: 2, styles: { halign: "left" as const } },
       ...colTotals.map((v) => String(v)),
+      String(teamTG),
       String(totTP),
       String(totTE),
-      `${teamPts === 0 ? 0 : 100}%`,
+      `${totTGP}%`,
     ]
 
-    const lastIdx = 2 + FLAT.length + 2 // índice da coluna TGP
-    const tpIdx = 2 + FLAT.length
+    const lastIdx = 2 + FLAT.length + 3 // índice da coluna TGP
+    const tgIdx = 2 + FLAT.length
+    const tpIdx = tgIdx + 1
     const teIdx = tpIdx + 1
 
     autoTable(doc, {
@@ -383,7 +387,11 @@ export async function exportScoutPdf(params: ExportPdfParams) {
           data.cell.styles.fillColor = C.yellowCell
           data.cell.styles.fontStyle = "bold"
         }
-        // TP em verde e TE em vermelho no corpo.
+        // TG (pontos) em azul, TP em verde e TE em vermelho no corpo.
+        if (data.section === "body" && data.column.index === tgIdx) {
+          data.cell.styles.textColor = C.blue
+          data.cell.styles.fontStyle = "bold"
+        }
         if (data.section === "body" && data.column.index === tpIdx) {
           data.cell.styles.textColor = C.emerald
           data.cell.styles.fontStyle = "bold"
