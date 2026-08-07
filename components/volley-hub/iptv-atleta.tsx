@@ -12,7 +12,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts"
-import { AthleteGrid } from "./athlete-grid"
+import { AthletePicker } from "./athlete-picker"
 import { HubCard, EvolutionRow, IptvBadge, EmptyState } from "./ui"
 import { getAthlete, listEntriesForAthlete, deleteAthlete } from "@/lib/hub/data"
 import { buildChapters, evolutionSeries, overallTrend } from "@/lib/hub/aggregate"
@@ -20,7 +20,7 @@ import { aggregateFundamentals, FUNDAMENTALS, FUNDAMENTAL_LABELS, successRate, t
 import { computeIPTV, generateEvaluation } from "@/lib/hub/intelligence"
 import { exportAthletePdf } from "@/lib/hub/export-pdf"
 import { Button } from "@/components/ui/button"
-import { FileDown, Sparkles, Trash2, ArrowLeft } from "lucide-react"
+import { FileDown, Sparkles, Trash2 } from "lucide-react"
 
 const FUND_COLORS: Record<string, string> = {
   ataque: "var(--chart-1)",
@@ -99,34 +99,20 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
 
   return (
     <div className="space-y-6">
-      {/* Sem atleta selecionada: grade de todas as atletas com filtro por categoria. */}
-      {!athleteId && (
-        <>
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Atletas</h1>
-            <p className="text-sm text-muted-foreground">
-              Toque numa atleta para ver o IPTV, a evolução e a avaliação inteligente.
-            </p>
-          </div>
-          <AthleteGrid onSelect={setAthleteId} />
-        </>
-      )}
-
-      {/* Com atleta selecionada: botão voltar + exportar PDF. */}
-      {athleteId && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Button variant="ghost" size="sm" onClick={() => setAthleteId(undefined)} className="gap-2 self-start">
-            <ArrowLeft className="size-4" />
-            Todas as atletas
-          </Button>
-          {data?.athlete && chapters.length > 0 && (
-            <Button onClick={handlePDF} disabled={exporting} className="gap-2">
-              <FileDown className="size-4" />
-              {exporting ? "Gerando..." : "Gerar PDF"}
-            </Button>
-          )}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:max-w-sm">
+          <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Atleta</label>
+          <AthletePicker value={athleteId} onChange={setAthleteId} />
         </div>
-      )}
+        {data?.athlete && chapters.length > 0 && (
+          <Button onClick={handlePDF} disabled={exporting} className="gap-2">
+            <FileDown className="size-4" />
+            {exporting ? "Gerando..." : "Gerar PDF"}
+          </Button>
+        )}
+      </div>
+
+      {!athleteId && <EmptyState title="Selecione uma atleta" description="Escolha uma atleta para ver o perfil, a evolução e a avaliação inteligente." />}
 
       {athleteId && isLoading && <p className="text-sm text-muted-foreground">Carregando perfil...</p>}
 
