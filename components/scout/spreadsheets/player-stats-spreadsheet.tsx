@@ -192,41 +192,29 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           }
         }
 
-        // Distribuição por posição de ataque
-        if (action.attackPosition === "O") playerStats[action.actionPlayer].attack.O++
-        else if (action.attackPosition === "P") playerStats[action.actionPlayer].attack.P++
-        else if (action.attackPosition === "M") playerStats[action.actionPlayer].attack.M++
-        else if (action.attackPosition === "F" || action.attackPosition === "S")
-          playerStats[action.actionPlayer].attack.FS++
+        // Classificação ÚNICA do ataque (cada ataque conta exatamente uma vez).
+        //   "#"            -> ponto
+        //   "!","+","%"    -> erro (fora/rede, bloqueado p/ ponto, erro de levant.)
+        //   "D","V"        -> certo (defendido / volume — seguiu em jogo)
+        //   "REC" (origem no bloqueio) -> certo (ataque bloqueado mas recuperado:
+        //          conta uma vez pela ação do bloqueio; a recuperação da defesa,
+        //          que traz defensivePlayer, é ignorada para não duplicar).
+        const comp = action.resultComplemento
+        let outcome: "ponto" | "certo" | "erro" | null = null
+        if (comp === "#") outcome = "ponto"
+        else if (comp === "!" || comp === "+" || comp === "%") outcome = "erro"
+        else if (comp === "D" || comp === "V") outcome = "certo"
+        else if (comp === "REC" && action.blockingPlayer && !action.defensivePlayer) outcome = "certo"
 
-        console.log(
-          "[v0] Processing attack - Player:",
-          action.actionPlayer,
-          "Team:",
-          action.attackingTeam,
-          "DefensivePlayer:",
-          action.defensivePlayer,
-          "ResultComplemento:",
-          action.resultComplemento,
-        )
-
-        // Ataque Certo: quando há defesa (D) ou volume (V) - ataque sem ponto
-        if (action.resultComplemento === "D" || action.resultComplemento === "V") {
-          console.log("[v0] Counting attack certo for player", action.actionPlayer, "on team", team)
-          playerStats[action.actionPlayer].attack.certo++
-        }
-
-        // Ataque Ponto: quando resultComplemento === "#"
-        if (action.resultComplemento === "#") {
-          console.log("[v0] Counting attack ponto for player", action.actionPlayer, "on team", team)
-          playerStats[action.actionPlayer].attack.ponto++
-        } else if (action.resultComplemento === "!") {
-          playerStats[action.actionPlayer].attack.erro++
-        } else if (action.resultComplemento === "+") {
-          playerStats[action.actionPlayer].attack.erro++
-        } else if (action.resultComplemento === "%") {
-          // Erro de levantamento contabilizado como erro de ataque
-          playerStats[action.actionPlayer].attack.erro++
+        if (outcome) {
+          playerStats[action.actionPlayer].attack[outcome]++
+          // A posição só é contabilizada quando há um ataque REAL classificado,
+          // mantendo O/P/M/FS coerente com ponto+certo+erro (sem "fantasmas").
+          if (action.attackPosition === "O") playerStats[action.actionPlayer].attack.O++
+          else if (action.attackPosition === "P") playerStats[action.actionPlayer].attack.P++
+          else if (action.attackPosition === "M") playerStats[action.actionPlayer].attack.M++
+          else if (action.attackPosition === "F" || action.attackPosition === "S")
+            playerStats[action.actionPlayer].attack.FS++
         }
       }
 
