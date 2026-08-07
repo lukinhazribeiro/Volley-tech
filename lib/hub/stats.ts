@@ -78,6 +78,29 @@ export function positiveActions(f: PlayerFundamentals): number {
   return tp
 }
 
+/** Total de ERROS (TE) da atleta somando todos os fundamentos. */
+export function errorActions(f: PlayerFundamentals): number {
+  let te = 0
+  for (const key of FUNDAMENTALS) {
+    te += f[key].erro
+  }
+  return te
+}
+
+/** Total de ações (T) = ações positivas (TP) + erros (TE). */
+export function totalActions(f: PlayerFundamentals): number {
+  return positiveActions(f) + errorActions(f)
+}
+
+/**
+ * TG (Total Great) = pontos feitos pela atleta:
+ * ataque convertido + ace de saque + pontos de bloqueio.
+ * No modelo do Hub, o bloqueio é sempre contabilizado como ponto (`certo`).
+ */
+export function greatActions(f: PlayerFundamentals): number {
+  return f.ataque.ponto + f.saque.ponto + f.bloqueio.certo
+}
+
 /**
  * Extrai o resumo por atleta de UM time (A ou B) a partir das ações do scout.
  * A lógica de contagem espelha a planilha oficial do Scout, mas o Hub mantém

@@ -10,7 +10,8 @@ import { getMatches, type StoredMatch, type StoredPlayer } from "@/lib/scout/mat
 import { loadHistory as loadVideoHistory, type MatchHistoryEntry } from "@/lib/video-scout/history"
 import type { MatchState } from "@/lib/video-scout/match"
 import type { Fundamento, Resultado } from "@/lib/video-scout/types"
-import { extractTeamPlayerStats, positiveActions, type PlayerFundamentals } from "./stats"
+import { extractTeamPlayerStats, positiveActions, errorActions, greatActions, type PlayerFundamentals } from "./stats"
+import { computeTGP } from "@/lib/tgp"
 import type { HubAthlete, HubHistoryEntry, HubImport, ImportCandidate, MatchResult } from "./types"
 
 function norm(s: string | null | undefined): string {
@@ -61,12 +62,14 @@ export function buildCandidatesFromLocalMatches(matches: StoredMatch[] = getMatc
       for (const p of players) if (p.name?.trim()) namesByNumber[p.number] = p.name.trim()
 
       const summaries = extractTeamPlayerStats(match.actions, team, namesByNumber)
-      // TP total da EQUIPE nesta partida — base do TGP (mesma fórmula do Scout).
-      const teamTP = summaries.reduce((sum, s) => sum + positiveActions(s.fundamentals), 0)
       for (const s of summaries) {
         const fullName = s.name?.trim()
         if (!fullName) continue // só associa atletas com nome
-        const tgp = teamTP > 0 ? Math.round((positiveActions(s.fundamentals) / teamTP) * 100) : null
+        // TGP definitivo (auto-contido por atleta): mesma fórmula da planilha.
+        const tp = positiveActions(s.fundamentals)
+        const te = errorActions(s.fundamentals)
+        const tg = greatActions(s.fundamentals)
+        const tgp = tp + te > 0 ? computeTGP({ tp, te, tg }) : null
         candidates.push({
           fullName,
           team: name,
@@ -153,11 +156,12 @@ export function buildCandidatesFromVideoMatches(entries: MatchHistoryEntry[]): I
         perPlayer.push({ player, fundamentals })
       }
 
-      // TP total da EQUIPE (lado) — base do TGP (mesma fórmula do Scout).
-      const teamTP = perPlayer.reduce((sum, p) => sum + positiveActions(p.fundamentals), 0)
-
       for (const { player, fundamentals } of perPlayer) {
-        const tgp = teamTP > 0 ? Math.round((positiveActions(fundamentals) / teamTP) * 100) : null
+        // TGP definitivo (auto-contido por atleta): mesma fórmula da planilha.
+        const tp = positiveActions(fundamentals)
+        const te = errorActions(fundamentals)
+        const tg = greatActions(fundamentals)
+        const tgp = tp + te > 0 ? computeTGP({ tp, te, tg }) : null
         candidates.push({
           fullName: player.name!.trim(),
           team: cfg.name,
