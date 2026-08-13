@@ -18,8 +18,6 @@ import {
   type PlayerFundamentals,
 } from "./stats"
 import { computeTGP } from "@/lib/tgp"
-import { getActionMatches } from "@/lib/scout-action/storage"
-import { computePlayerMetrics, toSyntheticFundamentals, type ScoutActionMatch } from "@/lib/scout-action/types"
 import type { HubAthlete, HubHistoryEntry, HubImport, ImportCandidate, MatchResult } from "./types"
 
 function norm(s: string | null | undefined): string {
@@ -195,69 +193,6 @@ export function buildCandidatesFromVideoMatches(entries: MatchHistoryEntry[]): I
 export async function loadVideoScoutCandidates(): Promise<ImportCandidate[]> {
   const history = await loadVideoHistory()
   return buildCandidatesFromVideoMatches(history)
-}
-
-// ----------------------- Leitura do Scout Action -----------------------
-
-/**
- * Converte as partidas do Scout Action (localStorage) em candidatos de
- * importação — um por atleta com nome.
- *
- * O Scout Action NÃO detalha fundamentos: guarda apenas TP/TE/TG por atleta.
- * Para reproduzir os MESMOS índices do Hub sem detalhamento:
- *   - o TGP é gravado direto no candidato (o Hub reusa `entry.tgp`, não recalcula);
- *   - o IPTV é recalculado pelo Hub a partir de `stats`; por isso montamos
- *     fundamentos sintéticos com a mesma taxa TP/(TP+TE) em todos os fundamentos,
- *     fazendo o IPTV bruto sair idêntico em qualquer posição.
- */
-export function buildCandidatesFromActionMatches(
-  matches: ScoutActionMatch[] = getActionMatches(),
-): ImportCandidate[] {
-  const candidates: ImportCandidate[] = []
-
-  for (const match of matches) {
-    const season = new Date(match.completedAt || match.createdAt).getFullYear().toString()
-    const competition = `${match.teamAName} x ${match.teamBName}`
-    const matchDate = new Date(match.completedAt || match.createdAt).toISOString().slice(0, 10)
-
-    for (const player of match.teamAPlayers) {
-      const fullName = player.name?.trim()
-      if (!fullName) continue
-      const m = computePlayerMetrics(match.events, "A", player.number)
-      if (m.t === 0) continue // sem ações registradas
-      candidates.push({
-        fullName,
-        team: match.teamAName,
-        category: match.category,
-        position: player.role,
-        playerNumber: player.number,
-        competition,
-        season,
-        matchDate,
-        stats: toSyntheticFundamentals(m.tp, m.te),
-        tgp: m.tgp,
-        fingerprint: `saction:${match.id}:${player.number}`,
-        raw: { source: "scout_action", matchId: match.id, number: player.number },
-      })
-    }
-  }
-
-  return candidates
-}
-
-/** Lista as partidas do Scout Action (localStorage) disponíveis para importar. */
-export function listActionImportMatches(): { matches: ScoutActionMatch[]; items: ImportableMatch[] } {
-  const matches = getActionMatches()
-  const items = matches.map((m) => {
-    const named = m.teamAPlayers.filter((p) => p.name?.trim()).length
-    return {
-      id: m.id,
-      title: `${m.teamAName} x ${m.teamBName}`,
-      subtitle: `${m.category || "Sem categoria"} · ${new Date(m.completedAt || m.createdAt).toLocaleDateString("pt-BR")}`,
-      hasRoster: named > 0,
-    }
-  })
-  return { matches, items }
 }
 
 // ----------------------- Seleção de jogos para importar -----------------------
