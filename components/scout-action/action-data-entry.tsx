@@ -138,13 +138,14 @@ export function ActionDataEntry({
     const setsB = sets.filter((s) => s.scoreB > s.scoreA).length
     const now = new Date()
     saveActionMatch({
-      teamAName: config.teamName,
-      teamBName: config.opponentName,
+      teamName: config.teamName,
+      opponentName: config.opponentName,
       category: config.category,
-      teamAPlayers: config.players,
-      teamBPlayers: [],
+      players: config.players,
       events,
       sets,
+      teamSets: setsA,
+      opponentSets: setsB,
       createdAt: now.toISOString(),
       completedAt: now.toISOString(),
       winner: setsA >= setsB ? "A" : "B",

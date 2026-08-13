@@ -47,16 +47,61 @@ export interface ActionSetScore {
 
 export interface ScoutActionMatch {
   id: string
-  teamAName: string
-  teamBName: string
+  /** Equipe acompanhada em detalhe (sempre o lado "A"). */
+  teamName: string
+  /** Adversário (apenas placar). */
+  opponentName: string
   category: string
-  teamAPlayers: ActionPlayer[]
-  teamBPlayers: ActionPlayer[]
+  /** Elenco da equipe acompanhada. */
+  players: ActionPlayer[]
   events: ActionEvent[]
   sets: ActionSetScore[]
+  /** Sets vencidos pela equipe / adversário. */
+  teamSets: number
+  opponentSets: number
   createdAt: string
-  completedAt: string
-  winner: "A" | "B"
+  completedAt: string | null
+  winner: "A" | "B" | null
+}
+
+/** Alias curto usado pela UI/relatórios. */
+export type ActionMatch = ScoutActionMatch
+
+export interface PlayerMatchStat extends PlayerMetrics {
+  number: number
+  name: string
+  role: ActionRole
+}
+
+/** Estatísticas por atleta da equipe acompanhada (lado A). */
+export function computeMatchStats(match: ActionMatch): PlayerMatchStat[] {
+  return match.players.map((p) => ({
+    number: p.number,
+    name: p.name,
+    role: p.role,
+    ...computePlayerMetrics(match.events, "A", p.number),
+  }))
+}
+
+/** Totais consolidados da equipe (soma de TP/TG/TE + TGP/IPTV recalculados). */
+export function matchTotals(match: ActionMatch): PlayerMetrics {
+  let tp = 0
+  let tg = 0
+  let te = 0
+  for (const s of computeMatchStats(match)) {
+    tp += s.tp
+    tg += s.tg
+    te += s.te
+  }
+  const t = tp + te
+  return {
+    tp,
+    tg,
+    te,
+    t,
+    tgp: t > 0 ? computeTGP({ tp, te, tg }) : 0,
+    iptv: t > 0 ? Math.round((tp / t) * 100) : 0,
+  }
 }
 
 export interface PlayerMetrics {

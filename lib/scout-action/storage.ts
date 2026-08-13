@@ -4,7 +4,9 @@
  */
 
 import { getStoredUser } from "@/lib/auth"
-import type { ScoutActionMatch } from "./types"
+import type { ScoutActionMatch, ActionMatch } from "./types"
+
+export type { ActionMatch }
 
 const STORAGE_KEY_BASE = "scout_action_history"
 const IN_PROGRESS_KEY_BASE = "scout_action_in_progress"
@@ -62,6 +64,9 @@ export function getActionMatches(): ScoutActionMatch[] {
 export function getActionMatchById(id: string): ScoutActionMatch | null {
   return getActionMatches().find((m) => m.id === id) ?? null
 }
+
+/** Alias semântico usado pela UI. */
+export const listActionMatches = getActionMatches
 
 export function deleteActionMatch(id: string): void {
   try {
