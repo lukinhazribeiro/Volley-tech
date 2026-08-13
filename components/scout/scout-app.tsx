@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Smartphone, Users, History } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Smartphone, Users, History, Zap } from "lucide-react"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
 import MatchDataEntryPage from "@/components/scout/pages/match-data-entry-page"
 import MatchHistoryPage from "@/components/scout/pages/match-history-page"
@@ -9,6 +10,7 @@ import RoomConnectionPage from "@/components/scout/pages/room-connection-page"
 import { syncManager } from "@/lib/scout/sync-manager"
 
 export default function ScoutApp() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [view, setView] = useState<"mode-select" | "history" | "match" | "room">("mode-select")
   const [roomId, setRoomId] = useState<string | null>(null)
@@ -86,6 +88,21 @@ export default function ScoutApp() {
                 <span>
                   <span className="block text-xl font-bold mb-1">Coleta Sincronizada</span>
                   <span className="block text-sm text-orange-50">Até 3 aparelhos conectados em tempo real</span>
+                </span>
+              </button>
+
+              <button
+                onClick={() => router.push("/scout-action")}
+                className="group w-full p-6 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg shadow-lg transition-all hover:-translate-y-1 active:translate-y-0 text-left flex items-center gap-4"
+              >
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                  <Zap className="w-7 h-7" />
+                </span>
+                <span>
+                  <span className="block text-xl font-bold mb-1">Scout Action</span>
+                  <span className="block text-sm text-cyan-100">
+                    Coleta rápida: só Ação, Ponto e Erro — com rodízio automático
+                  </span>
                 </span>
               </button>
 

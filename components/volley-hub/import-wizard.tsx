@@ -5,9 +5,11 @@ import { X, CheckCircle2, AlertTriangle, Loader2, UserPlus, Calendar } from "luc
 import {
   buildCandidatesFromLocalMatches,
   buildCandidatesFromVideoMatches,
+  buildCandidatesFromActionMatches,
   groupCandidatesByAthlete,
   listLocalImportMatches,
   listVideoImportMatches,
+  listActionImportMatches,
   matchCandidates,
   createAthlete,
   saveAlias,
@@ -17,15 +19,17 @@ import {
 } from "@/lib/hub/data"
 import type { StoredMatch } from "@/lib/scout/match-storage"
 import type { MatchHistoryEntry } from "@/lib/video-scout/history"
+import type { ScoutActionMatch } from "@/lib/scout-action/types"
 import { parseVHA, importVHA } from "@/lib/hub/vha"
 import type { ImportCandidate, MatchResult } from "@/lib/hub/types"
 
-type Mode = "local" | "video" | "vha"
+type Mode = "local" | "video" | "action" | "vha"
 type Phase = "loading" | "pick-matches" | "review" | "vha-pick" | "saving" | "done" | "error"
 
 const MODE_LABEL: Record<Mode, string> = {
   local: "Importar do Scout Volleyball",
   video: "Importar do Scout View IA",
+  action: "Importar do Scout Action",
   vha: "Importar arquivo .vha",
 }
 
@@ -51,6 +55,7 @@ export function ImportWizard({
   // Guarda os dados brutos das partidas para montar os candidatos ao confirmar.
   const localMatchesRef = useRef<StoredMatch[]>([])
   const videoEntriesRef = useRef<MatchHistoryEntry[]>([])
+  const actionMatchesRef = useRef<ScoutActionMatch[]>([])
   // Capítulos (um por jogo) de cada atleta, alinhado por índice com `results`.
   const groupsRef = useRef<ImportCandidate[][]>([])
 
@@ -62,6 +67,10 @@ export function ImportWizard({
         if (mode === "local") {
           const { matches, items } = listLocalImportMatches()
           localMatchesRef.current = matches
+          setMatchItems(items)
+        } else if (mode === "action") {
+          const { matches, items } = listActionImportMatches()
+          actionMatchesRef.current = matches
           setMatchItems(items)
         } else {
           const { entries, items } = await listVideoImportMatches()
@@ -100,6 +109,9 @@ export function ImportWizard({
       if (mode === "local") {
         const selected = localMatchesRef.current.filter((m) => selectedIds.has(m.id))
         candidates = buildCandidatesFromLocalMatches(selected)
+      } else if (mode === "action") {
+        const selected = actionMatchesRef.current.filter((m) => selectedIds.has(m.id))
+        candidates = buildCandidatesFromActionMatches(selected)
       } else {
         const selected = videoEntriesRef.current.filter((e) => selectedIds.has(e.id))
         candidates = buildCandidatesFromVideoMatches(selected)
@@ -109,7 +121,9 @@ export function ImportWizard({
         setError(
           mode === "video"
             ? "Os jogos selecionados não têm atletas com nome. Preencha os nomes do elenco no Scout View IA antes de importar."
-            : "Os jogos selecionados não têm atletas com nome. Cadastre os nomes do elenco ao configurar a partida no Scout Volleyball.",
+            : mode === "action"
+              ? "Os jogos selecionados não têm atletas com nome e ações registradas. Cadastre o elenco ao iniciar a coleta no Scout Action."
+              : "Os jogos selecionados não têm atletas com nome. Cadastre os nomes do elenco ao configurar a partida no Scout Volleyball.",
         )
         setPhase("error")
         return
@@ -141,7 +155,7 @@ export function ImportWizard({
   async function handleConfirmLocal() {
     setPhase("saving")
     try {
-      const source = mode === "video" ? "scout_video" : "scout_local"
+      const source = mode === "video" ? "scout_video" : mode === "action" ? "scout_action" : "scout_local"
       // Dedup por nome dentro do próprio lote: garante UMA atleta por nome mesmo
       // quando várias linhas "novas" têm o mesmo nome.
       const createdByName = new Map<string, string>()
@@ -186,7 +200,8 @@ export function ImportWizard({
         athletesTouched++
       }
 
-      const originLabel = mode === "video" ? "Scout View IA" : "Scout Volleyball"
+      const originLabel =
+        mode === "video" ? "Scout View IA" : mode === "action" ? "Scout Action" : "Scout Volleyball"
       await logImport(mode, `${originLabel} (${athletesTouched} atleta(s))`, inserted)
       setSummary(
         inserted > 0
@@ -252,7 +267,9 @@ export function ImportWizard({
                 <p className="mt-1 text-sm text-[var(--hub-muted)]">
                   {mode === "video"
                     ? "Salve uma análise no Scout View IA para importá-la aqui."
-                    : "Finalize e salve uma partida no Scout Volleyball para importá-la aqui."}
+                    : mode === "action"
+                      ? "Finalize uma coleta no Scout Action para importá-la aqui."
+                      : "Finalize e salve uma partida no Scout Volleyball para importá-la aqui."}
                 </p>
               </div>
             ) : (
