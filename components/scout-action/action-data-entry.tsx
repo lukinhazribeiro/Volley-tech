@@ -158,7 +158,7 @@ export function ActionDataEntry({
   const setsWonB = completedSets.filter((s) => s.scoreB > s.scoreA).length
 
   return (
-    <div className="mx-auto max-w-2xl px-3 py-4">
+    <div className="mx-auto max-w-2xl px-3 py-4 pb-28">
       {/* Placar */}
       <div className="mb-3 rounded-xl border border-slate-700 bg-slate-800/70 p-3">
         <div className="flex items-center justify-between">
