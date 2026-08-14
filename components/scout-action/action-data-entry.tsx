@@ -262,6 +262,7 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
           <Button
             onClick={handleUndo}
             variant="outline"
+            aria-label="Desfazer última ação"
             className="gap-1.5 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
           >
             <Undo2 className="size-4" />
@@ -270,6 +271,7 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
           <Button
             onClick={() => setShowSheet(true)}
             variant="outline"
+            aria-label="Abrir planilha"
             className="gap-1.5 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
           >
             <Table2 className="size-4" />
@@ -278,12 +280,17 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
           <Button
             onClick={handleCloseSet}
             variant="outline"
+            aria-label="Fechar set atual"
             className="gap-1.5 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
           >
             <FlagTriangleRight className="size-4" />
             <span className="hidden sm:inline">Fechar set</span>
           </Button>
-          <Button onClick={handleFinish} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500">
+          <Button
+            onClick={handleFinish}
+            aria-label="Encerrar e salvar partida"
+            className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+          >
             <Check className="size-4" />
             <span className="hidden sm:inline">Encerrar</span>
           </Button>

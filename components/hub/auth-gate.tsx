@@ -95,11 +95,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     setState("login")
   }, [])
 
-  // TEMP_PREVIEW_BYPASS: rota de verificação visual sem auth (remover depois).
-  if (typeof window !== "undefined" && window.location.pathname.startsWith("/sa-preview")) {
-    return <>{children}</>
-  }
-
   if (state === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50 to-white">
