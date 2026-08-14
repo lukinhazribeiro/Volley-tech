@@ -1,11 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/scout/ui/button"
 import { Input } from "@/components/scout/ui/input"
 import { Card } from "@/components/scout/ui/card"
-import { X, Plus } from 'lucide-react'
+import { X, Plus, Library, Save, Trash2 } from 'lucide-react'
 import { ROLE_OPTIONS, type PlayerRole } from "@/lib/scout/smart-collector"
+import {
+  loadPresets,
+  savePreset,
+  deletePreset,
+  subscribeToPresets,
+  migrateLocalPresets,
+  type TeamPreset,
+} from "@/lib/video-scout/team-presets"
+import { rosterToTeam, presetToRoster } from "@/lib/scout/team-preset-adapter"
 
 export interface Player {
   number: number
@@ -31,6 +40,53 @@ export default function TeamRosterManagement({
   const [teamBPlayers, setTeamBPlayers] = useState<Player[]>(
     Array.from({ length: 14 }, (_, i) => ({ number: i + 1, name: "" }))
   )
+
+  // Biblioteca de equipes na nuvem (a MESMA dos 3 módulos).
+  const [presets, setPresets] = useState<TeamPreset[]>([])
+  const [saving, setSaving] = useState<"A" | "B" | null>(null)
+  const [loadFor, setLoadFor] = useState<"A" | "B" | null>(null)
+  const [saveName, setSaveName] = useState("")
+
+  useEffect(() => {
+    let active = true
+    async function init() {
+      await migrateLocalPresets()
+      const p = await loadPresets()
+      if (active) setPresets(p)
+    }
+    init()
+    const unsub = subscribeToPresets(() => {
+      loadPresets().then((p) => active && setPresets(p))
+    })
+    return () => {
+      active = false
+      unsub()
+    }
+  }, [])
+
+  const playersFor = (team: "A" | "B") => (team === "A" ? teamAPlayers : teamBPlayers)
+  const nameFor = (team: "A" | "B") => (team === "A" ? teamAName : teamBName)
+  const setPlayersFor = (team: "A" | "B", players: Player[]) =>
+    team === "A" ? setTeamAPlayers(players) : setTeamBPlayers(players)
+
+  async function handleSavePreset() {
+    if (!saving) return
+    const team = rosterToTeam(saveName.trim() || nameFor(saving), playersFor(saving))
+    setPresets(await savePreset(saveName.trim() || nameFor(saving), team))
+    setSaving(null)
+    setSaveName("")
+  }
+
+  function handleLoadPreset(preset: TeamPreset) {
+    if (!loadFor) return
+    setPlayersFor(loadFor, presetToRoster(preset))
+    setLoadFor(null)
+  }
+
+  async function handleDeletePreset(id: string) {
+    if (!confirm("Excluir esta equipe salva da biblioteca?")) return
+    setPresets(await deletePreset(id))
+  }
 
   const handlePlayerChange = (
     team: "A" | "B",
@@ -101,12 +157,29 @@ export default function TeamRosterManagement({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Team A Roster */}
           <div>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-2xl font-bold text-red-600">{teamAName}</h2>
-              <Button onClick={() => handleAddPlayer("A")} size="sm" variant="outline">
-                <Plus className="h-4 w-4 mr-1" />
-                Adicionar
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setLoadFor("A")} size="sm" variant="outline">
+                  <Library className="h-4 w-4 mr-1" />
+                  Carregar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSaving("A")
+                    setSaveName(teamAName)
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Salvar
+                </Button>
+                <Button onClick={() => handleAddPlayer("A")} size="sm" variant="outline">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
             </div>
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
               {teamAPlayers.map((player, index) => (
@@ -159,12 +232,29 @@ export default function TeamRosterManagement({
 
           {/* Team B Roster */}
           <div>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-2xl font-bold text-blue-600">{teamBName}</h2>
-              <Button onClick={() => handleAddPlayer("B")} size="sm" variant="outline">
-                <Plus className="h-4 w-4 mr-1" />
-                Adicionar
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setLoadFor("B")} size="sm" variant="outline">
+                  <Library className="h-4 w-4 mr-1" />
+                  Carregar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSaving("B")
+                    setSaveName(teamBName)
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Salvar
+                </Button>
+                <Button onClick={() => handleAddPlayer("B")} size="sm" variant="outline">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
             </div>
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
               {teamBPlayers.map((player, index) => (
@@ -231,10 +321,101 @@ export default function TeamRosterManagement({
         <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
           <p className="text-sm text-slate-700">
             <strong>Importante:</strong> Configure os números e nomes dos jogadores. Os números serão usados na seleção
-            durante a coleta de dados.
+            durante a coleta de dados. Use <strong>Carregar</strong> para reaproveitar uma equipe salva na nuvem.
           </p>
         </div>
       </Card>
+
+      {/* Modal: salvar equipe na biblioteca */}
+      {saving && (
+        <RosterModal title={`Salvar equipe ${saving} na biblioteca`} onClose={() => setSaving(null)}>
+          <p className="mb-3 text-sm text-slate-600">
+            A equipe fica salva na nuvem e disponível nos três módulos (Scout View, Volleyball e Action).
+          </p>
+          <Input
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            placeholder="Nome da equipe"
+            className="mb-4"
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSaving(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSavePreset} className="bg-orange-600 text-white hover:bg-orange-700">
+              <Save className="mr-1.5 h-4 w-4" />
+              Salvar
+            </Button>
+          </div>
+        </RosterModal>
+      )}
+
+      {/* Modal: carregar equipe salva */}
+      {loadFor && (
+        <RosterModal title={`Carregar equipe salva → Equipe ${loadFor}`} onClose={() => setLoadFor(null)}>
+          {presets.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-500">
+              Nenhuma equipe salva ainda. Salve uma equipe para reaproveitá-la aqui e nos outros módulos.
+            </p>
+          ) : (
+            <ul className="max-h-80 space-y-2 overflow-y-auto">
+              {presets.map((preset) => (
+                <li
+                  key={preset.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-800">{preset.name}</p>
+                    <p className="text-xs text-slate-500">{preset.team.players.length} atletas</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    <Button size="sm" onClick={() => handleLoadPreset(preset)} className="bg-orange-600 text-white hover:bg-orange-700">
+                      Usar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-slate-400 hover:text-red-600"
+                      onClick={() => handleDeletePreset(preset.id)}
+                      aria-label="Excluir equipe salva"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </RosterModal>
+      )}
+    </div>
+  )
+}
+
+function RosterModal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string
+  children: React.ReactNode
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-orange-100 bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-3 text-base font-semibold text-slate-800">{title}</h3>
+        {children}
+      </div>
     </div>
   )
 }

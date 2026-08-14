@@ -67,8 +67,9 @@ export function successRate(c: FundamentalCount): number {
  * recepção certa + (saque certo + ace) + (ataque ponto + certo) + bloqueios + defesas.
  * No modelo do Hub isso equivale à soma de (certo + ponto) de cada fundamento.
  *
- * É a base do TGP: TGP = TP da atleta ÷ TP total da equipe × 100 — o mesmo
- * percentual exibido na planilha e no relatório do Scout.
+ * TP é uma das entradas do TGP definitivo (computeTGP em lib/tgp), a MESMA
+ * fórmula usada na planilha do Scout, no Scout View e na Hub. O TGP não é
+ * recalculado a partir dos fundamentos: é gravado no capítulo e lido de lá.
  */
 export function positiveActions(f: PlayerFundamentals): number {
   let tp = 0

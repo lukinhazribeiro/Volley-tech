@@ -3,10 +3,88 @@
 // e sincronizam entre aparelhos, sem misturar dados de contas diferentes.
 
 import { createClient } from "@/lib/supabase/client"
+import type { Player, Posicao } from "@/lib/video-scout/types"
+import { POSICAO_ORDER } from "@/lib/video-scout/types"
+import type { TeamConfig } from "@/lib/video-scout/match"
 
 export type RosterPlayer = {
   number: number
   name: string
+}
+
+/**
+ * As equipes do Summary agora vivem na MESMA biblioteca compartilhada dos scouts
+ * (tabela vs_team_presets). O Summary só edita número+nome, mas guardamos o
+ * elenco no formato rico (com função/posição/líbero/levantador) para que a mesma
+ * equipe apareça e seja reaproveitada nos Scouts (Volleyball, View e Action).
+ */
+type StoredTeam = Omit<TeamConfig, "side">
+
+let __pid = 0
+function genPlayerId(): string {
+  __pid += 1
+  return `pl_${Date.now().toString(36)}_${__pid}`
+}
+
+/** Constrói um elenco rico a partir de uma lista simples de número+nome. */
+function buildStoredTeam(name: string, roster: RosterPlayer[]): StoredTeam {
+  const players: Player[] = roster.map((p) => ({
+    id: genPlayerId(),
+    number: p.number,
+    name: p.name,
+    team: "casa",
+    posicao: null,
+    role: null,
+  }))
+  const formation = {} as Record<Posicao, string | null>
+  POSICAO_ORDER.forEach((pos, i) => {
+    formation[pos] = players[i]?.id ?? null
+  })
+  return { name: name.trim() || "Equipe", players, formation, liberoId: null, liberoReplaces: [], setterPosicao: "P1" }
+}
+
+/**
+ * Atualiza um elenco existente com uma nova lista de número+nome, PRESERVANDO a
+ * função/posição/líbero de quem continua (casado pelo número). Atletas novos
+ * entram sem função; quem saiu é removido da formação e do líbero.
+ */
+function mergeStoredTeam(existing: StoredTeam, name: string, roster: RosterPlayer[]): StoredTeam {
+  const byNumber = new Map<number, Player>()
+  for (const p of existing.players) byNumber.set(p.number, p)
+
+  const players: Player[] = roster.map((r) => {
+    const prev = byNumber.get(r.number)
+    return prev
+      ? { ...prev, name: r.name, number: r.number }
+      : { id: genPlayerId(), number: r.number, name: r.name, team: "casa", posicao: null, role: null }
+  })
+
+  const validIds = new Set(players.map((p) => p.id))
+  const formation = {} as Record<Posicao, string | null>
+  for (const pos of POSICAO_ORDER) {
+    const id = existing.formation?.[pos] ?? null
+    formation[pos] = id && validIds.has(id) ? id : null
+  }
+  const liberoId = existing.liberoId && validIds.has(existing.liberoId) ? existing.liberoId : null
+  const liberoReplaces = (existing.liberoReplaces ?? []).filter((id) => validIds.has(id))
+
+  return {
+    name: name.trim() || existing.name || "Equipe",
+    players,
+    formation,
+    liberoId,
+    liberoReplaces,
+    setterPosicao: existing.setterPosicao ?? "P1",
+  }
+}
+
+/** Extrai a lista simples número+nome (ordenada por número) de um elenco rico. */
+function storedToRoster(team: StoredTeam | null | undefined): RosterPlayer[] {
+  if (!team?.players) return []
+  return team.players
+    .map((p) => ({ number: Number(p.number) || 0, name: (p.name || "").trim() }))
+    .filter((p) => p.name !== "" && p.number > 0)
+    .sort((a, b) => a.number - b.number)
 }
 
 export type SavedTeam = {
@@ -57,24 +135,24 @@ function normalizePlayers(players: RosterPlayer[]): RosterPlayer[] {
 export async function getTeams(): Promise<SavedTeam[]> {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from("summary_teams")
-    .select("id, name, players, created_at, updated_at")
+    .from("vs_team_presets")
+    .select("id, name, team, saved_at")
     .order("name", { ascending: true })
   if (error) throw error
   return (data ?? []).map((r) => ({
     id: r.id as string,
     name: r.name as string,
-    players: (r.players as RosterPlayer[]) ?? [],
-    createdAt: r.created_at as string,
-    updatedAt: r.updated_at as string,
+    players: storedToRoster(r.team as StoredTeam),
+    createdAt: r.saved_at as string,
+    updatedAt: r.saved_at as string,
   }))
 }
 
 export async function getTeam(id: string): Promise<SavedTeam | undefined> {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from("summary_teams")
-    .select("id, name, players, created_at, updated_at")
+    .from("vs_team_presets")
+    .select("id, name, team, saved_at")
     .eq("id", id)
     .maybeSingle()
   if (error) throw error
@@ -82,9 +160,9 @@ export async function getTeam(id: string): Promise<SavedTeam | undefined> {
   return {
     id: data.id as string,
     name: data.name as string,
-    players: (data.players as RosterPlayer[]) ?? [],
-    createdAt: data.created_at as string,
-    updatedAt: data.updated_at as string,
+    players: storedToRoster(data.team as StoredTeam),
+    createdAt: data.saved_at as string,
+    updatedAt: data.saved_at as string,
   }
 }
 
@@ -92,34 +170,44 @@ export async function saveTeam(input: { name: string; players: RosterPlayer[] })
   const supabase = createClient()
   const userId = await requireUserId()
   const now = new Date().toISOString()
+  const stored = buildStoredTeam(input.name, normalizePlayers(input.players))
   const { data, error } = await supabase
-    .from("summary_teams")
+    .from("vs_team_presets")
     .insert({
       user_id: userId,
       name: input.name.trim(),
-      players: normalizePlayers(input.players),
-      updated_at: now,
+      team: JSON.parse(JSON.stringify(stored)) as StoredTeam,
+      saved_at: now,
     })
-    .select("id, name, players, created_at, updated_at")
+    .select("id, name, team, saved_at")
     .single()
   if (error) throw error
   return {
     id: data.id as string,
     name: data.name as string,
-    players: (data.players as RosterPlayer[]) ?? [],
-    createdAt: data.created_at as string,
-    updatedAt: data.updated_at as string,
+    players: storedToRoster(data.team as StoredTeam),
+    createdAt: data.saved_at as string,
+    updatedAt: data.saved_at as string,
   }
 }
 
 export async function updateTeam(id: string, input: { name: string; players: RosterPlayer[] }): Promise<void> {
   const supabase = createClient()
+  // Lê o elenco rico atual para preservar função/posição/líbero de quem continua.
+  const { data: current, error: readErr } = await supabase
+    .from("vs_team_presets")
+    .select("team")
+    .eq("id", id)
+    .maybeSingle()
+  if (readErr) throw readErr
+  const existing = (current?.team as StoredTeam) ?? buildStoredTeam(input.name, [])
+  const merged = mergeStoredTeam(existing, input.name, normalizePlayers(input.players))
   const { error } = await supabase
-    .from("summary_teams")
+    .from("vs_team_presets")
     .update({
       name: input.name.trim(),
-      players: normalizePlayers(input.players),
-      updated_at: new Date().toISOString(),
+      team: JSON.parse(JSON.stringify(merged)) as StoredTeam,
+      saved_at: new Date().toISOString(),
     })
     .eq("id", id)
   if (error) throw error
@@ -127,7 +215,7 @@ export async function updateTeam(id: string, input: { name: string; players: Ros
 
 export async function deleteTeam(id: string): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase.from("summary_teams").delete().eq("id", id)
+  const { error } = await supabase.from("vs_team_presets").delete().eq("id", id)
   if (error) throw error
 }
 

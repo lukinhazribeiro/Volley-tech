@@ -19,7 +19,7 @@ export interface IGDParts {
   iptv: number | null
   /** Média do IPF nas avaliações físicas (0-100) ou null. */
   ipf: number | null
-  /** Último TGP registrado (0-100) ou null. */
+  /** Último TGP registrado (0-100, mesmo valor da planilha) ou null. */
   tgp: number | null
   /** Índice geral (0-100) ou null quando não há nenhuma parcela. */
   igd: number | null

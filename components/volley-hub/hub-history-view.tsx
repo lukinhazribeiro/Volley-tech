@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import useSWR from "swr"
-import { FolderOpen, FileUp, Video } from "lucide-react"
+import { FolderOpen, FileUp, Video, Zap } from "lucide-react"
 import { listAllEntries, listAthletes } from "@/lib/hub/data"
 import { HubCard, SectionTitle, EmptyState } from "./ui"
 import { ImportWizard } from "./import-wizard"
@@ -15,7 +15,7 @@ async function loadHistory() {
 
 export function HubHistoryView() {
   const { data, isLoading, mutate } = useSWR("hub-history", loadHistory)
-  const [wizardMode, setWizardMode] = useState<"local" | "video" | "vha" | null>(null)
+  const [wizardMode, setWizardMode] = useState<"local" | "video" | "action" | "vha" | null>(null)
 
   const athletes: HubAthlete[] = data?.athletes ?? []
   const entries: HubHistoryEntry[] = data?.entries ?? []
@@ -34,12 +34,13 @@ export function HubHistoryView() {
         <p className="font-mono text-xs uppercase tracking-widest text-[var(--hub-accent)]">Dados</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">Histórico</h1>
         <p className="mt-1 text-sm text-[var(--hub-muted)]">
-          Importe scouts do Scout Volleyball, do Scout View IA ou arquivos .vha. O histórico original nunca é modificado.
+          Importe scouts do Scout Volleyball, do Scout Action, do Scout View IA ou arquivos .vha. O histórico
+          original nunca é modificado.
         </p>
       </div>
 
       {/* Ferramentas de importação */}
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <HubCard onClick={() => setWizardMode("local")}>
           <div className="flex items-start gap-3">
             <div className="rounded-xl bg-[var(--hub-accent)]/15 p-2.5">
@@ -49,6 +50,20 @@ export function HubHistoryView() {
               <h3 className="font-semibold">Importar do Scout Volleyball</h3>
               <p className="mt-1 text-sm text-[var(--hub-muted)]">
                 Lê as partidas salvas na sua conta e associa as atletas por nome, equipe e categoria.
+              </p>
+            </div>
+          </div>
+        </HubCard>
+
+        <HubCard onClick={() => setWizardMode("action")}>
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-[var(--hub-accent)]/15 p-2.5">
+              <Zap className="h-5 w-5 text-[var(--hub-accent)]" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Importar do Scout Action</h3>
+              <p className="mt-1 text-sm text-[var(--hub-muted)]">
+                Traz a coleta rápida (TG/TP/TE) por atleta. O IPTV é calculado no modo bruto TP/(TP+TE).
               </p>
             </div>
           </div>
