@@ -1,7 +1,19 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, Undo2, FlagTriangleRight, Check, Table2, Settings2 } from "lucide-react"
+import {
+  ArrowLeft,
+  Undo2,
+  FlagTriangleRight,
+  Check,
+  Table2,
+  Settings2,
+  Clock,
+  Trophy,
+  FileDown,
+  Trash2,
+  X,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ROLE_LABEL, formatTime, type Posicao } from "@/lib/video-scout/types"
 import type { TeamConfig } from "@/lib/video-scout/match"
@@ -17,8 +29,9 @@ import {
   type LiveState,
 } from "@/lib/scout-action/live"
 import type { ActionKind, ActionSide, ScoutActionMatch } from "@/lib/scout-action/types"
+import { matchTotals } from "@/lib/scout-action/types"
 import type { ActionMatchConfig } from "@/lib/scout-action/config"
-import { saveActionMatch, clearInProgressActionMatch } from "@/lib/scout-action/storage"
+import { saveActionMatch, clearInProgressActionMatch, type ActionMatch } from "@/lib/scout-action/storage"
 import { ActionCourt } from "./action-court"
 import { ActionSpreadsheet } from "./action-spreadsheet"
 import { ActionMatchMenu } from "./action-match-menu"
@@ -34,11 +47,22 @@ const KIND_META: Record<ActionKind, { label: string; cls: string }> = {
 
 interface ActionDataEntryProps {
   config: ActionMatchConfig
+  /** Scouts já salvos, exibidos no histórico do cabeçalho. */
+  savedMatches: ActionMatch[]
+  onExportPdf: (m: ActionMatch) => void
+  onDeleteMatch: (id: string) => void
   onFinish: () => void
   onExit: () => void
 }
 
-export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryProps) {
+export function ActionDataEntry({
+  config,
+  savedMatches,
+  onExportPdf,
+  onDeleteMatch,
+  onFinish,
+  onExit,
+}: ActionDataEntryProps) {
   const [state, setState] = useState<LiveState>(() =>
     createLiveMatch(config.teamA, config.teamB, config.firstServer),
   )
@@ -47,6 +71,7 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
   const [armed, setArmed] = useState<ActionKind | null>(null)
   const [showSheet, setShowSheet] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   // Dados da partida editáveis a qualquer momento pelo menu do topo.
   const [competition, setCompetition] = useState(config.competition)
@@ -201,6 +226,18 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
             <span className="rounded-full bg-orange-500/20 px-3 py-1 text-xs font-semibold text-orange-300">
               Scout Action · ao vivo
             </span>
+            <button
+              onClick={() => setShowSaved(true)}
+              aria-label="Ver scouts salvos"
+              className="relative inline-flex size-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+            >
+              <Clock className="size-4" />
+              {savedMatches.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[9px] font-bold text-white">
+                  {savedMatches.length}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => setShowMenu(true)}
               aria-label="Editar equipes e dados da partida"
@@ -450,6 +487,92 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
           onChangeTeam={handleChangeTeam}
           onClose={() => setShowMenu(false)}
         />
+      )}
+
+      {/* Histórico de scouts salvos */}
+      {showSaved && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Scouts salvos"
+          onClick={() => setShowSaved(false)}
+        >
+          <div
+            className="flex max-h-[85svh] w-full max-w-lg flex-col rounded-2xl border border-slate-700 bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 p-4">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Clock className="size-4 text-orange-400" />
+                Scouts salvos
+              </h3>
+              <button
+                onClick={() => setShowSaved(false)}
+                className="text-slate-400 hover:text-slate-200"
+                aria-label="Fechar"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {savedMatches.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-sm text-slate-400">
+                  Nenhum scout salvo ainda. Encerre uma coleta para vê-la aqui.
+                </p>
+              </div>
+            ) : (
+              <ul className="flex-1 space-y-2 overflow-y-auto p-4">
+                {savedMatches.map((m) => {
+                  const nA = m.teamA.name || "Equipe A"
+                  const nB = m.teamB.name || "Equipe B"
+                  const tA = matchTotals(m, "A")
+                  const tB = matchTotals(m, "B")
+                  return (
+                    <li
+                      key={m.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-800/50 p-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-2 text-sm font-medium text-slate-100">
+                          <Trophy className="size-4 shrink-0 text-orange-400" />
+                          <span className="truncate">
+                            {nA} <span className="text-slate-500">x</span> {nB}
+                          </span>
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          {new Date(m.createdAt).toLocaleDateString("pt-BR")} · Sets {m.setsA}-{m.setsB} · TGP{" "}
+                          {nA} {tA.tgp}% / {nB} {tB.tgp}%
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          onClick={() => onExportPdf(m)}
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 border-slate-700 bg-transparent text-slate-200 hover:bg-slate-800"
+                        >
+                          <FileDown className="size-4" />
+                          PDF
+                        </Button>
+                        <Button
+                          onClick={() => onDeleteMatch(m.id)}
+                          size="icon"
+                          variant="ghost"
+                          className="text-slate-400 hover:text-red-400"
+                          aria-label="Excluir scout"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
