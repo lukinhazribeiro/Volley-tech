@@ -1,219 +1,329 @@
 "use client"
 
-import { useState } from "react"
-import { Plus, Trash2, Play, ArrowLeft } from "lucide-react"
-import { ACTION_ROLES, type ActionPlayer, type ActionRole } from "@/lib/scout-action/types"
+import { useCallback, useEffect, useState } from "react"
+import { ArrowLeft, Play, Users, Save, Library, Trash2, Pencil } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { createTeam, applyTeamPatch, type TeamConfig } from "@/lib/video-scout/match"
+import type { Player, TeamSide } from "@/lib/video-scout/types"
+import {
+  loadPresets,
+  savePreset,
+  presetToTeam,
+  subscribeToPresets,
+  migrateLocalPresets,
+  deletePreset,
+  type TeamPreset,
+} from "@/lib/video-scout/team-presets"
+import type { ActionSide } from "@/lib/scout-action/types"
+import { TeamEditor } from "./team-editor"
 
 export interface ActionMatchConfig {
-  teamName: string
-  opponentName: string
   category: string
-  players: ActionPlayer[]
-  firstServer: "us" | "them"
+  competition: string
+  teamA: TeamConfig
+  teamB: TeamConfig
+  firstServer: ActionSide
 }
 
-interface RosterRow {
-  number: string
-  name: string
-  role: ActionRole
-}
+/** A = casa, B = adversario no modelo do motor. */
+const SIDE_MAP: Record<ActionSide, TeamSide> = { A: "casa", B: "adversario" }
 
-export function ActionSetup({
-  onStart,
-  onBack,
-}: {
+interface ActionSetupProps {
   onStart: (config: ActionMatchConfig) => void
   onBack: () => void
-}) {
-  const [teamName, setTeamName] = useState("")
-  const [opponentName, setOpponentName] = useState("")
+}
+
+export function ActionSetup({ onStart, onBack }: ActionSetupProps) {
   const [category, setCategory] = useState("")
-  const [firstServer, setFirstServer] = useState<"us" | "them">("us")
-  const [rows, setRows] = useState<RosterRow[]>([
-    { number: "", name: "", role: "Levantadora" },
-    { number: "", name: "", role: "Central" },
-    { number: "", name: "", role: "Ponteira" },
-  ])
+  const [competition, setCompetition] = useState("")
+  const [firstServer, setFirstServer] = useState<ActionSide>("A")
+  const [teamA, setTeamA] = useState<TeamConfig>(() => createTeam("casa", "Equipe A"))
+  const [teamB, setTeamB] = useState<TeamConfig>(() => createTeam("adversario", "Equipe B"))
 
-  function updateRow(i: number, patch: Partial<RosterRow>) {
-    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+  const [presets, setPresets] = useState<TeamPreset[]>([])
+  const [editing, setEditing] = useState<ActionSide | null>(null)
+  const [saving, setSaving] = useState<ActionSide | null>(null)
+  const [saveName, setSaveName] = useState("")
+  const [loadFor, setLoadFor] = useState<ActionSide | null>(null)
+
+  // Biblioteca de equipes na nuvem (mesma tabela do Scout View / 3 módulos).
+  useEffect(() => {
+    let active = true
+    async function init() {
+      await migrateLocalPresets()
+      const pres = await loadPresets()
+      if (active) setPresets(pres)
+    }
+    init()
+    const unsub = subscribeToPresets(() => {
+      loadPresets().then((p) => active && setPresets(p))
+    })
+    return () => {
+      active = false
+      unsub()
+    }
+  }, [])
+
+  const teamFor = (side: ActionSide) => (side === "A" ? teamA : teamB)
+  const setTeamFor = (side: ActionSide, team: TeamConfig) =>
+    side === "A" ? setTeamA(team) : setTeamB(team)
+
+  const patchTeam = useCallback((side: ActionSide, patch: Partial<TeamConfig>) => {
+    const apply = side === "A" ? setTeamA : setTeamB
+    apply((prev) => applyTeamPatch(prev, patch))
+  }, [])
+
+  function loadPreset(preset: TeamPreset, side: ActionSide) {
+    const team = presetToTeam(preset, SIDE_MAP[side])
+    setTeamFor(side, team)
+    setLoadFor(null)
   }
 
-  function addRow() {
-    setRows((prev) => [...prev, { number: "", name: "", role: "Ponteira" }])
+  async function handleSavePreset() {
+    if (!saving) return
+    const team = teamFor(saving)
+    const next = await savePreset(saveName.trim() || team.name, team)
+    setPresets(next)
+    setSaving(null)
+    setSaveName("")
   }
 
-  function removeRow(i: number) {
-    setRows((prev) => prev.filter((_, idx) => idx !== i))
+  async function handleDeletePreset(id: string) {
+    if (!confirm("Excluir esta equipe salva da biblioteca?")) return
+    setPresets(await deletePreset(id))
   }
-
-  const validPlayers: ActionPlayer[] = rows
-    .filter((r) => r.number.trim() && r.name.trim())
-    .map((r) => ({ number: Number(r.number), name: r.name.trim(), role: r.role }))
-
-  const numbers = validPlayers.map((p) => p.number)
-  const hasDuplicate = new Set(numbers).size !== numbers.length
-  const canStart = teamName.trim().length > 0 && validPlayers.length >= 2 && !hasDuplicate
 
   function handleStart() {
-    if (!canStart) return
     onStart({
-      teamName: teamName.trim(),
-      opponentName: opponentName.trim() || "Adversário",
       category: category.trim(),
-      players: validPlayers,
+      competition: competition.trim(),
+      teamA,
+      teamB,
       firstServer,
     })
+  }
+
+  if (editing) {
+    const side = editing
+    return (
+      <TeamEditor
+        team={teamFor(side)}
+        accent={side === "A" ? "sky" : "orange"}
+        title={`Editar ${side === "A" ? "Equipe A" : "Equipe B"}`}
+        onChange={(patch) => patchTeam(side, patch)}
+        onClose={() => setEditing(null)}
+      />
+    )
   }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <button
         onClick={onBack}
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-300 hover:text-white"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="size-4" />
         Voltar
       </button>
 
-      <h1 className="mb-1 text-2xl font-bold text-white">Nova coleta</h1>
-      <p className="mb-6 text-sm text-slate-400">
-        Configure o time que será acompanhado. O adversário entra apenas como placar.
+      <h1 className="mb-1 text-2xl font-bold tracking-tight text-foreground">Nova coleta</h1>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Monte as duas equipes (A e B). Ambas são coletadas em detalhe, geram índice e vão para a Hub.
       </p>
 
-      {/* Times */}
-      <div className="mb-5 space-y-3 rounded-xl border border-slate-700 bg-slate-800/60 p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-400">Meu time</span>
-            <input
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              placeholder="Ex.: Vôlei Sub-17"
-              className="h-10 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 text-sm text-white placeholder:text-slate-500"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-400">Adversário</span>
-            <input
-              value={opponentName}
-              onChange={(e) => setOpponentName(e.target.value)}
-              placeholder="Adversário"
-              className="h-10 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 text-sm text-white placeholder:text-slate-500"
-            />
-          </label>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-400">Categoria</span>
-            <input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="Ex.: Sub-17 Feminino"
-              className="h-10 w-full rounded-lg border border-slate-600 bg-slate-900 px-3 text-sm text-white placeholder:text-slate-500"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-400">Primeiro saque</span>
-            <div className="flex h-10 gap-2">
-              <button
-                type="button"
-                onClick={() => setFirstServer("us")}
-                className={`flex-1 rounded-lg border text-sm font-medium ${
-                  firstServer === "us"
-                    ? "border-cyan-500 bg-cyan-500/15 text-cyan-300"
-                    : "border-slate-600 bg-slate-900 text-slate-400"
-                }`}
-              >
-                Nós
-              </button>
-              <button
-                type="button"
-                onClick={() => setFirstServer("them")}
-                className={`flex-1 rounded-lg border text-sm font-medium ${
-                  firstServer === "them"
-                    ? "border-cyan-500 bg-cyan-500/15 text-cyan-300"
-                    : "border-slate-600 bg-slate-900 text-slate-400"
-                }`}
-              >
-                Adversário
-              </button>
-            </div>
-          </label>
-        </div>
+      {/* Dados da partida */}
+      <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">Competição</span>
+          <input
+            value={competition}
+            onChange={(e) => setCompetition(e.target.value)}
+            placeholder="Ex.: Estadual Sub-17"
+            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">Categoria</span>
+          <input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="Ex.: Sub-17 Feminino"
+            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+          />
+        </label>
       </div>
 
-      {/* Elenco */}
-      <div className="mb-5 rounded-xl border border-slate-700 bg-slate-800/60 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Elenco</h2>
-          <span className="text-xs text-slate-400">{validPlayers.length} atleta(s)</span>
-        </div>
-
-        <div className="space-y-2">
-          {rows.map((r, i) => (
-            <div key={i} className="flex items-center gap-2">
+      {/* Equipes */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {(["A", "B"] as ActionSide[]).map((side) => {
+          const team = teamFor(side)
+          const accent = side === "A" ? "text-sky-600" : "text-orange-600"
+          const inCourt = team.players.filter((p) => p.posicao).length
+          return (
+            <div key={side} className="rounded-xl border border-border bg-card p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Users className={`size-4 ${accent}`} />
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Equipe {side}
+                </span>
+              </div>
               <input
-                value={r.number}
-                onChange={(e) => updateRow(i, { number: e.target.value.replace(/\D/g, "") })}
-                placeholder="Nº"
-                inputMode="numeric"
-                className="h-10 w-14 shrink-0 rounded-lg border border-slate-600 bg-slate-900 px-2 text-center text-sm text-white placeholder:text-slate-500"
+                value={team.name}
+                onChange={(e) => setTeamFor(side, { ...team, name: e.target.value })}
+                placeholder={`Equipe ${side}`}
+                className="mb-2 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-semibold text-foreground"
               />
-              <input
-                value={r.name}
-                onChange={(e) => updateRow(i, { name: e.target.value })}
-                placeholder="Nome da atleta"
-                className="h-10 min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-900 px-3 text-sm text-white placeholder:text-slate-500"
-              />
-              <select
-                value={r.role}
-                onChange={(e) => updateRow(i, { role: e.target.value as ActionRole })}
-                className="h-10 shrink-0 rounded-lg border border-slate-600 bg-slate-900 px-1 text-xs text-white"
-              >
-                {ACTION_ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => removeRow(i)}
-                className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-600 text-slate-400 hover:text-red-400"
-                aria-label="Remover atleta"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <p className="mb-3 text-xs text-muted-foreground">
+                {team.players.length} atletas · {inCourt} em quadra
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" className="gap-1.5 bg-transparent" onClick={() => setEditing(side)}>
+                  <Pencil className="size-3.5" />
+                  Editar quadra
+                </Button>
+                <Button size="sm" variant="outline" className="gap-1.5 bg-transparent" onClick={() => setLoadFor(side)}>
+                  <Library className="size-3.5" />
+                  Carregar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 bg-transparent"
+                  onClick={() => {
+                    setSaving(side)
+                    setSaveName(team.name)
+                  }}
+                >
+                  <Save className="size-3.5" />
+                  Salvar
+                </Button>
+              </div>
             </div>
+          )
+        })}
+      </div>
+
+      {/* Primeiro saque */}
+      <div className="mb-5 rounded-xl border border-border bg-card p-4">
+        <span className="mb-2 block text-xs font-medium text-muted-foreground">Primeiro saque</span>
+        <div className="flex gap-2">
+          {(["A", "B"] as ActionSide[]).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setFirstServer(s)}
+              className={`flex-1 rounded-lg border py-2 text-sm font-semibold ${
+                firstServer === s
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-input bg-background text-muted-foreground"
+              }`}
+            >
+              {s === "A" ? teamA.name || "Equipe A" : teamB.name || "Equipe B"}
+            </button>
           ))}
         </div>
-
-        <button
-          onClick={addRow}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-600 px-3 py-2 text-sm text-slate-300 hover:border-cyan-500 hover:text-cyan-300"
-        >
-          <Plus className="h-4 w-4" />
-          Adicionar atleta
-        </button>
-
-        {hasDuplicate && (
-          <p className="mt-2 text-xs text-red-400">Há números de camisa repetidos.</p>
-        )}
       </div>
 
-      <button
-        onClick={handleStart}
-        disabled={!canStart}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 py-3.5 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <Play className="h-5 w-5" />
+      <Button onClick={handleStart} className="w-full gap-2 py-6 text-base font-bold">
+        <Play className="size-5" />
         Iniciar coleta
-      </button>
-      {!canStart && (
-        <p className="mt-2 text-center text-xs text-slate-500">
-          Informe o nome do time e ao menos duas atletas (número + nome).
-        </p>
+      </Button>
+
+      {/* Modal: salvar equipe */}
+      {saving && (
+        <Modal onClose={() => setSaving(null)} title={`Salvar Equipe ${saving} na biblioteca`}>
+          <p className="mb-3 text-sm text-muted-foreground">
+            A equipe fica salva na nuvem e disponível nos três módulos (Scout View, Volleyball e Action).
+          </p>
+          <input
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            placeholder="Nome da equipe"
+            className="mb-4 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSaving(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSavePreset} className="gap-1.5">
+              <Save className="size-4" />
+              Salvar
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal: carregar equipe */}
+      {loadFor && (
+        <Modal onClose={() => setLoadFor(null)} title={`Carregar equipe salva → Equipe ${loadFor}`}>
+          {presets.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma equipe salva ainda. Salve uma equipe para reaproveitá-la aqui e nos outros módulos.
+            </p>
+          ) : (
+            <ul className="max-h-80 space-y-2 overflow-y-auto">
+              {presets.map((preset) => (
+                <li
+                  key={preset.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">{preset.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {preset.team.players.length} atletas
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    <Button size="sm" onClick={() => loadPreset(preset, loadFor)}>
+                      Usar
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeletePreset(preset.id)}
+                      aria-label="Excluir equipe salva"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
       )}
     </div>
   )
 }
+
+function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string
+  children: React.ReactNode
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-3 text-base font-semibold text-foreground">{title}</h3>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// Reexporta o tipo Player para o editor (mantém o import coeso).
+export type { Player }

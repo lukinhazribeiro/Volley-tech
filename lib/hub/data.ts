@@ -210,30 +210,47 @@ export async function loadVideoScoutCandidates(): Promise<ImportCandidate[]> {
  */
 export function buildCandidatesFromActionMatches(matches: ActionMatch[] = getActionMatches()): ImportCandidate[] {
   const candidates: ImportCandidate[] = []
+  const sides: ("A" | "B")[] = ["A", "B"]
 
   for (const match of matches) {
     const season = new Date(match.createdAt).getFullYear().toString()
-    const competition = `${match.teamName} x ${match.opponentName || "Adversário"}`
+    const nameA = match.teamA.name || "Equipe A"
+    const nameB = match.teamB.name || "Equipe B"
+    const competition = match.competition?.trim() || `${nameA} x ${nameB}`
     const matchDate = new Date(match.completedAt ?? match.createdAt).toISOString().slice(0, 10)
 
-    for (const s of computeMatchStats(match)) {
-      const fullName = s.name?.trim()
-      if (!fullName) continue // só associa atletas com nome
-      if (s.t === 0) continue // sem ações registradas
-      candidates.push({
-        fullName,
-        team: match.teamName,
-        category: match.category,
-        position: s.role || "",
-        playerNumber: s.number,
-        competition,
-        season,
-        matchDate,
-        stats: toSyntheticFundamentals(s.tp, s.te),
-        tgp: s.tgp,
-        fingerprint: `saction:${match.id}:${s.number}`,
-        raw: { source: "scout_action", matchId: match.id, number: s.number, tp: s.tp, te: s.te, tg: s.tg },
-      })
+    // As DUAS equipes são coletadas em detalhe e viram capítulos no Hub.
+    for (const side of sides) {
+      const teamName = side === "A" ? nameA : nameB
+      for (const s of computeMatchStats(match, side)) {
+        const fullName = s.name?.trim()
+        if (!fullName) continue // só associa atletas com nome
+        if (s.t === 0) continue // sem ações registradas
+        candidates.push({
+          fullName,
+          team: teamName,
+          category: match.category,
+          position: s.position || "",
+          playerNumber: s.number,
+          competition,
+          season,
+          matchDate,
+          // Não detalhado por fundamento → gera índice com fundamentos sintéticos.
+          stats: toSyntheticFundamentals(s.tp, s.te),
+          // TGP idêntico ao da planilha (computeTGP); o Hub usa este valor gravado.
+          tgp: s.tgp,
+          fingerprint: `saction:${match.id}:${side}:${s.number}`,
+          raw: {
+            source: "scout_action",
+            matchId: match.id,
+            side,
+            number: s.number,
+            tp: s.tp,
+            te: s.te,
+            tg: s.tg,
+          },
+        })
+      }
     }
   }
 
@@ -245,14 +262,15 @@ export function listActionImportMatches(): { matches: ActionMatch[]; items: Impo
   const matches = getActionMatches()
   const items = matches.map((m) => ({
     id: m.id,
-    title: `${m.teamName} x ${m.opponentName || "Adversário"}`,
+    title: `${m.teamA.name || "Equipe A"} x ${m.teamB.name || "Equipe B"}`,
     subtitle: `${m.category || "Sem categoria"} · ${new Date(m.createdAt).toLocaleDateString("pt-BR")}`,
-    hasRoster: m.players.some((p) => p.name?.trim()),
+    hasRoster:
+      m.teamA.players.some((p) => p.name?.trim()) || m.teamB.players.some((p) => p.name?.trim()),
   }))
   return { matches, items }
 }
 
-// ----------------------- Seleção de jogos para importar -----------------------
+// ----------------------- Sele��ão de jogos para importar -----------------------
 
 export interface ImportableMatch {
   id: string

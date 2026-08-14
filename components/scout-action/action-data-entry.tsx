@@ -1,430 +1,327 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Undo2, Flag, StopCircle, Volleyball, SlidersHorizontal, Table2, Grid3x3, Zap } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ArrowLeft, Undo2, FlagTriangleRight, Check, Table2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { ROLE_LABEL, formatTime, type Posicao } from "@/lib/video-scout/types"
 import {
-  buildInitialLineup,
-  courtSlots,
-  opponent,
-  rotate,
-  setPlayerAtPosition,
-  type TeamLineup,
-} from "@/lib/scout-action/rotation"
-import type { ActionEvent, ActionKind, ActionSetScore } from "@/lib/scout-action/types"
-import { saveActionMatch } from "@/lib/scout-action/storage"
-import type { ActionMatchConfig } from "./action-setup"
+  createLiveMatch,
+  courtCells,
+  recordLive,
+  closeSet,
+  setsWon,
+  toStoredTeam,
+  type LiveState,
+} from "@/lib/scout-action/live"
+import type { ActionKind, ActionSide, ScoutActionMatch } from "@/lib/scout-action/types"
+import { saveActionMatch, clearInProgressActionMatch } from "@/lib/scout-action/storage"
+import { ActionCourt } from "./action-court"
 import { ActionSpreadsheet } from "./action-spreadsheet"
+import type { ActionMatchConfig } from "./action-setup"
 
-interface Snapshot {
-  events: ActionEvent[]
-  lineup: TeamLineup
-  serving: "A" | "B"
-  setScoreA: number
-  setScoreB: number
-  completedSets: ActionSetScore[]
-  currentSet: number
+// Ordem de exibição da grade de jogadores (igual à quadra).
+const GRID_ORDER: Posicao[] = ["P4", "P3", "P2", "P5", "P6", "P1"]
+
+const KIND_META: Record<ActionKind, { label: string; cls: string }> = {
+  acao: { label: "AÇÃO", cls: "bg-amber-500 hover:bg-amber-400 text-slate-900" },
+  ponto: { label: "PONTO", cls: "bg-emerald-500 hover:bg-emerald-400 text-white" },
+  erro: { label: "ERRO", cls: "bg-red-500 hover:bg-red-400 text-white" },
 }
 
-let eventSeq = 0
-function newEvent(e: Omit<ActionEvent, "id" | "createdAt">): ActionEvent {
-  eventSeq += 1
-  return { ...e, id: `sae_${Date.now()}_${eventSeq}`, createdAt: Date.now() }
-}
-
-export function ActionDataEntry({
-  config,
-  onFinish,
-  onExit,
-}: {
+interface ActionDataEntryProps {
   config: ActionMatchConfig
   onFinish: () => void
   onExit: () => void
-}) {
-  const initialLineup = useMemo(() => buildInitialLineup(config.players), [config.players])
-  const setterNumber = initialLineup.setterNumber
+}
 
-  const [tab, setTab] = useState<"coleta" | "planilha">("coleta")
-  const [events, setEvents] = useState<ActionEvent[]>([])
-  const [lineup, setLineup] = useState<TeamLineup>(initialLineup)
-  const [serving, setServing] = useState<"A" | "B">(config.firstServer === "us" ? "A" : "B")
-  const [setScoreA, setSetScoreA] = useState(0)
-  const [setScoreB, setSetScoreB] = useState(0)
-  const [completedSets, setCompletedSets] = useState<ActionSetScore[]>([])
-  const [currentSet, setCurrentSet] = useState(0)
-  const [autoSet, setAutoSet] = useState(true)
-  const [adjust, setAdjust] = useState(false)
-  const [undoStack, setUndoStack] = useState<Snapshot[]>([])
+export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryProps) {
+  const [state, setState] = useState<LiveState>(() =>
+    createLiveMatch(config.teamA, config.teamB, config.firstServer),
+  )
+  const historyRef = useRef<LiveState[]>([])
+  const [side, setSide] = useState<ActionSide>("A")
+  const [armed, setArmed] = useState<ActionKind | null>(null)
+  const [showSheet, setShowSheet] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
 
-  function snapshot(): Snapshot {
-    return {
-      events: [...events],
-      lineup: { ...lineup, positions: [...lineup.positions] },
-      serving,
-      setScoreA,
-      setScoreB,
-      completedSets: [...completedSets],
-      currentSet,
-    }
-  }
+  const startRef = useRef(Date.now())
+  useEffect(() => {
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
+      1000,
+    )
+    return () => clearInterval(id)
+  }, [])
 
-  function pushUndo() {
-    setUndoStack((prev) => [...prev.slice(-49), snapshot()])
+  const nameA = state.teamA.name || "Equipe A"
+  const nameB = state.teamB.name || "Equipe B"
+  const cellsA = useMemo(() => courtCells(state, "A"), [state])
+  const cellsB = useMemo(() => courtCells(state, "B"), [state])
+  const gridCells = side === "A" ? cellsA : cellsB
+  const sets = setsWon(state)
+
+  const commit = useCallback((next: LiveState) => {
+    historyRef.current.push(next)
+    setState(next)
+  }, [])
+
+  function handlePlayer(pos: Posicao) {
+    if (!armed) return
+    historyRef.current.push(state)
+    setState(recordLive(state, side, pos, armed))
+    setArmed(null)
   }
 
   function handleUndo() {
-    setUndoStack((prev) => {
-      if (prev.length === 0) return prev
-      const last = prev[prev.length - 1]
-      setEvents(last.events)
-      setLineup(last.lineup)
-      setServing(last.serving)
-      setSetScoreA(last.setScoreA)
-      setSetScoreB(last.setScoreB)
-      setCompletedSets(last.completedSets)
-      setCurrentSet(last.currentSet)
-      return prev.slice(0, -1)
-    })
+    const hist = historyRef.current
+    if (hist.length === 0) return
+    const prev = hist.pop()!
+    setState(prev)
   }
 
-  /** Aplica o ponto: atualiza placar, rodízio (side-out) e quem saca. */
-  function applyPoint(winner: "A" | "B") {
-    if (winner === "A") setSetScoreA((s) => s + 1)
-    else setSetScoreB((s) => s + 1)
-    // Side-out: quem venceu sem estar sacando gira e passa a sacar.
-    if (winner !== serving) {
-      if (winner === "A") setLineup((l) => ({ ...l, positions: rotate(l.positions) }))
-      setServing(winner)
+  function handleCloseSet() {
+    if (state.scoreA === 0 && state.scoreB === 0) return
+    if (!confirm(`Encerrar o set ${state.setIndex + 1} em ${state.scoreA} x ${state.scoreB}?`)) return
+    // Próximo set: quem perdeu começa sacando (fallback A).
+    const nextServer: ActionSide = state.scoreA > state.scoreB ? "B" : "A"
+    commit(closeSet(state, nextServer))
+    setArmed(null)
+  }
+
+  function handleFinish() {
+    if (!confirm("Encerrar o scout e salvar? Isto conclui a coleta das duas equipes.")) return
+    const finalScores = [...state.setScores]
+    if (state.scoreA > 0 || state.scoreB > 0) {
+      finalScores.push({ scoreA: state.scoreA, scoreB: state.scoreB })
     }
-  }
-
-  function registerPlayer(playerNumber: number, kind: ActionKind) {
-    pushUndo()
-    const additions: ActionEvent[] = [newEvent({ team: "A", playerNumber, kind, setIndex: currentSet })]
-    // Levantamento automático: credita AÇÃO à levantadora em quadra numa jogada
-    // positiva de outra atleta (participação no ponto/ataque).
-    if (autoSet && setterNumber != null && setterNumber !== playerNumber && (kind === "acao" || kind === "ponto")) {
-      additions.push(
-        newEvent({ team: "A", playerNumber: setterNumber, kind: "acao", setIndex: currentSet, auto: true }),
-      )
+    let a = 0
+    let b = 0
+    for (const s of finalScores) {
+      if (s.scoreA > s.scoreB) a++
+      else if (s.scoreB > s.scoreA) b++
     }
-    setEvents((prev) => [...prev, ...additions])
-    if (kind === "ponto") applyPoint("A")
-    else if (kind === "erro") applyPoint("B")
-    // "acao" não pontua: rally segue.
-  }
-
-  function registerOpponentPoint() {
-    pushUndo()
-    setEvents((prev) => [...prev, newEvent({ team: "B", playerNumber: 0, kind: "ponto", setIndex: currentSet })])
-    applyPoint("B")
-  }
-
-  function endSet() {
-    if (setScoreA === 0 && setScoreB === 0) return
-    pushUndo()
-    setCompletedSets((prev) => [...prev, { scoreA: setScoreA, scoreB: setScoreB }])
-    setCurrentSet((s) => s + 1)
-    setSetScoreA(0)
-    setSetScoreB(0)
-    // Saque alterna a cada set.
-    setServing((prev) => opponent(prev))
-    setLineup(initialLineup)
-  }
-
-  function finishMatch() {
-    const sets = [...completedSets]
-    if (setScoreA > 0 || setScoreB > 0) sets.push({ scoreA: setScoreA, scoreB: setScoreB })
-    const setsA = sets.filter((s) => s.scoreA > s.scoreB).length
-    const setsB = sets.filter((s) => s.scoreB > s.scoreA).length
-    const now = new Date()
-    saveActionMatch({
-      teamName: config.teamName,
-      opponentName: config.opponentName,
+    const match: Omit<ScoutActionMatch, "id"> = {
       category: config.category,
-      players: config.players,
-      events,
-      sets,
-      teamSets: setsA,
-      opponentSets: setsB,
-      createdAt: now.toISOString(),
-      completedAt: now.toISOString(),
-      winner: setsA >= setsB ? "A" : "B",
-    })
+      competition: config.competition,
+      teamA: toStoredTeam(state.teamA),
+      teamB: toStoredTeam(state.teamB),
+      events: state.events,
+      setScores: finalScores,
+      setsA: a,
+      setsB: b,
+      createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      winner: a === b ? null : a > b ? "A" : "B",
+    }
+    saveActionMatch(match)
+    clearInProgressActionMatch()
     onFinish()
   }
 
-  const slots = courtSlots(lineup)
-  const setsWonA = completedSets.filter((s) => s.scoreA > s.scoreB).length
-  const setsWonB = completedSets.filter((s) => s.scoreB > s.scoreA).length
+  const lastSet = state.setScores[state.setScores.length - 1]
+
+  if (showSheet) {
+    return (
+      <ActionSpreadsheet
+        live={state}
+        category={config.category}
+        competition={config.competition}
+        onBack={() => setShowSheet(false)}
+      />
+    )
+  }
 
   return (
-    <div className="mx-auto max-w-2xl px-3 py-4 pb-28">
-      {/* Placar */}
-      <div className="mb-3 rounded-xl border border-slate-700 bg-slate-800/70 p-3">
+    <div className="min-h-svh bg-slate-950 text-slate-100">
+      <div className="mx-auto flex max-w-3xl flex-col gap-3 px-3 py-4">
+        {/* Cabeçalho */}
         <div className="flex items-center justify-between">
-          <TeamScore
-            name={config.teamName}
-            points={setScoreA}
-            sets={setsWonA}
-            serving={serving === "A"}
-            align="left"
-          />
-          <div className="px-3 text-center">
-            <p className="text-[10px] uppercase tracking-widest text-slate-500">Set {currentSet + 1}</p>
-            <p className="text-xs font-semibold text-slate-400">{setsWonA} — {setsWonB}</p>
-          </div>
-          <TeamScore
-            name={config.opponentName}
-            points={setScoreB}
-            sets={setsWonB}
-            serving={serving === "B"}
-            align="right"
-          />
+          <button
+            onClick={onExit}
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200"
+          >
+            <ArrowLeft className="size-4" />
+            Sair
+          </button>
+          <span className="rounded-full bg-orange-500/20 px-3 py-1 text-xs font-semibold text-orange-300">
+            Scout Action · ao vivo
+          </span>
         </div>
-      </div>
 
-      {/* Abas */}
-      <div className="mb-3 flex gap-2">
-        <TabButton active={tab === "coleta"} onClick={() => setTab("coleta")} icon={<Grid3x3 className="h-4 w-4" />}>
-          Coleta
-        </TabButton>
-        <TabButton active={tab === "planilha"} onClick={() => setTab("planilha")} icon={<Table2 className="h-4 w-4" />}>
-          Planilha
-        </TabButton>
-      </div>
+        {/* Placar */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4">
+          <div className="min-w-0 text-center">
+            <p className="truncate text-sm font-semibold text-sky-300">{nameA}</p>
+            <p className="text-5xl font-black tabular-nums text-white">{state.scoreA}</p>
+            <SetDots count={sets.a} active={state.servingTeam === "A"} />
+          </div>
+          <div className="text-center text-slate-500">
+            <p className="text-[10px] font-bold uppercase tracking-widest">Set {state.setIndex + 1}</p>
+            <p className="text-2xl font-black">x</p>
+          </div>
+          <div className="min-w-0 text-center">
+            <p className="truncate text-sm font-semibold text-orange-300">{nameB}</p>
+            <p className="text-5xl font-black tabular-nums text-white">{state.scoreB}</p>
+            <SetDots count={sets.b} active={state.servingTeam === "B"} />
+          </div>
+        </div>
 
-      {tab === "planilha" ? (
-        <ActionSpreadsheet players={config.players} events={events} teamName={config.teamName} />
-      ) : (
-        <>
-          {/* Rodízio */}
-          <div className="mb-3 rounded-xl border border-slate-700 bg-slate-800/70 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-                <Volleyball className="h-4 w-4 text-cyan-400" />
-                Rodízio 5x1
-              </span>
-              <button
-                onClick={() => setAdjust((v) => !v)}
-                className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium ${
-                  adjust ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                {adjust ? "Concluir ajuste" : "Ajustar"}
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {slots.map((slot) => (
-                <CourtCell
-                  key={slot.position}
-                  slot={slot}
-                  adjust={adjust}
-                  players={config.players}
-                  onChange={(num) => setLineup((l) => setPlayerAtPosition(l, slot.position, num))}
-                />
-              ))}
-            </div>
-            <label className="mt-3 flex items-center gap-2 text-xs text-slate-300">
-              <input
-                type="checkbox"
-                checked={autoSet}
-                onChange={(e) => setAutoSet(e.target.checked)}
-                className="h-4 w-4 accent-cyan-500"
-              />
-              <Zap className="h-3.5 w-3.5 text-amber-400" />
-              Levantamento automático para a levantadora em quadra
-            </label>
+        {/* Quadra */}
+        <ActionCourt
+          nameA={nameA}
+          nameB={nameB}
+          cellsA={cellsA}
+          cellsB={cellsB}
+          serving={state.servingTeam}
+        />
+
+        {/* Coletor: seletor A/B + 3 botões + grade de jogadores */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3">
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            {(["A", "B"] as ActionSide[]).map((s) => {
+              const active = side === s
+              const name = s === "A" ? nameA : nameB
+              const activeCls =
+                s === "A"
+                  ? "border-sky-400 bg-sky-500/20 text-sky-200"
+                  : "border-orange-400 bg-orange-500/20 text-orange-200"
+              return (
+                <button
+                  key={s}
+                  onClick={() => setSide(s)}
+                  className={[
+                    "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-bold transition",
+                    active
+                      ? activeCls
+                      : "border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200",
+                  ].join(" ")}
+                >
+                  <span className="shrink-0">{s}</span>
+                  <span className="truncate">{name}</span>
+                </button>
+              )
+            })}
           </div>
 
-          {/* Botões por atleta */}
-          <div className="space-y-2">
-            {config.players.map((p) => (
-              <div
-                key={p.number}
-                className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/70 p-2"
+          {/* Botões de ação */}
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            {(["acao", "ponto", "erro"] as ActionKind[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setArmed((cur) => (cur === k ? null : k))}
+                className={[
+                  "rounded-xl px-2 py-3 text-sm font-black uppercase tracking-wide transition",
+                  KIND_META[k].cls,
+                  armed === k ? "ring-4 ring-white/60" : "opacity-90",
+                ].join(" ")}
               >
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-700 text-sm font-bold text-white">
-                    {p.number}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-white">{p.name}</p>
-                    <p className="text-[11px] text-slate-400">
-                      {p.role}
-                      {p.number === setterNumber ? " · levanta" : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 gap-1.5">
-                  <ActionBtn variant="acao" onClick={() => registerPlayer(p.number, "acao")}>
-                    Ação
-                  </ActionBtn>
-                  <ActionBtn variant="ponto" onClick={() => registerPlayer(p.number, "ponto")}>
-                    Ponto
-                  </ActionBtn>
-                  <ActionBtn variant="erro" onClick={() => registerPlayer(p.number, "erro")}>
-                    Erro
-                  </ActionBtn>
-                </div>
-              </div>
+                {KIND_META[k].label}
+              </button>
             ))}
           </div>
 
-          {/* Ponto do adversário */}
-          <button
-            onClick={registerOpponentPoint}
-            className="mt-3 w-full rounded-xl border border-slate-600 bg-slate-800/70 py-3 text-sm font-semibold text-slate-200 hover:border-red-500/60 hover:text-red-300"
+          <p className="mb-2 text-center text-[11px] text-slate-400">
+            {armed
+              ? `Toque na atleta que fez a ${KIND_META[armed].label.toLowerCase()}`
+              : "Selecione AÇÃO, PONTO ou ERRO e toque na atleta"}
+          </p>
+
+          {/* Grade de jogadores em quadra da equipe selecionada */}
+          <div className="grid grid-cols-3 gap-2">
+            {GRID_ORDER.map((pos) => {
+              const cell = gridCells.find((c) => c.posicao === pos)!
+              const p = cell.player
+              return (
+                <button
+                  key={pos}
+                  onClick={() => handlePlayer(pos)}
+                  disabled={!armed || !p}
+                  className={[
+                    "flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 transition",
+                    cell.isLibero
+                      ? "border-amber-500/40 bg-amber-500/10"
+                      : "border-slate-700 bg-slate-800",
+                    armed && p ? "hover:border-white/60 active:scale-95" : "opacity-60",
+                  ].join(" ")}
+                >
+                  <span className="text-[9px] font-bold text-slate-500">{pos}</span>
+                  <span className="text-xl font-black tabular-nums text-white">
+                    {p ? p.number : "—"}
+                  </span>
+                  <span className="max-w-full truncate text-[9px] uppercase text-slate-400">
+                    {cell.isLibero ? "Líbero" : p?.role ? ROLE_LABEL[p.role] : ""}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Ações do jogo */}
+        <div className="grid grid-cols-4 gap-2">
+          <Button
+            onClick={handleUndo}
+            variant="outline"
+            className="gap-1.5 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
           >
-            +1 Ponto do adversário
-          </button>
-        </>
-      )}
+            <Undo2 className="size-4" />
+            <span className="hidden sm:inline">Desfazer</span>
+          </Button>
+          <Button
+            onClick={() => setShowSheet(true)}
+            variant="outline"
+            className="gap-1.5 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
+          >
+            <Table2 className="size-4" />
+            <span className="hidden sm:inline">Planilha</span>
+          </Button>
+          <Button
+            onClick={handleCloseSet}
+            variant="outline"
+            className="gap-1.5 border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white"
+          >
+            <FlagTriangleRight className="size-4" />
+            <span className="hidden sm:inline">Fechar set</span>
+          </Button>
+          <Button onClick={handleFinish} className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500">
+            <Check className="size-4" />
+            <span className="hidden sm:inline">Encerrar</span>
+          </Button>
+        </div>
 
-      {/* Controles */}
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <button
-          onClick={handleUndo}
-          disabled={undoStack.length === 0}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-600 py-2.5 text-sm font-medium text-slate-200 disabled:opacity-40"
-        >
-          <Undo2 className="h-4 w-4" />
-          Desfazer
-        </button>
-        <button
-          onClick={endSet}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 py-2.5 text-sm font-medium text-amber-300"
-        >
-          <Flag className="h-4 w-4" />
-          Encerrar set
-        </button>
-        <button
-          onClick={finishMatch}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 py-2.5 text-sm font-bold text-white"
-        >
-          <StopCircle className="h-4 w-4" />
-          Finalizar
-        </button>
+        {/* Barra inferior */}
+        <div className="grid grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-slate-900 p-3 text-center text-xs">
+          <BottomStat label="Set" value={`${state.setIndex + 1}`} />
+          <BottomStat label="Tempo" value={formatTime(elapsed)} />
+          <BottomStat label="Competição" value={config.competition || "—"} />
+          <BottomStat
+            label="Placar do set"
+            value={lastSet ? `${lastSet.scoreA}-${lastSet.scoreB}` : `${sets.a}-${sets.b} sets`}
+          />
+        </div>
       </div>
-
-      <button onClick={onExit} className="mt-3 w-full py-2 text-center text-xs text-slate-500 hover:text-slate-300">
-        Descartar e sair sem salvar
-      </button>
     </div>
   )
 }
 
-function TeamScore({
-  name,
-  points,
-  serving,
-  align,
-}: {
-  name: string
-  points: number
-  sets: number
-  serving: boolean
-  align: "left" | "right"
-}) {
+function SetDots({ count, active }: { count: number; active: boolean }) {
   return (
-    <div className={`min-w-0 flex-1 ${align === "right" ? "text-right" : "text-left"}`}>
-      <div className={`flex items-center gap-1.5 ${align === "right" ? "justify-end" : "justify-start"}`}>
-        {serving && align === "left" && <Volleyball className="h-3.5 w-3.5 text-cyan-400" />}
-        <p className="truncate text-xs font-medium text-slate-300">{name}</p>
-        {serving && align === "right" && <Volleyball className="h-3.5 w-3.5 text-cyan-400" />}
-      </div>
-      <p className="text-3xl font-bold text-white">{points}</p>
-    </div>
-  )
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium ${
-        active ? "bg-cyan-600 text-white" : "border border-slate-700 bg-slate-800/50 text-slate-400"
-      }`}
-    >
-      {icon}
-      {children}
-    </button>
-  )
-}
-
-function CourtCell({
-  slot,
-  adjust,
-  players,
-  onChange,
-}: {
-  slot: ReturnType<typeof courtSlots>[number]
-  adjust: boolean
-  players: ActionMatchConfig["players"]
-  onChange: (num: number) => void
-}) {
-  return (
-    <div
-      className={`relative rounded-lg border p-2 text-center ${
-        slot.isServer ? "border-cyan-500 bg-cyan-500/10" : "border-slate-700 bg-slate-900/60"
-      }`}
-    >
-      <span className="absolute left-1 top-1 text-[9px] font-medium text-slate-500">P{slot.position}</span>
-      <div className="absolute right-1 top-1 flex gap-0.5">
-        {slot.isSetter && (
-          <span className="rounded bg-amber-500/20 px-1 text-[9px] font-bold text-amber-300">Lev</span>
-        )}
-        {slot.isLibero && <span className="rounded bg-fuchsia-500/20 px-1 text-[9px] font-bold text-fuchsia-300">Líb</span>}
-      </div>
-      {adjust ? (
-        <select
-          value={slot.number}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="mt-3 w-full rounded bg-slate-800 text-center text-sm font-bold text-white"
-        >
-          {players.map((p) => (
-            <option key={p.number} value={p.number}>
-              {p.number}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <p className="mt-3 text-lg font-bold text-white">{slot.number || "—"}</p>
+    <div className="mt-1 flex items-center justify-center gap-1">
+      <span className="text-[10px] text-slate-500">{count} sets</span>
+      {active && (
+        <span className="rounded bg-emerald-500/20 px-1 text-[9px] font-bold uppercase text-emerald-300">
+          saque
+        </span>
       )}
     </div>
   )
 }
 
-function ActionBtn({
-  variant,
-  onClick,
-  children,
-}: {
-  variant: "acao" | "ponto" | "erro"
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  const styles: Record<typeof variant, string> = {
-    acao: "bg-slate-700 text-slate-100 hover:bg-slate-600",
-    ponto: "bg-emerald-600 text-white hover:bg-emerald-500",
-    erro: "bg-red-600 text-white hover:bg-red-500",
-  }
+function BottomStat({ label, value }: { label: string; value: string }) {
   return (
-    <button
-      onClick={onClick}
-      className={`h-10 w-14 rounded-lg text-xs font-bold transition-colors active:scale-95 ${styles[variant]}`}
-    >
-      {children}
-    </button>
+    <div className="min-w-0">
+      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
+      <p className="truncate text-sm font-semibold text-slate-200">{value}</p>
+    </div>
   )
 }

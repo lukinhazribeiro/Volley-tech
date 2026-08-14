@@ -72,7 +72,7 @@ const ROTATE_CLOCKWISE: Record<Posicao, Posicao> = {
 }
 
 /** Gira a equipe no sentido horário (formação + posição do levantador). */
-function rotateTeamClockwise(team: TeamConfig): TeamConfig {
+export function rotateTeamClockwise(team: TeamConfig): TeamConfig {
   const novaFormacao = {} as Record<Posicao, string | null>
   for (const pos of POSICAO_ORDER) {
     novaFormacao[ROTATE_CLOCKWISE[pos]] = team.formation[pos]
