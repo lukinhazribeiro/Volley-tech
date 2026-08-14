@@ -72,6 +72,15 @@ export function createLiveMatch(
   }
 }
 
+/**
+ * Substitui a configuração de uma equipe (elenco, formação, líbero, levantadora,
+ * nome) preservando o andamento da partida: placar, sets, saque e eventos já
+ * registrados. Usado pelo menu de edição durante a coleta.
+ */
+export function updateLiveTeam(state: LiveState, side: ActionSide, team: TeamConfig): LiveState {
+  return side === "A" ? { ...state, teamA: team } : { ...state, teamB: team }
+}
+
 export interface CourtCell {
   posicao: Posicao
   player: Player | null

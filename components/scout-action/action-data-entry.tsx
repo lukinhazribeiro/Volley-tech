@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, Undo2, FlagTriangleRight, Check, Table2 } from "lucide-react"
+import { ArrowLeft, Undo2, FlagTriangleRight, Check, Table2, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ROLE_LABEL, formatTime, type Posicao } from "@/lib/video-scout/types"
+import type { TeamConfig } from "@/lib/video-scout/match"
 import {
   createLiveMatch,
   courtCells,
@@ -11,14 +12,16 @@ import {
   closeSet,
   setsWon,
   substitutePlayer,
+  updateLiveTeam,
   toStoredTeam,
   type LiveState,
 } from "@/lib/scout-action/live"
 import type { ActionKind, ActionSide, ScoutActionMatch } from "@/lib/scout-action/types"
+import type { ActionMatchConfig } from "@/lib/scout-action/config"
 import { saveActionMatch, clearInProgressActionMatch } from "@/lib/scout-action/storage"
 import { ActionCourt } from "./action-court"
 import { ActionSpreadsheet } from "./action-spreadsheet"
-import type { ActionMatchConfig } from "./action-setup"
+import { ActionMatchMenu } from "./action-match-menu"
 
 // Ordem de exibição da grade de jogadores (igual à quadra).
 const GRID_ORDER: Posicao[] = ["P4", "P3", "P2", "P5", "P6", "P1"]
@@ -43,7 +46,12 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
   const [side, setSide] = useState<ActionSide>("A")
   const [armed, setArmed] = useState<ActionKind | null>(null)
   const [showSheet, setShowSheet] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  // Dados da partida editáveis a qualquer momento pelo menu do topo.
+  const [competition, setCompetition] = useState(config.competition)
+  const [category, setCategory] = useState(config.category)
+  const [firstServer, setFirstServer] = useState<ActionSide>(config.firstServer)
   /** Substituição em andamento: quem sai (posição da quadra) e a equipe. */
   const [subTarget, setSubTarget] = useState<{ side: ActionSide; outId: string } | null>(null)
 
@@ -103,6 +111,21 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
     setSubTarget(null)
   }
 
+  /** Troca a config de uma equipe pelo menu (preserva placar/eventos). */
+  function handleChangeTeam(teamSide: ActionSide, team: TeamConfig) {
+    setState((s) => updateLiveTeam(s, teamSide, team))
+  }
+
+  /** Edição dos dados da partida. O primeiro saque só muda antes do 1º lance. */
+  function handleChangeMeta(patch: { competition?: string; category?: string; firstServer?: ActionSide }) {
+    if (patch.competition !== undefined) setCompetition(patch.competition)
+    if (patch.category !== undefined) setCategory(patch.category)
+    if (patch.firstServer !== undefined && state.events.length === 0) {
+      setFirstServer(patch.firstServer)
+      setState((s) => ({ ...s, servingTeam: patch.firstServer! }))
+    }
+  }
+
   function handleUndo() {
     const hist = historyRef.current
     if (hist.length === 0) return
@@ -132,8 +155,8 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
       else if (s.scoreB > s.scoreA) b++
     }
     const match: Omit<ScoutActionMatch, "id"> = {
-      category: config.category,
-      competition: config.competition,
+      category,
+      competition,
       teamA: toStoredTeam(state.teamA),
       teamB: toStoredTeam(state.teamB),
       events: state.events,
@@ -155,8 +178,8 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
     return (
       <ActionSpreadsheet
         live={state}
-        category={config.category}
-        competition={config.competition}
+        category={category}
+        competition={competition}
         onBack={() => setShowSheet(false)}
       />
     )
@@ -174,9 +197,18 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
             <ArrowLeft className="size-4" />
             Sair
           </button>
-          <span className="rounded-full bg-orange-500/20 px-3 py-1 text-xs font-semibold text-orange-300">
-            Scout Action · ao vivo
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-orange-500/20 px-3 py-1 text-xs font-semibold text-orange-300">
+              Scout Action · ao vivo
+            </span>
+            <button
+              onClick={() => setShowMenu(true)}
+              aria-label="Editar equipes e dados da partida"
+              className="inline-flex size-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+            >
+              <Settings2 className="size-4" />
+            </button>
+          </div>
         </div>
 
         {/* Placar */}
@@ -332,7 +364,7 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
         <div className="grid grid-cols-4 gap-2 rounded-xl border border-slate-800 bg-slate-900 p-3 text-center text-xs">
           <BottomStat label="Set" value={`${state.setIndex + 1}`} />
           <BottomStat label="Tempo" value={formatTime(elapsed)} />
-          <BottomStat label="Competição" value={config.competition || "—"} />
+          <BottomStat label="Competição" value={competition || "—"} />
           <BottomStat
             label="Placar do set"
             value={lastSet ? `${lastSet.scoreA}-${lastSet.scoreB}` : `${sets.a}-${sets.b} sets`}
@@ -403,6 +435,21 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
             )}
           </div>
         </div>
+      )}
+
+      {/* Menu de edição de equipes e dados da partida */}
+      {showMenu && (
+        <ActionMatchMenu
+          competition={competition}
+          category={category}
+          firstServer={firstServer}
+          teamA={state.teamA}
+          teamB={state.teamB}
+          lockServer={state.events.length > 0}
+          onChangeMeta={handleChangeMeta}
+          onChangeTeam={handleChangeTeam}
+          onClose={() => setShowMenu(false)}
+        />
       )}
     </div>
   )

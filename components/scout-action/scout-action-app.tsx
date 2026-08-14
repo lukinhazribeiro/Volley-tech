@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { ArrowLeft, Plus, Trash2, FileDown, Clock, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ActionSetup, type ActionMatchConfig } from "./action-setup"
 import { ActionDataEntry } from "./action-data-entry"
+import { type ActionMatchConfig, createDefaultConfig } from "@/lib/scout-action/config"
 import { listActionMatches, deleteActionMatch, type ActionMatch } from "@/lib/scout-action/storage"
 import { matchTotals } from "@/lib/scout-action/types"
 import { exportActionMatchPdf } from "@/lib/scout-action/export-pdf"
 
-type View = "menu" | "setup" | "capture"
+type View = "menu" | "capture"
 
 export function ScoutActionApp() {
   const [view, setView] = useState<View>("menu")
@@ -22,8 +22,9 @@ export function ScoutActionApp() {
     refresh()
   }, [refresh])
 
-  function startCapture(cfg: ActionMatchConfig) {
-    setConfig(cfg)
+  function startNewScout() {
+    // Abre direto no painel com duas equipes padrão; tudo é editável no menu do topo.
+    setConfig(createDefaultConfig())
     setView("capture")
   }
 
@@ -37,10 +38,6 @@ export function ScoutActionApp() {
     if (!confirm("Excluir este scout? Esta ação não pode ser desfeita.")) return
     deleteActionMatch(id)
     refresh()
-  }
-
-  if (view === "setup") {
-    return <ActionSetup onBack={() => setView("menu")} onStart={startCapture} />
   }
 
   if (view === "capture" && config) {
@@ -69,7 +66,7 @@ export function ScoutActionApp() {
         </p>
       </div>
 
-      <Button onClick={() => setView("setup")} className="mb-8 w-full gap-2 sm:w-auto">
+      <Button onClick={startNewScout} className="mb-8 w-full gap-2 sm:w-auto">
         <Plus className="size-4" />
         Novo scout
       </Button>
