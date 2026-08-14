@@ -4,10 +4,20 @@ import { ROLE_LABEL } from "@/lib/video-scout/types"
 import type { CourtCell } from "@/lib/scout-action/live"
 import type { ActionSide } from "@/lib/scout-action/types"
 
-// Disposição na meia-quadra: coluna da rede (frente) e coluna de fundo.
-// Frente: P4 (fundo do campo visual, cima), P3, P2. Fundo: P5, P6, P1.
-const NET_COL = ["P4", "P3", "P2"] as const
-const BACK_COL = ["P5", "P6", "P1"] as const
+// Disposição das posições conforme a quadra oficial (visão de transmissão).
+// Equipe A (metade esquerda), colunas da esquerda → direita:
+//   fundo = P5/P6/P1 (externa) · rede = P4/P3/P2 (interna, junto ao centro).
+const A_COLS = [
+  ["P5", "P6", "P1"],
+  ["P4", "P3", "P2"],
+] as const
+
+// Equipe B é simétrica por rotação de 180° (espelha colunas E linhas):
+//   rede = P2/P3/P4 (interna, junto ao centro) · fundo = P1/P6/P5 (externa).
+const B_COLS = [
+  ["P2", "P3", "P4"],
+  ["P1", "P6", "P5"],
+] as const
 
 interface ActionCourtProps {
   nameA: string
@@ -72,17 +82,15 @@ function PlayerToken({
 function CourtHalf({
   side,
   cells,
-  mirrored,
+  cols,
   onPlayerTap,
 }: {
   side: ActionSide
   cells: CourtCell[]
-  mirrored?: boolean
+  cols: readonly (readonly string[])[]
   onPlayerTap?: (side: ActionSide, playerId: string) => void
 }) {
   const byPos = (pos: string) => cells.find((c) => c.posicao === pos)!
-  // Coluna mais próxima da rede fica no lado interno (perto do centro).
-  const cols = mirrored ? [BACK_COL, NET_COL] : [NET_COL, BACK_COL]
 
   return (
     <div className="flex flex-1 gap-2 sm:gap-4">
@@ -132,14 +140,14 @@ export function ActionCourt({ nameA, nameB, cellsA, cellsB, serving, onPlayerTap
           <div className="relative flex rounded-lg bg-gradient-to-b from-orange-500 to-orange-700 p-2 shadow-inner ring-1 ring-orange-900/40 sm:p-3">
             {/* Linhas de fundo/laterais */}
             <div className="pointer-events-none absolute inset-2 rounded border border-white/40 sm:inset-3" aria-hidden />
-            <CourtHalf side="A" cells={cellsA} onPlayerTap={onPlayerTap} />
+            <CourtHalf side="A" cells={cellsA} cols={A_COLS} onPlayerTap={onPlayerTap} />
 
             {/* Rede vertical ao centro */}
             <div className="relative z-10 mx-1 flex flex-col items-center justify-center">
               <div className="h-full w-1 bg-[repeating-linear-gradient(0deg,rgba(255,255,255,0.9)_0_4px,transparent_4px_8px)]" />
             </div>
 
-            <CourtHalf side="B" cells={cellsB} mirrored onPlayerTap={onPlayerTap} />
+            <CourtHalf side="B" cells={cellsB} cols={B_COLS} onPlayerTap={onPlayerTap} />
           </div>
         </div>
       </div>
