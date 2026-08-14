@@ -75,6 +75,34 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
     setArmed(null)
   }
 
+  /** Toque num jogador em quadra: registra a ação armada, ou abre a substituição. */
+  function handleCourtTap(tappedSide: ActionSide, playerId: string) {
+    if (armed && tappedSide === side) {
+      const cells = tappedSide === "A" ? cellsA : cellsB
+      const cell = cells.find((c) => c.player?.id === playerId)
+      if (cell) handlePlayer(cell.posicao)
+      return
+    }
+    // Sem ação armada → substituir este atleta por um reserva.
+    setSubTarget({ side: tappedSide, outId: playerId })
+  }
+
+  /** Reservas disponíveis da equipe alvo (elenco menos quem está em quadra). */
+  const subReserves = useMemo(() => {
+    if (!subTarget) return []
+    const team = subTarget.side === "A" ? state.teamA : state.teamB
+    const cells = subTarget.side === "A" ? cellsA : cellsB
+    const onCourt = new Set(cells.map((c) => c.player?.id).filter(Boolean))
+    return team.players.filter((p) => p.name?.trim() && !onCourt.has(p.id))
+  }, [subTarget, state, cellsA, cellsB])
+
+  function handleSubstitute(inId: string) {
+    if (!subTarget) return
+    historyRef.current.push(state)
+    setState(substitutePlayer(state, subTarget.side, subTarget.outId, inId))
+    setSubTarget(null)
+  }
+
   function handleUndo() {
     const hist = historyRef.current
     if (hist.length === 0) return
@@ -176,6 +204,7 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
           cellsA={cellsA}
           cellsB={cellsB}
           serving={state.servingTeam}
+          onPlayerTap={handleCourtTap}
         />
 
         {/* Coletor: seletor A/B + 3 botões + grade de jogadores */}
@@ -310,6 +339,71 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
           />
         </div>
       </div>
+
+      {/* Modal de substituição: trocar o atleta tocado por um reserva do banco */}
+      {subTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Substituir atleta"
+          onClick={() => setSubTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-white">
+                Substituir · {subTarget.side === "A" ? nameA : nameB}
+              </h3>
+              <button
+                onClick={() => setSubTarget(null)}
+                className="text-slate-400 hover:text-slate-200"
+                aria-label="Cancelar substituição"
+              >
+                <ArrowLeft className="size-4" />
+              </button>
+            </div>
+            {(() => {
+              const team = subTarget.side === "A" ? state.teamA : state.teamB
+              const out = team.players.find((p) => p.id === subTarget.outId)
+              return (
+                <p className="mb-3 text-xs text-slate-400">
+                  Sai <span className="font-semibold text-slate-200">#{out?.number} {out?.name}</span>. Escolha quem
+                  entra:
+                </p>
+              )
+            })()}
+            {subReserves.length === 0 ? (
+              <p className="rounded-lg bg-slate-800 p-4 text-center text-sm text-slate-400">
+                Nenhum reserva com nome disponível no elenco.
+              </p>
+            ) : (
+              <ul className="max-h-72 space-y-1.5 overflow-y-auto">
+                {subReserves.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      onClick={() => handleSubstitute(p.id)}
+                      className="flex w-full items-center gap-3 rounded-lg border border-slate-700 bg-slate-800 p-2.5 text-left hover:border-orange-400 hover:bg-slate-700"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white">
+                        {p.number}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-slate-100">{p.name}</span>
+                        {p.role && (
+                          <span className="block text-[10px] uppercase text-slate-400">{p.role}</span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
