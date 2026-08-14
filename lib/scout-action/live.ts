@@ -10,8 +10,10 @@
  *   - ERRO da equipe S   → a OUTRA equipe marca ponto.
  *   - AÇÃO               → jogada positiva que não encerra o rally (sem ponto).
  * Rodízio por sideout: quem marca sem estar sacando recupera o saque e gira.
- * Levantamento automático: em PONTO/AÇÃO de quem não é a levantadora, credita
- * +1 participação (TP) à levantadora em quadra.
+ * Levantamento automático: credita +1 participação (TP) à levantadora em quadra
+ * SOMENTE quando a mesma equipe faz duas ações seguidas (recepção/defesa →
+ * ataque), pois é entre elas que a levantadora toca a bola — nunca após cada
+ * ação isolada.
  */
 
 import {
@@ -121,22 +123,31 @@ export function recordLive(
     },
   ]
 
-  // Levantamento automático: credita participação à levantadora em quadra
-  // (exceto quando a própria ação já é dela ou quando é um erro).
+  // Levantamento automático: o levantamento só ocorre quando a MESMA equipe
+  // faz duas ações seguidas (ex.: recepção/defesa → ataque) — é entre essas
+  // duas ações que a levantadora toca a bola. Portanto só credita +1 à
+  // levantadora quando a ação real anterior foi da mesma equipe, no mesmo set,
+  // e não encerrou o rally (erro). Também não conta se a própria ação é dela.
   if (kind !== "erro") {
-    const setterId = onCourtPlayerId(team, team.setterPosicao, isServing)
-    if (setterId && setterId !== playerId) {
-      const setter = findPlayer(team, setterId)
-      events.push({
-        id: uid("ev"),
-        side,
-        playerId: setterId,
-        playerNumber: setter?.number ?? 0,
-        kind: "acao",
-        setIndex: state.setIndex,
-        auto: true,
-        createdAt: Date.now(),
-      })
+    // Última ação REAL (ignora levantamentos automáticos já creditados).
+    const prev = [...state.events].reverse().find((e) => !e.auto)
+    const consecutiveSameTeam =
+      prev != null && prev.side === side && prev.setIndex === state.setIndex && prev.kind !== "erro"
+    if (consecutiveSameTeam) {
+      const setterId = onCourtPlayerId(team, team.setterPosicao, isServing)
+      if (setterId && setterId !== playerId) {
+        const setter = findPlayer(team, setterId)
+        events.push({
+          id: uid("ev"),
+          side,
+          playerId: setterId,
+          playerNumber: setter?.number ?? 0,
+          kind: "acao",
+          setIndex: state.setIndex,
+          auto: true,
+          createdAt: Date.now(),
+        })
+      }
     }
   }
 
