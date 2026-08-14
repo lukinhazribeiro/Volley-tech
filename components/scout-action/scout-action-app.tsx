@@ -86,7 +86,10 @@ export function ScoutActionApp() {
       ) : (
         <ul className="space-y-3">
           {matches.map((m) => {
-            const t = matchTotals(m)
+            const nameA = m.teamA.name || "Equipe A"
+            const nameB = m.teamB.name || "Equipe B"
+            const tA = matchTotals(m, "A")
+            const tB = matchTotals(m, "B")
             return (
               <li
                 key={m.id}
@@ -96,13 +99,12 @@ export function ScoutActionApp() {
                   <p className="flex items-center gap-2 font-medium text-foreground">
                     <Trophy className="size-4 shrink-0 text-orange-500" />
                     <span className="truncate">
-                      {m.teamName} <span className="text-muted-foreground">x</span>{" "}
-                      {m.opponentName || "Adversário"}
+                      {nameA} <span className="text-muted-foreground">x</span> {nameB}
                     </span>
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {new Date(m.createdAt).toLocaleDateString("pt-BR")} · Sets {m.teamSets}-{m.opponentSets} · TGP
-                    equipe {t.tgp}%
+                    {new Date(m.createdAt).toLocaleDateString("pt-BR")} · Sets {m.setsA}-{m.setsB} ·
+                    TGP {nameA} {tA.tgp}% / {nameB} {tB.tgp}%
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
