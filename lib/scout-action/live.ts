@@ -181,6 +181,49 @@ export function setsWon(state: LiveState): { a: number; b: number } {
   return { a, b }
 }
 
+/**
+ * Substitui um atleta em quadra por um reserva do elenco.
+ *
+ * Troca `outId` (que está numa posição da formação) por `inId` (reserva). O
+ * reserva assume a mesma posição de quadra e a função do atleta que saiu, para
+ * que rodízio, líbero e auto-levantamento continuem coerentes. Não afeta os
+ * eventos já registrados (estatísticas de quem saiu permanecem).
+ */
+export function substitutePlayer(
+  state: LiveState,
+  side: ActionSide,
+  outId: string,
+  inId: string,
+): LiveState {
+  const team = teamOf(state, side)
+  if (outId === inId) return state
+
+  // Posição de quadra ocupada por quem sai (se estiver na formação).
+  let pos: Posicao | null = null
+  for (const p of POSICAO_ORDER) {
+    if (team.formation[p] === outId) {
+      pos = p
+      break
+    }
+  }
+
+  const outPlayer = findPlayer(team, outId)
+  const players = team.players.map((p) =>
+    // O reserva herda a função de quem saiu (mantém o esquema 5x1).
+    p.id === inId ? { ...p, role: p.role ?? outPlayer?.role ?? null } : p,
+  )
+
+  const formation = { ...team.formation }
+  if (pos) formation[pos] = inId
+
+  // Se quem saiu era o líbero, o reserva vira o novo líbero.
+  const liberoId = team.liberoId === outId ? inId : team.liberoId
+  const liberoReplaces = team.liberoReplaces.map((r) => (r === outId ? inId : r))
+
+  const nextTeam: TeamConfig = { ...team, players, formation, liberoId, liberoReplaces }
+  return side === "A" ? { ...state, teamA: nextTeam } : { ...state, teamB: nextTeam }
+}
+
 /** Converte o TeamConfig ao vivo para o formato guardado (sem o campo side). */
 export function toStoredTeam(team: TeamConfig): StoredTeam {
   const { side: _side, ...rest } = team

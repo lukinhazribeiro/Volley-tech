@@ -98,7 +98,7 @@ export function IgdAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <PartCard icon={Activity} label="Média IPTV" value={parts.iptv} hint="Desempenho técnico" />
               <PartCard icon={Dumbbell} label="Média IPF" value={parts.ipf} hint="Desempenho físico" />
-              <PartCard icon={Target} label="Último TGP" value={parts.tgp} hint="Participação nos pontos" />
+              <PartCard icon={Target} label="Último TGP" value={parts.tgp} hint="Mesmo valor da planilha" />
             </div>
           </HubCard>
 

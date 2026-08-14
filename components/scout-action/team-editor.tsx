@@ -62,6 +62,26 @@ export function TeamEditor({ team, title, accent, onChange, onClose }: TeamEdito
     onChange({ formation })
   }
 
+  /**
+   * Marca/desmarca o líbero. O líbero NÃO faz parte dos 6 em quadra: ao marcá-lo
+   * ele sai da formação e reveza automaticamente no fundo pelos centrais
+   * (liberoReplaces). Ao desmarcar, limpa o revezamento.
+   */
+  function toggleLibero(id: string) {
+    if (team.liberoId === id) {
+      onChange({ liberoId: null, liberoReplaces: [] })
+      return
+    }
+    // Tira o novo líbero de qualquer posição de quadra.
+    const formation = { ...team.formation }
+    for (const p of POSICAO_ORDER) if (formation[p] === id) formation[p] = null
+    // Reveza pelos centrais que estiverem em quadra (regra padrão do 5x1).
+    const centraisIds = team.players
+      .filter((pl) => pl.role === "central" && pl.id !== id)
+      .map((pl) => pl.id)
+    onChange({ liberoId: id, liberoReplaces: centraisIds, formation })
+  }
+
   function positionOf(id: string): Posicao | "" {
     return (POSICAO_ORDER.find((p) => team.formation[p] === id) as Posicao) || ""
   }
@@ -146,19 +166,27 @@ export function TeamEditor({ team, title, accent, onChange, onClose }: TeamEdito
                       <select
                         value={positionOf(p.id)}
                         onChange={(e) => setPosition(p.id, e.target.value as Posicao | "")}
-                        className="rounded-md border border-input bg-card px-2 py-1.5 text-sm text-foreground"
+                        disabled={isLibero}
+                        title={isLibero ? "O líbero reveza automaticamente no fundo" : undefined}
+                        className="rounded-md border border-input bg-card px-2 py-1.5 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <option value="">Reserva</option>
-                        {POSICAO_ORDER.map((pos) => (
-                          <option key={pos} value={pos}>
-                            {pos}
-                          </option>
-                        ))}
+                        {isLibero ? (
+                          <option value="">Fundo (auto)</option>
+                        ) : (
+                          <>
+                            <option value="">Reserva</option>
+                            {POSICAO_ORDER.map((pos) => (
+                              <option key={pos} value={pos}>
+                                {pos}
+                              </option>
+                            ))}
+                          </>
+                        )}
                       </select>
                     </div>
                     <button
                       type="button"
-                      onClick={() => onChange({ liberoId: isLibero ? null : p.id })}
+                      onClick={() => toggleLibero(p.id)}
                       className={`mb-0.5 rounded-md px-2 py-1.5 text-xs font-semibold ${
                         isLibero ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground"
                       }`}

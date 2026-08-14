@@ -4,71 +4,10 @@ import { ROLE_LABEL } from "@/lib/video-scout/types"
 import type { CourtCell } from "@/lib/scout-action/live"
 import type { ActionSide } from "@/lib/scout-action/types"
 
-// Disposição na meia-quadra: linha da rede (P4/P3/P2) e linha de fundo (P5/P6/P1).
-const NET_ROW = ["P4", "P3", "P2"] as const
-const BACK_ROW = ["P5", "P6", "P1"] as const
-
-interface CourtHalfProps {
-  side: ActionSide
-  name: string
-  cells: CourtCell[]
-  /** Meia-quadra espelhada (rede à esquerda) para a equipe da direita. */
-  mirrored?: boolean
-}
-
-function Circle({ cell }: { cell: CourtCell }) {
-  const isBlue = !cell.isLibero
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div
-        className={[
-          "relative flex size-11 items-center justify-center rounded-full border-2 text-sm font-bold tabular-nums shadow-md sm:size-12",
-          cell.isLibero
-            ? "border-amber-300 bg-amber-500 text-white"
-            : "border-sky-300 bg-sky-700 text-white",
-          cell.isSetter ? "ring-2 ring-emerald-300 ring-offset-2 ring-offset-slate-900" : "",
-        ].join(" ")}
-        title={`${cell.posicao} · ${cell.player ? `#${cell.player.number} ${cell.player.name}` : "—"}`}
-      >
-        <span className="absolute -top-1.5 -left-1.5 rounded bg-slate-900 px-1 text-[9px] font-bold text-sky-200">
-          {cell.posicao}
-        </span>
-        {cell.player ? cell.player.number : "—"}
-        {isBlue && cell.isSetter && (
-          <span className="absolute -bottom-1.5 rounded bg-emerald-500 px-1 text-[8px] font-bold text-white">
-            LEV
-          </span>
-        )}
-      </div>
-      <span className="max-w-[60px] truncate text-center text-[9px] uppercase tracking-wide text-slate-400">
-        {cell.isLibero ? "Líbero" : cell.player?.role ? ROLE_LABEL[cell.player.role] : ""}
-      </span>
-    </div>
-  )
-}
-
-function CourtHalf({ side, name, cells, mirrored }: CourtHalfProps) {
-  const byPos = (pos: string) => cells.find((c) => c.posicao === pos)!
-  const rows = mirrored ? [BACK_ROW, NET_ROW] : [NET_ROW, BACK_ROW]
-  const accent = side === "A" ? "text-sky-300" : "text-orange-300"
-
-  return (
-    <div className="flex-1">
-      <p className={`mb-1 text-center text-[10px] font-bold uppercase tracking-widest ${accent}`}>
-        {name}
-      </p>
-      <div className="rounded-lg bg-gradient-to-b from-orange-500/80 to-orange-600/70 p-2 shadow-inner">
-        {rows.map((row, i) => (
-          <div key={i} className="grid grid-cols-3 place-items-center gap-1 py-1.5">
-            {row.map((pos) => (
-              <Circle key={pos} cell={byPos(pos)} />
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+// Disposição na meia-quadra: coluna da rede (frente) e coluna de fundo.
+// Frente: P4 (fundo do campo visual, cima), P3, P2. Fundo: P5, P6, P1.
+const NET_COL = ["P4", "P3", "P2"] as const
+const BACK_COL = ["P5", "P6", "P1"] as const
 
 interface ActionCourtProps {
   nameA: string
@@ -76,23 +15,134 @@ interface ActionCourtProps {
   cellsA: CourtCell[]
   cellsB: CourtCell[]
   serving: ActionSide | null
+  /** Toque num jogador em quadra (para substituição). */
+  onPlayerTap?: (side: ActionSide, playerId: string) => void
 }
 
-/** Quadra em visão superior com as duas equipes (P1–P6 + funções). */
-export function ActionCourt({ nameA, nameB, cellsA, cellsB, serving }: ActionCourtProps) {
+function PlayerToken({
+  cell,
+  side,
+  onTap,
+}: {
+  cell: CourtCell
+  side: ActionSide
+  onTap?: () => void
+}) {
+  const base =
+    side === "A"
+      ? "border-sky-300 bg-sky-700"
+      : "border-orange-300 bg-orange-600"
+  const label = cell.isLibero ? "Líbero" : cell.player?.role ? ROLE_LABEL[cell.player.role] : ""
+
   return (
-    <div className="flex items-stretch gap-1 rounded-xl border border-slate-700 bg-slate-900/60 p-2">
-      <CourtHalf side="A" name={nameA} cells={cellsA} />
-      {/* Rede */}
-      <div className="flex flex-col items-center justify-center px-1">
-        <div className="h-full w-0.5 bg-slate-500" />
-        <span className="my-1 rotate-0 text-[8px] font-bold uppercase text-slate-500">rede</span>
-        <div className="h-full w-0.5 bg-slate-500" />
+    <button
+      type="button"
+      onClick={onTap}
+      disabled={!onTap}
+      aria-label={`${cell.posicao} · ${cell.player ? `número ${cell.player.number} ${cell.player.name}` : "vazio"}${onTap ? " · tocar para substituir" : ""}`}
+      className="group flex select-none flex-col items-center gap-0.5 outline-none disabled:cursor-default"
+    >
+      <span className="relative flex flex-col items-center">
+        <span
+          className={[
+            "relative flex size-10 items-center justify-center rounded-full border-2 text-sm font-bold tabular-nums text-white shadow-lg transition sm:size-12",
+            cell.isLibero ? "border-amber-300 bg-amber-500" : base,
+            cell.isSetter ? "ring-2 ring-emerald-300 ring-offset-2 ring-offset-orange-700" : "",
+            onTap ? "group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-white" : "",
+          ].join(" ")}
+        >
+          <span className="absolute -top-2 -left-2 rounded bg-slate-950/90 px-1 text-[9px] font-bold text-slate-200">
+            {cell.posicao}
+          </span>
+          {cell.player ? cell.player.number : "—"}
+          {cell.isSetter && !cell.isLibero && (
+            <span className="absolute -bottom-2 rounded bg-emerald-500 px-1 text-[8px] font-bold text-white">
+              LEV
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="max-w-[64px] truncate text-center text-[9px] font-medium uppercase tracking-wide text-white/90">
+        {label}
+      </span>
+    </button>
+  )
+}
+
+function CourtHalf({
+  side,
+  cells,
+  mirrored,
+  onPlayerTap,
+}: {
+  side: ActionSide
+  cells: CourtCell[]
+  mirrored?: boolean
+  onPlayerTap?: (side: ActionSide, playerId: string) => void
+}) {
+  const byPos = (pos: string) => cells.find((c) => c.posicao === pos)!
+  // Coluna mais próxima da rede fica no lado interno (perto do centro).
+  const cols = mirrored ? [BACK_COL, NET_COL] : [NET_COL, BACK_COL]
+
+  return (
+    <div className="flex flex-1 gap-2 sm:gap-4">
+      {cols.map((col, i) => (
+        <div key={i} className="flex flex-1 flex-col justify-around gap-2 py-1">
+          {col.map((pos) => {
+            const cell = byPos(pos)
+            return (
+              <div key={pos} className="flex justify-center">
+                <PlayerToken
+                  cell={cell}
+                  side={side}
+                  onTap={
+                    onPlayerTap && cell.player
+                      ? () => onPlayerTap(side, cell.player!.id)
+                      : undefined
+                  }
+                />
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Quadra horizontal (estilo transmissão) com as duas equipes lado a lado. */
+export function ActionCourt({ nameA, nameB, cellsA, cellsB, serving, onPlayerTap }: ActionCourtProps) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900/60 p-2 sm:p-3">
+      {/* Faixas com nome das equipes */}
+      <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-widest">
+        <span className="flex items-center gap-1 truncate rounded bg-sky-500/15 px-2 py-1 text-sky-300">
+          {serving === "A" && <span className="size-1.5 rounded-full bg-sky-400" aria-hidden />}
+          <span className="truncate">{nameA}</span>
+        </span>
+        <span className="flex items-center gap-1 truncate rounded bg-orange-500/15 px-2 py-1 text-orange-300">
+          <span className="truncate">{nameB}</span>
+          {serving === "B" && <span className="size-1.5 rounded-full bg-orange-400" aria-hidden />}
+        </span>
       </div>
-      <CourtHalf side="B" name={nameB} cells={cellsB} mirrored />
-      {serving && (
-        <span className="sr-only">{serving === "A" ? nameA : nameB} sacando</span>
-      )}
+
+      {/* Quadra em perspectiva */}
+      <div className="[perspective:900px]">
+        <div className="[transform:rotateX(14deg)] rounded-lg">
+          <div className="relative flex rounded-lg bg-gradient-to-b from-orange-500 to-orange-700 p-2 shadow-inner ring-1 ring-orange-900/40 sm:p-3">
+            {/* Linhas de fundo/laterais */}
+            <div className="pointer-events-none absolute inset-2 rounded border border-white/40 sm:inset-3" aria-hidden />
+            <CourtHalf side="A" cells={cellsA} onPlayerTap={onPlayerTap} />
+
+            {/* Rede vertical ao centro */}
+            <div className="relative z-10 mx-1 flex flex-col items-center justify-center">
+              <div className="h-full w-1 bg-[repeating-linear-gradient(0deg,rgba(255,255,255,0.9)_0_4px,transparent_4px_8px)]" />
+            </div>
+
+            <CourtHalf side="B" cells={cellsB} mirrored onPlayerTap={onPlayerTap} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

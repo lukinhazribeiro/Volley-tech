@@ -10,6 +10,7 @@ import {
   recordLive,
   closeSet,
   setsWon,
+  substitutePlayer,
   toStoredTeam,
   type LiveState,
 } from "@/lib/scout-action/live"
@@ -43,6 +44,8 @@ export function ActionDataEntry({ config, onFinish, onExit }: ActionDataEntryPro
   const [armed, setArmed] = useState<ActionKind | null>(null)
   const [showSheet, setShowSheet] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  /** Substituição em andamento: quem sai (posição da quadra) e a equipe. */
+  const [subTarget, setSubTarget] = useState<{ side: ActionSide; outId: string } | null>(null)
 
   const startRef = useRef(Date.now())
   useEffect(() => {

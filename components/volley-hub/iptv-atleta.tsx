@@ -71,8 +71,8 @@ export function IptvAtleta({ initialAthleteId }: { initialAthleteId?: string }) 
   const last = chapters[chapters.length - 1]
   const prev = chapters[chapters.length - 2]
 
-  // Último TGP registrado: participação nos pontos da equipe no capítulo mais
-  // recente que possua o dado. Não entra no cálculo do IPTV.
+  // Último TGP registrado: mesmo valor exibido na planilha do scout (computeTGP)
+  // no capítulo mais recente que possua o dado. Não entra no cálculo do IPTV.
   const lastTgpEntry = data
     ? [...data.entries]
         .reverse()

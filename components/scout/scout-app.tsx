@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Smartphone, Users, History, Zap } from "lucide-react"
+import { Smartphone, Users, History } from "lucide-react"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
 import MatchDataEntryPage from "@/components/scout/pages/match-data-entry-page"
 import MatchHistoryPage from "@/components/scout/pages/match-history-page"
@@ -89,21 +88,6 @@ export default function ScoutApp() {
                   <span className="block text-sm text-orange-50">Até 3 aparelhos conectados em tempo real</span>
                 </span>
               </button>
-
-              <Link
-                href="/scout-action"
-                className="group w-full p-6 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg shadow-lg transition-all hover:-translate-y-1 active:translate-y-0 text-left flex items-center gap-4"
-              >
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/15">
-                  <Zap className="w-7 h-7" />
-                </span>
-                <span>
-                  <span className="block text-xl font-bold mb-1">Scout Action</span>
-                  <span className="block text-sm text-orange-50">
-                    Coleta rápida: 3 botões, rodízio 5x1 e levantamento automáticos
-                  </span>
-                </span>
-              </Link>
 
               <button
                 onClick={() => setView("history")}

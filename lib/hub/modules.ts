@@ -59,6 +59,16 @@ export const VOLLEY_MODULES: VolleyModule[] = [
     features: ["Vídeo + IA", "Por posição", "Relatório"],
   },
   {
+    key: "scout-action",
+    title: "Scout Action",
+    tag: "Coleta rápida",
+    description: "Coleta simplificada com 3 botões (Ação, Ponto, Erro), rodízio 5x1 e levantamento automáticos.",
+    href: "/scout-action",
+    image: "/images/hub-scout-action.jpg",
+    accent: "#fb923c",
+    features: ["3 botões", "Rodízio 5x1", "Gera índice"],
+  },
+  {
     key: "gestao",
     title: "Gestão de Clube",
     tag: "Gestão e organização",
