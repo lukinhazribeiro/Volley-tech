@@ -727,6 +727,7 @@ export function opponentGeneralRally(
       timestamp: Date.now(),
       servingPlayer: 0,
       serveQuality: "+",
+      general: true,
       ...a,
     } as MatchAction)
 

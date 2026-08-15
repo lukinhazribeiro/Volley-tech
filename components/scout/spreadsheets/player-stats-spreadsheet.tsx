@@ -31,6 +31,24 @@ interface PlayerStats {
   tgp: number
 }
 
+/** Resumo geral da equipe adversária (sem leitura por atleta). */
+interface OpponentGeneralSummary {
+  /** Ações de continuidade registradas. */
+  acao: number
+  /** Saques da adversária. */
+  saque: number
+  /** Pontos marcados pela adversária. */
+  ponto: number
+  /** Erros da adversária. */
+  erro: number
+  /** Total de participações positivas (ação + saque + ponto). */
+  tp: number
+  /** Total Great (pontos). */
+  tg: number
+  /** TGP calculado. */
+  tgp: number
+}
+
 export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }: PlayerStatsSpreadsheetProps) {
   const [playerNames, setPlayerNames] = useState<Record<string, Record<number, string>>>({
     A: {},
@@ -309,6 +327,63 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     return result.sort((a, b) => a.number - b.number)
   }
 
+  // Resumo GERAL da equipe adversária (registro sem leitura por atleta).
+  // Participação positiva (TP) = ação + saque + ponto; TG = pontos; TE = erros.
+  const computeOpponentGeneral = (team: "A" | "B"): OpponentGeneralSummary | null => {
+    const filtered =
+      selectedSet === "all" ? actions : actions.filter((action) => action.setNumber === selectedSet)
+    const general = filtered.filter((a) => a.general)
+    if (general.length === 0) return null
+
+    let acao = 0
+    let saque = 0
+    let ponto = 0
+    let erro = 0
+    for (const a of general) {
+      // Saque da adversária (saque em jogo): servingTeam da equipe + serveZone.
+      if (a.servingTeam === team && a.serveZone) {
+        saque++
+        continue
+      }
+      if (a.attackingTeam === team) {
+        if (a.resultComplemento === "#") ponto++
+        else if (a.resultComplemento === "!") erro++
+        else if (a.resultComplemento === "V") acao++
+      }
+    }
+
+    const tg = ponto
+    const tp = ponto + acao + saque
+    const te = erro
+    const tgp = computeTGP({ tp, te, tg })
+    return { acao, saque, ponto, erro, tp, tg, tgp }
+  }
+
+  /** Monta a tabela do resumo geral da adversária no PDF. */
+  const opponentGeneralPdfTable = (doc: jsPDF, teamName: string, s: OpponentGeneralSummary) => {
+    doc.setFontSize(12)
+    doc.text(
+      `${teamName} - Registro Geral (${selectedSet === "all" ? "Todos os Sets" : `Set ${selectedSet}`})`,
+      14,
+      17,
+    )
+    autoTable(doc, {
+      startY: 22,
+      head: [["AÇÃO", "SAQUE", "PONTO", "TG", "TP", "TE", "TGP"]],
+      body: [[s.acao, s.saque, s.ponto, s.tg, s.tp, s.erro, `${s.tgp}%`]],
+      theme: "grid",
+      styles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1,
+        fontSize: 10,
+        halign: "center",
+      },
+      headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
+    })
+  }
+
   const exportTeamToPDF = async (team: "A" | "B") => {
     const doc = new jsPDF({ orientation: "landscape" })
     const stats = calculatePlayerStats(team)
@@ -316,6 +391,15 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
 
     doc.setFontSize(16)
     doc.text(`${teamAName} vs ${teamBName}`, 14, 10)
+
+    // Equipe apenas com registro geral (adversária): tabela-resumo.
+    const general = computeOpponentGeneral(team)
+    if (stats.length === 0 && general) {
+      opponentGeneralPdfTable(doc, teamName, general)
+      doc.save(`${teamName}_stats.pdf`)
+      return
+    }
+
     doc.setFontSize(12)
     doc.text(`${teamName} - ${selectedSet === "all" ? "Todos os Sets" : `Set ${selectedSet}`}`, 14, 17)
 
@@ -465,9 +549,18 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     })
 
     const statsB = calculatePlayerStats("B")
+    const generalB = computeOpponentGeneral("B")
     doc.addPage()
     doc.setFontSize(16)
     doc.text(`${teamAName} vs ${teamBName}`, 14, 10)
+
+    // Equipe B apenas com registro geral (adversária): tabela-resumo.
+    if (statsB.length === 0 && generalB) {
+      opponentGeneralPdfTable(doc, teamBName, generalB)
+      doc.save(`${teamAName}_vs_${teamBName}_stats.pdf`)
+      return
+    }
+
     doc.setFontSize(12)
     doc.text(`${teamBName} - ${selectedSet === "all" ? "Todos os Sets" : `Set ${selectedSet}`}`, 14, 17)
 
@@ -748,6 +841,65 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     )
   }
 
+  /** Tabela do resumo geral da adversária (exibida na tela). */
+  const renderOpponentGeneralTable = (team: "A" | "B", teamName: string, s: OpponentGeneralSummary) => {
+    const bgColor = team === "A" ? "bg-blue-50" : "bg-red-50"
+    const headerColor = team === "A" ? "bg-blue-600" : "bg-red-600"
+    const cols: { label: string; value: string | number; highlight?: boolean }[] = [
+      { label: "AÇÃO", value: s.acao },
+      { label: "SAQUE", value: s.saque },
+      { label: "PONTO", value: s.ponto },
+      { label: "TG", value: s.tg },
+      { label: "TP", value: s.tp },
+      { label: "TE", value: s.erro },
+      { label: "TGP", value: `${s.tgp}%`, highlight: true },
+    ]
+    return (
+      <Card className={`overflow-hidden p-4 ${bgColor}`}>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex flex-col">
+            <h2 className="text-xl font-bold team-title">{teamName}</h2>
+            <span className="text-xs font-medium text-muted-foreground">Registro geral (sem leitura por atleta)</span>
+          </div>
+          <span className="rounded-full bg-black/10 px-2.5 py-0.5 text-xs font-semibold">{setLabel}</span>
+        </div>
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className={`${headerColor} text-white`}>
+                {cols.map((c) => (
+                  <th key={c.label} className="border border-gray-300 p-2">
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-white/60 text-center font-bold">
+                {cols.map((c) => (
+                  <td
+                    key={c.label}
+                    className={`border border-gray-300 p-2 ${c.highlight ? "bg-yellow-200" : ""}`}
+                  >
+                    {c.value}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    )
+  }
+
+  /** Decide entre a planilha detalhada e o resumo geral (adversária). */
+  const renderTeamSection = (team: "A" | "B", teamName: string) => {
+    const general = computeOpponentGeneral(team)
+    const stats = calculatePlayerStats(team)
+    if (stats.length === 0 && general) return renderOpponentGeneralTable(team, teamName, general)
+    return renderTeamTable(team, teamName)
+  }
+
   // Sets que efetivamente possuem ações coletadas
   const availableSets = Array.from(
     new Set(actions.map((a) => a.setNumber).filter((n): n is number => typeof n === "number")),
@@ -822,8 +974,8 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       </div>
 
       <div id="spreadsheet-content" className="space-y-6">
-        {renderTeamTable("A", teamAName)}
-        {renderTeamTable("B", teamBName)}
+        {renderTeamSection("A", teamAName)}
+        {renderTeamSection("B", teamBName)}
       </div>
     </div>
   )

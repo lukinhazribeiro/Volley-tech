@@ -22,6 +22,12 @@ export interface MatchAction {
   pointScoredBy?: "A" | "B"
   pointType?: "serve" | "attack" | "block" | "error"
   setNumber?: number
+  /**
+   * Registro GERAL da equipe adversária (sem leitura por atleta). Quando true,
+   * a ação entra apenas no resumo geral da adversária no relatório, e não na
+   * planilha detalhada por jogador.
+   */
+  general?: boolean
 }
 
 export interface TeamStats {
