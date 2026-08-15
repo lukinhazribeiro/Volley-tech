@@ -677,3 +677,103 @@ export function finalizeRally(
   })
   return { actions, pointScoredBy: teamOfLast, extras: { touches, defenses, blocks } }
 }
+
+// ---------------------------------------------------------------------------
+// Registro GERAL da equipe adversária (leitura assimétrica)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tipos de registro geral da adversária. Diferente da leitura detalhada da
+ * minha equipe (toque a toque, por atleta), a adversária é registrada de forma
+ * agregada — sem atletas, sem posições —, mas alimentando o MESMO placar e a
+ * MESMA lógica de saque/rodízio do sistema.
+ *
+ *  • point  — a adversária marcou o ponto (ex.: ataque/saque dela).
+ *  • error  — a adversária errou; o ponto é da MINHA equipe.
+ *  • serve  — apenas continuidade: a adversária está sacando (marca saque dela).
+ *  • action — apenas continuidade: uma ação geral da adversária (sem ponto).
+ */
+export type OpponentGeneralKind = "point" | "error" | "serve" | "action"
+
+/** Rótulos exibidos nos botões do registro geral da adversária. */
+export const OPPONENT_GENERAL_LABEL: Record<OpponentGeneralKind, string> = {
+  point: "Ponto adversário",
+  error: "Erro adversário",
+  serve: "Saque adversário",
+  action: "Ação adversário",
+}
+
+/**
+ * Constrói as ações do registro GERAL da adversária.
+ *
+ * `myTeam` é o lado da MINHA equipe (leitura detalhada) e `opponent` é sempre o
+ * outro lado. As ações emitidas são 100% compatíveis com `calculateMatchStats`
+ * (placar via `pointScoredBy`) e NÃO criam leitura por atleta da adversária.
+ *
+ * Retorno:
+ *  • actions        — ações a serem persistidas (podem estar vazias).
+ *  • pointScoredBy  — quem marcou o ponto (null quando é continuidade).
+ *  • nextServingTeam— quem deve sacar a seguir (para líbero/rodízio no painel).
+ */
+export function opponentGeneralRally(
+  kind: OpponentGeneralKind,
+  myTeam: "A" | "B",
+  servingTeam: "A" | "B",
+): { actions: MatchAction[]; pointScoredBy: "A" | "B" | null; nextServingTeam: "A" | "B" } {
+  const opponent: "A" | "B" = myTeam === "A" ? "B" : "A"
+  const mk = (a: Partial<MatchAction> & Pick<MatchAction, "servingTeam" | "attackingTeam">): MatchAction =>
+    ({
+      id: newId(),
+      timestamp: Date.now(),
+      servingPlayer: 0,
+      serveQuality: "+",
+      ...a,
+    } as MatchAction)
+
+  // Ponto da adversária: modelado como ataque dela com ponto ("#").
+  if (kind === "point") {
+    const action = mk({
+      servingTeam,
+      attackingTeam: opponent,
+      attackPosition: "P",
+      resultComplemento: "#",
+      actionPlayer: 0,
+    })
+    return { actions: [action], pointScoredBy: opponent, nextServingTeam: opponent }
+  }
+
+  // Erro da adversária: ponto da MINHA equipe (modelado como erro de ataque dela).
+  if (kind === "error") {
+    const action = mk({
+      servingTeam,
+      attackingTeam: opponent,
+      attackPosition: "P",
+      resultComplemento: "!",
+      actionPlayer: 0,
+    })
+    return { actions: [action], pointScoredBy: myTeam, nextServingTeam: myTeam }
+  }
+
+  // Saque da adversária: continuidade. Marca um saque em jogo dela (sem ponto) e
+  // passa a posse de saque para a adversária (líbero/rodízio da minha equipe
+  // reagem a isso no painel).
+  if (kind === "serve") {
+    const action = mk({
+      servingTeam: opponent,
+      attackingTeam: myTeam,
+      serveQuality: "+",
+      serveZone: "8.6",
+    })
+    return { actions: [action], pointScoredBy: null, nextServingTeam: opponent }
+  }
+
+  // Ação geral da adversária: continuidade pura (conta como ação, sem ponto).
+  const action = mk({
+    servingTeam,
+    attackingTeam: opponent,
+    attackPosition: "P",
+    resultComplemento: "V",
+    actionPlayer: 0,
+  })
+  return { actions: [action], pointScoredBy: null, nextServingTeam: servingTeam }
+}
