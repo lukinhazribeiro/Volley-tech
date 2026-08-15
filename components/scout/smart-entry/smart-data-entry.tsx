@@ -7,7 +7,6 @@ import {
   Pause,
   Play,
   Settings,
-  ArrowLeftRight,
   Swords,
   Hand,
   Send,
@@ -15,6 +14,9 @@ import {
   HandMetal,
   ArrowUpFromLine,
   Timer,
+  Plus,
+  Minus,
+  Activity,
 } from "lucide-react"
 import type { MatchAction, TeamStats } from "@/lib/scout/match-parser"
 import type { Player } from "@/components/scout/team-roster-management"
@@ -36,6 +38,9 @@ import {
   finalizeRally,
   describeSystem,
   BACK_ROW,
+  opponentGeneralRally,
+  OPPONENT_GENERAL_LABEL,
+  type OpponentGeneralKind,
 } from "@/lib/scout/smart-collector"
 
 interface SmartDataEntryProps {
@@ -195,10 +200,12 @@ export default function SmartDataEntry({
     setPending(null)
   }
 
+  // Leitura DETALHADA apenas da minha equipe (A). Toques na adversária (B) são
+  // ignorados aqui — a adversária é registrada de forma geral, mais abaixo.
   const selectPlayer = (team: "A" | "B", pos: CourtPos) => {
-    const court = team === "A" ? courtA : courtB
-    setPossession(team)
-    setPending({ team, player: court[pos], pos })
+    if (team !== "A") return
+    setPossession("A")
+    setPending({ team: "A", player: courtA[pos], pos })
   }
 
   const handleFundamento = (f: Fundamento) => {

@@ -597,63 +597,6 @@ export function recordAction(state: MatchState, input: RecordInput): MatchState 
   return { ...state, actions }
 }
 
-/** Tipos de registro geral da equipe adversária (sem leitura por atleta). */
-export type OpponentGeneralKind = "ponto" | "acao" | "erro" | "saque"
-
-/**
- * Registra uma ação GERAL da equipe adversária, sem detalhar atleta/posição.
- * Mantém placar, saque e o rodízio 5x1 da MINHA equipe corretos:
- * - ponto: adversária pontua (ganha o saque);
- * - erro: adversária erra → minha equipe pontua (rotaciona no sideout);
- * - saque: adversária passa a sacar (meu líbero cobre a P1);
- * - acao: continuidade (só estatística geral, não altera placar/saque).
- */
-export function recordOpponentGeneral(state: MatchState, kind: OpponentGeneralKind): MatchState {
-  const rallyId = `rally_${state.set}_${state.currentRally}`
-  const base = {
-    id: uid("act"),
-    rallyId,
-    timestamp: 0,
-    playerId: null,
-    posicao: null as Posicao | null,
-    team: "adversario" as TeamSide,
-    general: true,
-    confidence: 1,
-    validated: true,
-  }
-
-  if (kind === "saque") {
-    const action: ScoutAction = {
-      ...base,
-      fundamento: "saque",
-      resultado: "continuidade",
-      qualidade: "positivo",
-      posicao: "P1",
-    }
-    return { ...state, actions: [...state.actions, action], servingTeam: "adversario" }
-  }
-
-  if (kind === "acao") {
-    const action: ScoutAction = {
-      ...base,
-      fundamento: "ataque",
-      resultado: "continuidade",
-      qualidade: "positivo",
-    }
-    return { ...state, actions: [...state.actions, action] }
-  }
-
-  // ponto ou erro: aplica placar e rotação por sideout.
-  const action: ScoutAction = {
-    ...base,
-    fundamento: "ataque",
-    resultado: kind === "ponto" ? "ponto" : "erro",
-    qualidade: kind === "ponto" ? "ponto" : "erro",
-  }
-  const scoringTeam: TeamSide = kind === "ponto" ? "adversario" : "casa"
-  return { ...state, actions: [...state.actions, action], ...applyScoring(state, scoringTeam) }
-}
-
 /**
  * Converte a última ação (não automática) de uma equipe para ponto ou erro.
  * Usado quando a ação foi registrada como positiva e logo depois o usuário

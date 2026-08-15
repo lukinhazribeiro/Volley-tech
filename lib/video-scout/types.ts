@@ -90,12 +90,6 @@ export interface ScoutAction {
   /** Indica que a ação foi inserida automaticamente (ex.: levantamento antes do ataque). */
   auto?: boolean
   /**
-   * Registro GERAL da equipe adversária (sem leitura por atleta). Usado quando
-   * só a minha equipe é detalhada e a adversária entra apenas como estatística
-   * geral (ponto/ação/erro/saque), sem afetar o rodízio da minha equipe.
-   */
-  general?: boolean
-  /**
    * Bloqueio positivo (toque): o bloqueio tocou na bola e o rally seguiu (houve
    * defesa depois). Não conta ponto nem erro — é apenas uma ação positiva.
    */
