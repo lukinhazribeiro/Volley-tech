@@ -14,9 +14,8 @@ import {
   HandMetal,
   ArrowUpFromLine,
   Timer,
-  Plus,
-  Minus,
-  Activity,
+  Flag,
+  AlertTriangle,
 } from "lucide-react"
 import type { MatchAction, TeamStats } from "@/lib/scout/match-parser"
 import type { Player } from "@/components/scout/team-roster-management"
@@ -209,23 +208,23 @@ export default function SmartDataEntry({
   }
 
   const handleFundamento = (f: Fundamento) => {
-    // Saque: sempre da P1 da equipe que saca.
+    // SAQUE: sempre da minha equipe (A), da P1. O saque da adversária é
+    // registrado pelo botão "Saque adversário" (registro geral).
     if (f === "S") {
-      const court = servingTeam === "A" ? courtA : courtB
-      setPossession(servingTeam)
-      pushTouch(servingTeam, court[1], 1, "S")
+      setPossession("A")
+      pushTouch("A", courtA[1], 1, "S")
       return
     }
 
-    // Levantamento automático: usa o levantador em quadra da posse.
+    // Levantamento automático: usa o levantador em quadra da minha equipe (A).
     // Só pergunta "quem levantou?" se o próprio levantador tiver defendido no rally.
     if (f === "L") {
-      const setter = possession === "A" ? setterA : setterB
-      const court = possessionCourt
+      const setter = setterA
+      const court = courtA
       const setterDefended =
-        setter != null && touches.some((t) => t.team === possession && t.player === setter && t.fundamento === "D")
+        setter != null && touches.some((t) => t.team === "A" && t.player === setter && t.fundamento === "D")
       if (setter != null && !setterDefended) {
-        pushTouch(possession, setter, findPosition(court, setter), "L")
+        pushTouch("A", setter, findPosition(court, setter), "L")
         return
       }
       // Levantador defendeu (ou não há levantador em quadra): perguntar.
@@ -233,7 +232,7 @@ export default function SmartDataEntry({
       const options = wanted
         .map((role) => {
           for (const pos of [1, 2, 3, 4, 5, 6] as CourtPos[]) {
-            if (possessionSetup.roles[court[pos]] === role) return { role, player: court[pos], pos }
+            if (setupA.roles[court[pos]] === role) return { role, player: court[pos], pos }
           }
           return null
         })
@@ -286,6 +285,37 @@ export default function SmartDataEntry({
   const undoLast = () => {
     setTouches((prev) => prev.slice(0, -1))
     setLog((prev) => prev.slice(1))
+  }
+
+  // Registro GERAL da equipe adversária (sem leitura por atleta). Mantém placar,
+  // saque e rodízio 5x1 da MINHA equipe corretos.
+  const handleOpponentGeneral = (kind: OpponentGeneralKind) => {
+    const res = opponentGeneralRally(kind, "A", servingTeam)
+    if (res.actions.length > 0) {
+      if (onActionsBatch) onActionsBatch(res.actions)
+      else res.actions.forEach((a) => onActionComplete(a))
+    }
+    // Histórico visual.
+    setLog((prev) => [
+      {
+        id: Math.random().toString(36).slice(2),
+        team: "B",
+        pos: null,
+        f: kind === "serve" ? "S" : "A",
+        symbol: kind === "point" ? "#" : kind === "error" ? "!" : "+",
+        detail: OPPONENT_GENERAL_LABEL[kind],
+        time: formatTime(elapsed),
+      },
+      ...prev,
+    ])
+    // Rodízio automático por side-out (mesma regra do rally detalhado).
+    if (res.pointScoredBy && res.pointScoredBy !== servingTeam) {
+      if (res.pointScoredBy === "A") setFormationA((f) => rotateFormation(f))
+      else setFormationB((f) => rotateFormation(f))
+    }
+    setServingTeam(res.nextServingTeam)
+    setPossession("A")
+    resetRally()
   }
 
   const lastLog = log[0]
@@ -408,34 +438,9 @@ export default function SmartDataEntry({
           </div>
         </div>
 
-        {/* ============ TROCA DE EQUIPE + LIMPAR ============ */}
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => setPossession("A")}
-              className={`flex-1 rounded-xl px-4 py-4 text-center transition ${
-                possession === "A"
-                  ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg"
-                  : "bg-slate-100 text-slate-400"
-              }`}
-            >
-              <p className="text-3xl font-black leading-none">A</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide">{teamAName}</p>
-            </button>
-            <ArrowLeftRight className="h-6 w-6 shrink-0 text-slate-400" />
-            <button
-              onClick={() => setPossession("B")}
-              className={`flex-1 rounded-xl px-4 py-4 text-center transition ${
-                possession === "B"
-                  ? "bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg"
-                  : "bg-slate-100 text-slate-400"
-              }`}
-            >
-              <p className="text-3xl font-black leading-none">B</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide">{teamBName}</p>
-            </button>
-          </div>
-          <div className="mt-3 flex justify-center">
+        {/* ============ LIMPAR ÚLTIMA AÇÃO ============ */}
+        <div className="rounded-2xl bg-white p-3 shadow-sm">
+          <div className="flex justify-center">
             <button
               onClick={undoLast}
               disabled={touches.length === 0}
@@ -451,32 +456,20 @@ export default function SmartDataEntry({
           {/* ---- LADO ESQUERDO: posições da equipe com a posse + PONTO ---- */}
           <div className="rounded-2xl bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-black tracking-tight text-slate-800">
-                {possession === "A" ? teamAName : teamBName}
-              </h3>
-              <span
-                className={`rounded-lg px-2 py-0.5 text-xs font-black text-white ${
-                  possession === "A" ? "bg-blue-600" : "bg-orange-500"
-                }`}
-              >
-                Equipe {possession}
-              </span>
+              <h3 className="text-base font-black tracking-tight text-slate-800">{teamAName}</h3>
+              <span className="rounded-lg bg-blue-600 px-2 py-0.5 text-xs font-black text-white">MINHA EQUIPE</span>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {([4, 3, 2, 5, 6, 1] as CourtPos[]).map((pos) => {
-                const num = possessionCourt[pos]
-                const selected = pending?.team === possession && pending?.pos === pos
-                const isLibero = possessionSetup.liberoNumber === num
+                const num = courtA[pos]
+                const selected = pending?.team === "A" && pending?.pos === pos
+                const isLibero = setupA.liberoNumber === num
                 return (
                   <button
                     key={pos}
-                    onClick={() => selectPlayer(possession, pos)}
+                    onClick={() => selectPlayer("A", pos)}
                     className={`relative flex flex-col items-center rounded-xl border-2 py-2 transition ${
-                      selected
-                        ? possession === "A"
-                          ? "border-blue-600 bg-blue-50"
-                          : "border-orange-500 bg-orange-50"
-                        : "border-slate-100 hover:border-slate-300"
+                      selected ? "border-blue-600 bg-blue-50" : "border-slate-100 hover:border-slate-300"
                     }`}
                   >
                     {isLibero && (
@@ -484,11 +477,7 @@ export default function SmartDataEntry({
                         L
                       </span>
                     )}
-                    <span
-                      className={`flex h-10 w-10 items-center justify-center rounded-full text-lg font-black text-white ${
-                        possession === "A" ? "bg-blue-600" : "bg-orange-500"
-                      }`}
-                    >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-lg font-black text-white">
                       {num}
                     </span>
                     <span className="mt-0.5 text-sm font-black text-slate-700">P{pos}</span>
@@ -517,7 +506,7 @@ export default function SmartDataEntry({
           {/* ---- LADO DIREITO: fundamentos (S P A / B D L) + ERRO ---- */}
           <div className="rounded-2xl bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-black tracking-tight text-slate-800">AÇÃO</h3>
+              <h3 className="text-base font-black tracking-tight text-slate-800">AÇÃO DA MINHA EQUIPE</h3>
               {/* Qualificação do próximo toque */}
               <div className="flex overflow-hidden rounded-lg border border-slate-200 text-xs font-black">
                 <button
@@ -558,12 +547,43 @@ export default function SmartDataEntry({
           </div>
         </div>
 
+        {/* ============ REGISTRO GERAL DA EQUIPE ADVERSÁRIA ============ */}
+        <div className="rounded-2xl bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-black tracking-tight text-slate-800">{teamBName}</h3>
+            <span className="rounded-lg bg-orange-500 px-2 py-0.5 text-xs font-black text-white">REGISTRO GERAL</span>
+          </div>
+          <p className="mb-3 text-xs text-slate-400">
+            A adversária é registrada de forma geral (sem leitura por atleta). Mantém o placar, o saque e o rodízio da
+            sua equipe corretos.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(
+              [
+                { kind: "point", Icon: Flag, color: "border-orange-200 bg-orange-50 text-orange-600" },
+                { kind: "error", Icon: AlertTriangle, color: "border-emerald-200 bg-emerald-50 text-emerald-600" },
+                { kind: "serve", Icon: Send, color: "border-amber-200 bg-amber-50 text-amber-600" },
+                { kind: "action", Icon: ShieldCheck, color: "border-slate-200 bg-slate-50 text-slate-600" },
+              ] as { kind: OpponentGeneralKind; Icon: typeof Flag; color: string }[]
+            ).map(({ kind, Icon, color }) => (
+              <button
+                key={kind}
+                onClick={() => handleOpponentGeneral(kind)}
+                className={`flex flex-col items-center gap-1 rounded-xl border-2 py-3 font-bold transition hover:brightness-95 ${color}`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-center text-[11px] font-black leading-tight">{OPPONENT_GENERAL_LABEL[kind]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Rodapé */}
         <div className="flex items-center justify-between px-2 pb-2 text-xs text-slate-400">
           <span className="font-semibold uppercase tracking-wide">
             Inteligência para <span className="text-orange-400">decisões vencedoras</span>
           </span>
-          <span className="font-black text-blue-700">SCOUT VIEW IA</span>
+          <span className="font-black text-blue-700">SCOUT VOLLEYBALL</span>
         </div>
       </div>
 
