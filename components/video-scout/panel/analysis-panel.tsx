@@ -26,11 +26,13 @@ import {
   nextSet,
   quickStats,
   recordAction,
+  recordOpponentGeneral,
   setServingTeam,
   substitute,
   undoLast,
   updateTeam,
   type MatchState,
+  type OpponentGeneralKind,
   type TeamConfig,
 } from "@/lib/video-scout/match"
 import {
@@ -61,7 +63,10 @@ import {
 } from "@/lib/video-scout/live-session"
 import { ScoutReport } from "../scout-report"
 import { PanelSidebar } from "./panel-sidebar"
-import { PanelTeam, type RecordPayload } from "./panel-team"
+import { type RecordPayload } from "./panel-team"
+import { PanelCourt } from "./panel-court"
+import { PanelMyTeam } from "./panel-my-team"
+import { PanelOpponent } from "./panel-opponent"
 import { PanelActions } from "./panel-actions"
 import { PanelStatsBar } from "./panel-stats-bar"
 import { HistoryDialog, SubstitutionDialog, TeamSetupDialog } from "./panel-dialogs"
@@ -226,6 +231,11 @@ export function AnalysisPanel() {
 
   const handleAmend = useCallback((side: TeamSide, quality: "ponto" | "erro") => {
     setMatch((prev) => amendLastQuality(prev, side, quality))
+  }, [])
+
+  // Registro GERAL da equipe adversária (sem leitura por atleta).
+  const handleOpponentGeneral = useCallback((kind: OpponentGeneralKind) => {
+    setMatch((prev) => recordOpponentGeneral(prev, kind))
   }, [])
 
   // Define qual equipe inicia sacando (só na configuração inicial do set).
@@ -707,24 +717,25 @@ export function AnalysisPanel() {
           </div>
         </header>
 
-        <main className="flex flex-1 flex-col gap-4 p-4">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.1fr_1fr]">
-            {/* Equipe A */}
-            <PanelTeam
-              team={match.teamA}
-              accent="blue"
-              isServing={match.servingTeam === null ? true : match.servingTeam === "casa"}
-              onRecord={(p) => handleRecord("casa", p)}
-              onAmend={(q) => handleAmend("casa", q)}
-              canAmend={canAmend.casa}
-              onSubstitute={(pos) => setSubTarget({ side: "casa", pos })}
-              onOpenLibero={() => setSetupTarget("casa")}
-            />
+        <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4">
+          {/* Quadra de transmissão: as duas equipes (A detalhada, B geral) */}
+          <div>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-600">
+                <span className="size-2 rounded-full bg-blue-500" aria-hidden="true" />
+                Equipe A
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wide text-orange-500">
+                Equipe B
+              </span>
+            </div>
+            <PanelCourt teamA={match.teamA} teamB={match.teamB} servingTeam={match.servingTeam} />
+          </div>
 
-            {/* Centro: placar ao vivo + lista de ações */}
-            <div className="flex min-h-0 flex-col gap-4">
-              {/* Placar ao vivo */}
-              <div className="rounded-xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
+          {/* Bloco central: placar ao vivo */}
+          <div className="flex min-h-0 flex-col gap-4">
+            {/* Placar ao vivo */}
+            <div className="rounded-xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
                 <div className="mb-2 flex items-center justify-center gap-2">
                   <span className="rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-orange-700">
                     Set {match.set}
@@ -814,22 +825,22 @@ export function AnalysisPanel() {
                   </button>
                 </div>
               </div>
-
-              <PanelActions actions={match.actions} onDelete={handleDelete} onUndo={handleUndo} />
-            </div>
-
-            {/* Equipe B */}
-            <PanelTeam
-              team={match.teamB}
-              accent="pink"
-              isServing={match.servingTeam === null ? true : match.servingTeam === "adversario"}
-              onRecord={(p) => handleRecord("adversario", p)}
-              onAmend={(q) => handleAmend("adversario", q)}
-              canAmend={canAmend.adversario}
-              onSubstitute={(pos) => setSubTarget({ side: "adversario", pos })}
-              onOpenLibero={() => setSetupTarget("adversario")}
-            />
           </div>
+
+          {/* Leitura detalhada da MINHA equipe (Equipe A) */}
+          <PanelMyTeam
+            team={match.teamA}
+            isServing={match.servingTeam === null ? true : match.servingTeam === "casa"}
+            onRecord={(p) => handleRecord("casa", p)}
+            onAmend={(q) => handleAmend("casa", q)}
+            canAmend={canAmend.casa}
+            onSubstitute={(pos) => setSubTarget({ side: "casa", pos })}
+          />
+
+          {/* Registro GERAL da equipe adversária (Equipe B) */}
+          <PanelOpponent teamName={match.teamB.name} onRecord={handleOpponentGeneral} />
+
+          <PanelActions actions={match.actions} onDelete={handleDelete} onUndo={handleUndo} />
 
           <PanelStatsBar {...stats} onReport={() => setView("relatorio")} />
         </main>

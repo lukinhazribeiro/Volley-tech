@@ -25,6 +25,16 @@ interface ScoutReportProps {
   teamBName?: string
 }
 
+/** Célula de estatística do resumo geral da adversária. */
+function GeneralStat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+      <p className={`text-2xl font-bold tabular-nums ${tone}`}>{value}</p>
+      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+    </div>
+  )
+}
+
 function StatCard({
   icon,
   label,
@@ -331,6 +341,19 @@ export function ScoutReport({
 
   const breakdowns = useMemo(() => computeBreakdowns(filteredActions), [filteredActions])
 
+  // Resumo GERAL da equipe adversária (ações sem leitura por atleta).
+  const opponentGeneral = useMemo(() => {
+    const gerais = actions.filter((a) => a.general && a.team === "adversario")
+    if (gerais.length === 0) return null
+    return {
+      total: gerais.length,
+      pontos: gerais.filter((a) => a.resultado === "ponto").length,
+      erros: gerais.filter((a) => a.resultado === "erro").length,
+      saques: gerais.filter((a) => a.fundamento === "saque").length,
+      acoes: gerais.filter((a) => a.resultado === "continuidade").length,
+    }
+  }, [actions])
+
   // Agrupa jogadores por equipe para as planilhas separadas.
   const teamsToShow = useMemo<TeamSide[]>(() => {
     const all: TeamSide[] = ["casa", "adversario"]
@@ -555,16 +578,38 @@ export function ScoutReport({
           </div>
         </div>
 
-        {summary.jogadores.length === 0 ? (
+        {teamsToShow.map((team) =>
+          statsByTeam[team].length > 0 ? (
+            <TeamTable key={team} team={team} stats={statsByTeam[team]} />
+          ) : null,
+        )}
+
+        {/* Resumo geral da adversária (sem leitura por atleta). */}
+        {opponentGeneral && (teamFilter === "todos" || teamFilter === "adversario") && (
+          <div className="overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-sm">
+            <div className="flex items-center gap-2 bg-orange-50 px-4 py-3">
+              <span className="inline-block h-3 w-3 rounded-full bg-orange-500" aria-hidden="true" />
+              <h3 className="text-base font-bold text-slate-800">
+                {teamBName || TEAM_LABEL.adversario}{" "}
+                <span className="text-sm font-medium text-slate-400">(registro geral)</span>
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+              <GeneralStat label="Pontos" value={opponentGeneral.pontos} tone="text-emerald-600" />
+              <GeneralStat label="Ações" value={opponentGeneral.acoes} tone="text-blue-600" />
+              <GeneralStat label="Erros" value={opponentGeneral.erros} tone="text-red-600" />
+              <GeneralStat label="Saques" value={opponentGeneral.saques} tone="text-orange-600" />
+            </div>
+            <p className="border-t border-slate-100 px-4 py-2 text-center text-[11px] text-slate-400">
+              Registro geral — não há leitura detalhada por atleta da equipe adversária.
+            </p>
+          </div>
+        )}
+
+        {summary.jogadores.length === 0 && !opponentGeneral && (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
             Sem ações atribuídas a atletas para os filtros atuais.
           </div>
-        ) : (
-          teamsToShow.map((team) =>
-            statsByTeam[team].length > 0 ? (
-              <TeamTable key={team} team={team} stats={statsByTeam[team]} />
-            ) : null,
-          )
         )}
       </div>
     </div>
