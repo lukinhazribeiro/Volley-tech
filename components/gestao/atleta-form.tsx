@@ -24,7 +24,6 @@ export type AtletaInitial = {
   email?: string | null
   dataNascimento?: string | null
   dataInscricao?: string | null
-  genero?: string | null
   responsavel?: string | null
   telefoneResponsavel?: string | null
   categoriaId?: number | null
@@ -131,15 +130,6 @@ export function AtletaForm({
           <div>
             <label className={labelCls} htmlFor="dataNascimento">Data de nascimento</label>
             <input id="dataNascimento" name="dataNascimento" type="date" defaultValue={initial?.dataNascimento ?? ""} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls} htmlFor="genero">Gênero</label>
-            <select id="genero" name="genero" defaultValue={initial?.genero ?? ""} className={inputCls}>
-              <option value="">Não informado</option>
-              <option value="feminino">Feminino</option>
-              <option value="masculino">Masculino</option>
-            </select>
-            <p className="mt-1 text-[11px] text-muted-foreground">Usado pela inteligência do VIB na Hub.</p>
           </div>
           <div>
             <label className={labelCls} htmlFor="dataInscricao">Data de inscrição *</label>

@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/lib/gestao/db"
-import { atletas, turmas, categorias, clubeConfig } from "@/lib/gestao/db/schema"
+import { atletas, turmas, categorias } from "@/lib/gestao/db/schema"
 import { getGestaoUserId } from "@/lib/gestao/auth"
 import { and, asc, eq } from "drizzle-orm"
 
@@ -18,7 +18,6 @@ export interface GestaoAthleteOption {
   categoria: string | null
   turma: string | null
   dataNascimento: string | null
-  genero: string | null
 }
 
 /** Lista as atletas ativas da Gestão do usuário (para vincular / sugerir). */
@@ -38,7 +37,6 @@ export async function listGestaoAthletes(): Promise<GestaoAthleteOption[]> {
       categoria: categorias.nome,
       turma: turmas.nome,
       dataNascimento: atletas.dataNascimento,
-      genero: atletas.genero,
       ativo: atletas.ativo,
     })
     .from(atletas)
@@ -55,7 +53,6 @@ export async function listGestaoAthletes(): Promise<GestaoAthleteOption[]> {
       categoria: r.categoria,
       turma: r.turma,
       dataNascimento: r.dataNascimento,
-      genero: r.genero,
     }))
 }
 
@@ -76,7 +73,6 @@ export async function getGestaoAthlete(id: number): Promise<GestaoAthleteOption 
       categoria: categorias.nome,
       turma: turmas.nome,
       dataNascimento: atletas.dataNascimento,
-      genero: atletas.genero,
     })
     .from(atletas)
     .leftJoin(categorias, eq(categorias.id, atletas.categoriaId))
@@ -84,19 +80,4 @@ export async function getGestaoAthlete(id: number): Promise<GestaoAthleteOption 
     .where(and(eq(atletas.id, id), eq(atletas.userId, userId)))
 
   return row ?? null
-}
-
-/** Nome do clube configurado pela conta na Gestão (usado como clube atual no VIB). */
-export async function getClubeNome(): Promise<string | null> {
-  let userId: string
-  try {
-    userId = await getGestaoUserId()
-  } catch {
-    return null
-  }
-  const [row] = await db
-    .select({ nomeClube: clubeConfig.nomeClube })
-    .from(clubeConfig)
-    .where(eq(clubeConfig.userId, userId))
-  return row?.nomeClube ?? null
 }

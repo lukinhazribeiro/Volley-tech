@@ -2,19 +2,12 @@ import { AppShell } from "@/components/gestao/app-shell"
 import { listCategorias } from "@/app/gestao/actions/categorias"
 import { listTurmas } from "@/app/gestao/actions/turmas"
 import { listAtletas } from "@/app/gestao/actions/atletas"
-import { getClube } from "@/app/gestao/actions/clube"
-import { ClubeConfigForm } from "@/components/gestao/clube-config-form"
 import { Building2, Users, Users2, Layers } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
 export default async function ConfiguracoesPage() {
-  const [categorias, turmas, atletas, clube] = await Promise.all([
-    listCategorias(),
-    listTurmas(),
-    listAtletas(),
-    getClube(),
-  ])
+  const [categorias, turmas, atletas] = await Promise.all([listCategorias(), listTurmas(), listAtletas()])
 
   const stats = [
     { icon: Users, label: "Atletas cadastrados", value: atletas.length },
@@ -52,8 +45,6 @@ export default async function ConfiguracoesPage() {
           </div>
         </div>
       </section>
-
-      <ClubeConfigForm initialNome={clube.nomeClube} />
     </AppShell>
   )
 }

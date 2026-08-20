@@ -55,7 +55,6 @@ export default async function EditarAtletaPage({ params }: { params: Promise<{ i
             telefone: a.telefone,
             email: a.email,
             dataNascimento: a.dataNascimento,
-            genero: a.genero,
             dataInscricao: a.dataInscricao,
             responsavel: a.responsavel,
             telefoneResponsavel: a.telefoneResponsavel,

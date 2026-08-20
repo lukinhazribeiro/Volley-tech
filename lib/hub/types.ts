@@ -19,8 +19,6 @@ export interface HubAthlete {
   sex: string | null
   /** Identidade da atleta (VIB): clube atual. */
   club: string | null
-  /** Origem da identidade no VIB: 'auto' sincroniza com a Gestão; 'manual' usa os campos do perfil. */
-  identity_mode: "auto" | "manual" | null
   /** Vínculo fixo com a atleta correspondente no módulo de Gestão (atletas.id). */
   gestao_atleta_id: number | null
   created_at: string

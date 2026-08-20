@@ -32,7 +32,6 @@ export const atletas = pgTable("atletas", {
   telefone: text("telefone"),
   email: text("email"),
   dataNascimento: date("data_nascimento"),
-  genero: text("genero"),
   dataInscricao: date("data_inscricao"),
   categoriaId: integer("categoria_id"),
   turmaId: integer("turma_id"),
@@ -45,13 +44,6 @@ export const atletas = pgTable("atletas", {
   bolsista: boolean("bolsista").notNull().default(false),
   ativo: boolean("ativo").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-})
-
-/** Perfil do clube por conta (informado em Configurações, abaixo do administrador). */
-export const clubeConfig = pgTable("clube_config", {
-  userId: uuid("user_id").primaryKey(),
-  nomeClube: text("nome_clube"),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 
 export const atletaTurmas = pgTable("atleta_turmas", {

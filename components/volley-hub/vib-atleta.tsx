@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import useSWR, { useSWRConfig } from "swr"
 import { AthleteGrid } from "./athlete-grid"
 import { HubCard, EmptyState } from "./ui"
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { getAthlete, listEntriesForAthlete } from "@/lib/hub/data"
 import { listAssessments } from "@/lib/hub/physical"
 import { computeIGD } from "@/lib/hub/igd"
-import { getGestaoAthlete, getClubeNome } from "@/app/volley-hub/actions/gestao-link"
+import { getGestaoAthlete } from "@/app/volley-hub/actions/gestao-link"
 import {
   ageFromBirthDate,
   band1Average,
@@ -21,35 +21,19 @@ import {
   type VibClassification,
   type VibCompareResult,
 } from "@/lib/hub/vib"
-import {
-  compareVib,
-  listVibHistory,
-  saveVibHistory,
-  syncVibSample,
-  updateAthleteIdentity,
-} from "@/lib/hub/vib-data"
+import { compareVib, listVibHistory, saveVibHistory, syncVibSample } from "@/lib/hub/vib-data"
 import {
   Cake,
   ChevronLeft,
   Crown,
-  Link2,
   Link2Off,
-  Pencil,
-  RefreshCw,
   Save,
   Shield,
   Sparkles,
   Target,
   TrendingUp,
   Users,
-  Venus,
-  X,
 } from "lucide-react"
-
-type IdentityMode = "auto" | "manual"
-
-const POSITION_OPTIONS = ["Levantadora", "Ponteira", "Oposta", "Central", "Líbero"]
-const SEX_LABEL: Record<string, string> = { feminino: "Feminino", masculino: "Masculino" }
 
 /** Tom semântico por faixa estatística (1 = topo, 4 = base). */
 function bandTone(band: number): { text: string; bg: string; border: string; bar: string } {
@@ -65,6 +49,7 @@ function bandTone(band: number): { text: string; bg: string; border: string; bar
   }
 }
 
+/** Rótulo curto da classificação por faixa (sem "Excelente", que é destaque). */
 const BAND_TIER_LABEL: Record<number, string> = {
   1: "Muito Bom",
   2: "Bom",
@@ -83,67 +68,28 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
       listAssessments(athleteId!),
     ])
 
-    // Vínculo com a Gestão (mesma ponte usada por IPTV/IPF/TGP) + clube da conta.
-    const [gestao, clubeNome] = await Promise.all([
-      athlete?.gestao_atleta_id != null ? getGestaoAthlete(athlete.gestao_atleta_id) : Promise.resolve(null),
-      getClubeNome(),
-    ])
+    // Identidade vinda da Gestão (mesmo vínculo usado por IPTV/IPF/TGP).
+    const gestao =
+      athlete?.gestao_atleta_id != null ? await getGestaoAthlete(athlete.gestao_atleta_id) : null
 
-    const mode: IdentityMode = (athlete?.identity_mode as IdentityMode) ?? "auto"
-
-    // Identidade efetiva conforme o modo escolhido.
-    const identity =
-      mode === "auto"
-        ? {
-            birthDate: gestao?.dataNascimento ?? athlete?.birth_date ?? null,
-            sex: gestao?.genero ?? athlete?.sex ?? null,
-            category: gestao?.categoria ?? athlete?.category ?? null,
-            club: clubeNome ?? athlete?.club ?? athlete?.team ?? null,
-            position: athlete?.position ?? null,
-          }
-        : {
-            birthDate: athlete?.birth_date ?? null,
-            sex: athlete?.sex ?? null,
-            category: athlete?.category ?? null,
-            club: athlete?.club ?? athlete?.team ?? null,
-            position: athlete?.position ?? null,
-          }
-
-    // No modo automático, persiste a identidade da Gestão na Hub para manter
-    // tudo coerente (a "informação boa" também fica salva no perfil).
-    if (mode === "auto" && athlete) {
-      const drift =
-        (identity.birthDate ?? null) !== (athlete.birth_date ?? null) ||
-        (identity.sex ?? null) !== (athlete.sex ?? null) ||
-        (identity.club ?? null) !== (athlete.club ?? null) ||
-        (identity.category ?? null) !== (athlete.category ?? null)
-      if (drift) {
-        try {
-          await updateAthleteIdentity(athlete.id, {
-            birthDate: identity.birthDate,
-            sex: identity.sex,
-            club: identity.club,
-            category: identity.category,
-          })
-        } catch {
-          // não bloqueia o cálculo do VIB
-        }
-      }
-    }
+    // Nascimento e categoria priorizam a Gestão; posição/clube vêm da Hub.
+    const birthDate = gestao?.dataNascimento ?? athlete?.birth_date ?? null
+    const category = athlete?.category ?? gestao?.categoria ?? null
 
     const parts = computeIGD(entries, assessments)
     const igd = parts.igd
 
+    // Participação automática: mantém a amostra anônima em dia e compara.
     await syncVibSample({
       athleteId: athleteId!,
-      position: identity.position,
-      birthDate: identity.birthDate,
+      position: athlete?.position ?? null,
+      birthDate,
       igd,
     })
-    const compare = await compareVib({ position: identity.position, birthDate: identity.birthDate, igd })
+    const compare = await compareVib({ position: athlete?.position ?? null, birthDate, igd })
     const history = await listVibHistory(athleteId!)
 
-    return { athlete, gestao, mode, identity, igd, compare, history }
+    return { athlete, gestao, birthDate, category, igd, compare, history }
   })
 
   if (!athleteId) {
@@ -164,15 +110,11 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
   const igd = data?.igd ?? null
   const compare = data?.compare ?? null
   const classification = classifyVib(compare)
-  const identity = data?.identity
-  const birthDate = identity?.birthDate ?? null
+  const birthDate = data?.birthDate ?? null
   const age = ageFromBirthDate(birthDate)
-  const group = positionToGroup(identity?.position)
+  const group = positionToGroup(athlete?.position)
   const groupLabel = POSITION_GROUP_LABEL[group]
-  const mode: IdentityMode = data?.mode ?? "auto"
   const linkedToGestao = athlete?.gestao_atleta_id != null
-
-  const refresh = () => mutate(["vib-atleta", athleteId])
 
   return (
     <div className="space-y-5">
@@ -183,20 +125,16 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
 
       {isLoading && <p className="text-sm text-[var(--hub-muted)]">Calculando VIB…</p>}
 
-      {!isLoading && athlete && identity && (
+      {!isLoading && athlete && (
         <>
-          <IdentityPanel
-            athleteId={athlete.id}
+          <IdentityStrip
             name={athlete.full_name}
-            mode={mode}
-            club={identity.club}
-            category={identity.category}
-            position={identity.position}
-            sex={identity.sex}
+            club={athlete.club ?? athlete.team ?? null}
+            category={data?.category ?? null}
+            position={athlete.position ?? null}
             birthDate={birthDate}
             age={age}
             linkedToGestao={linkedToGestao}
-            onChanged={refresh}
           />
 
           {igd == null ? (
@@ -207,7 +145,7 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
               />
             </HubCard>
           ) : !birthDate || group === "outro" ? (
-            <MissingIdentityNotice missingBirth={!birthDate} missingPosition={group === "outro"} mode={mode} />
+            <MissingIdentityNotice missingBirth={!birthDate} missingPosition={group === "outro"} />
           ) : compare && compare.sampleSize > 0 ? (
             <>
               <VibHero
@@ -231,7 +169,7 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
                   igd={igd}
                   band1Avg={band1Average(compare)}
                   sampleSize={compare.sampleSize}
-                  onSaved={refresh}
+                  onSaved={() => mutate(["vib-atleta", athleteId])}
                 />
               </div>
             </>
@@ -252,55 +190,32 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Identidade — modo Automático (Gestão) ou Manual (editável)          */
+/* Identidade (somente leitura — vem da Gestão + Hub)                  */
 /* ------------------------------------------------------------------ */
 
-function IdentityPanel({
-  athleteId,
+function IdentityStrip({
   name,
-  mode,
   club,
   category,
   position,
-  sex,
   birthDate,
   age,
   linkedToGestao,
-  onChanged,
 }: {
-  athleteId: string
   name: string
-  mode: IdentityMode
   club: string | null
   category: string | null
   position: string | null
-  sex: string | null
   birthDate: string | null
   age: number | null
   linkedToGestao: boolean
-  onChanged: () => void
 }) {
-  const [editing, setEditing] = useState(false)
-  const [busy, setBusy] = useState(false)
-
   const initials = name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
     .join("")
-
-  async function switchMode(next: IdentityMode) {
-    if (next === mode || busy) return
-    setBusy(true)
-    try {
-      await updateAthleteIdentity(athleteId, { identityMode: next })
-      if (next === "manual") setEditing(true)
-      onChanged()
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--hub-border)] bg-gradient-to-br from-[var(--hub-surface)] to-[var(--hub-bg-deep)] p-5">
@@ -309,7 +224,9 @@ function IdentityPanel({
           {initials || "?"}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--hub-accent)]">Perfil da atleta</p>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--hub-accent)]">
+            Perfil da atleta
+          </p>
           <h3 className="truncate text-xl font-bold text-[var(--hub-text)]">{name}</h3>
           <p className="truncate text-sm text-[var(--hub-muted)]">
             {[position, club].filter(Boolean).join(" • ") || "Sem posição definida"}
@@ -317,180 +234,30 @@ function IdentityPanel({
         </div>
       </div>
 
-      {/* Alternância de modo: Automático x Manual */}
-      <div className="mt-4 flex items-center gap-2">
-        <div className="inline-flex rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] p-0.5">
-          <ModeTab active={mode === "auto"} onClick={() => switchMode("auto")} disabled={busy}>
-            <RefreshCw className="size-3.5" />
-            Automático
-          </ModeTab>
-          <ModeTab active={mode === "manual"} onClick={() => switchMode("manual")} disabled={busy}>
-            <Pencil className="size-3.5" />
-            Manual
-          </ModeTab>
-        </div>
-        {mode === "manual" && !editing && (
-          <Button variant="outline" size="sm" className="ml-auto gap-1.5" onClick={() => setEditing(true)}>
-            <Pencil className="size-3.5" />
-            Editar
-          </Button>
-        )}
-      </div>
-
-      {editing && mode === "manual" ? (
-        <ManualIdentityForm
-          athleteId={athleteId}
-          initial={{ birthDate, sex, position, club, category }}
-          onCancel={() => setEditing(false)}
-          onSaved={() => {
-            setEditing(false)
-            onChanged()
-          }}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <IdentityChip icon={Shield} label="Categoria" value={category} />
+        <IdentityChip icon={Target} label="Posição" value={position} />
+        <IdentityChip
+          icon={Cake}
+          label="Nascimento"
+          value={birthDate ? new Date(birthDate).toLocaleDateString("pt-BR") : null}
         />
-      ) : (
-        <>
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            <IdentityChip icon={Shield} label="Categoria" value={category} />
-            <IdentityChip icon={Target} label="Posição" value={position} />
-            <IdentityChip icon={Venus} label="Gênero" value={sex ? (SEX_LABEL[sex] ?? sex) : null} />
-            <IdentityChip
-              icon={Cake}
-              label="Nascimento"
-              value={birthDate ? new Date(birthDate).toLocaleDateString("pt-BR") : null}
-            />
-            <IdentityChip icon={Users} label="Idade" value={age != null ? `${age} anos` : null} />
-          </div>
-
-          <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--hub-muted)]">
-            {mode === "auto" ? (
-              linkedToGestao ? (
-                <>
-                  <Sparkles className="size-3 text-[var(--hub-accent)]" />
-                  Identidade sincronizada com o cadastro da Gestão (nascimento, gênero, categoria) e o clube da conta.
-                </>
-              ) : (
-                <>
-                  <Link2Off className="size-3" />
-                  Sem vínculo com a Gestão. Vincule a atleta em IPTV/IPF, ou use o modo Manual para preencher aqui.
-                </>
-              )
-            ) : (
-              <>
-                <Link2 className="size-3 text-[var(--hub-accent)]" />
-                Identidade definida manualmente neste perfil, independente da Gestão.
-              </>
-            )}
-          </p>
-        </>
-      )}
-    </div>
-  )
-}
-
-function ModeTab({
-  active,
-  onClick,
-  disabled,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  disabled?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
-        active
-          ? "bg-[var(--hub-accent)] text-black"
-          : "text-[var(--hub-muted)] hover:text-[var(--hub-text)]"
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
-function ManualIdentityForm({
-  athleteId,
-  initial,
-  onCancel,
-  onSaved,
-}: {
-  athleteId: string
-  initial: { birthDate: string | null; sex: string | null; position: string | null; club: string | null; category: string | null }
-  onCancel: () => void
-  onSaved: () => void
-}) {
-  const [birthDate, setBirthDate] = useState(initial.birthDate ?? "")
-  const [sex, setSex] = useState(initial.sex ?? "")
-  const [position, setPosition] = useState(initial.position ?? "")
-  const [club, setClub] = useState(initial.club ?? "")
-  const [category, setCategory] = useState(initial.category ?? "")
-  const [saving, setSaving] = useState(false)
-
-  async function save() {
-    setSaving(true)
-    try {
-      await updateAthleteIdentity(athleteId, {
-        birthDate: birthDate || null,
-        sex: sex || null,
-        position: position || null,
-        club: club || null,
-        category: category || null,
-      })
-      onSaved()
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const fieldCls =
-    "w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] px-3 py-2 text-sm text-[var(--hub-text)] focus:border-[var(--hub-accent)] focus:outline-none"
-  const labelCls = "mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--hub-muted)]"
-
-  return (
-    <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-[var(--hub-border)] bg-[var(--hub-surface)]/60 p-4 sm:grid-cols-2">
-      <div>
-        <label className={labelCls} htmlFor="vib-birth">Data de nascimento</label>
-        <input id="vib-birth" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className={fieldCls} />
+        <IdentityChip icon={Users} label="Idade" value={age != null ? `${age} anos` : null} />
       </div>
-      <div>
-        <label className={labelCls} htmlFor="vib-sex">Gênero</label>
-        <select id="vib-sex" value={sex} onChange={(e) => setSex(e.target.value)} className={fieldCls}>
-          <option value="">Não informado</option>
-          <option value="feminino">Feminino</option>
-          <option value="masculino">Masculino</option>
-        </select>
-      </div>
-      <div>
-        <label className={labelCls} htmlFor="vib-position">Posição</label>
-        <select id="vib-position" value={position} onChange={(e) => setPosition(e.target.value)} className={fieldCls}>
-          <option value="">Não informada</option>
-          {POSITION_OPTIONS.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className={labelCls} htmlFor="vib-category">Categoria</label>
-        <input id="vib-category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex.: Sub-15" className={fieldCls} />
-      </div>
-      <div className="sm:col-span-2">
-        <label className={labelCls} htmlFor="vib-club">Clube atual</label>
-        <input id="vib-club" value={club} onChange={(e) => setClub(e.target.value)} placeholder="Nome do clube" className={fieldCls} />
-      </div>
-      <div className="flex items-center justify-end gap-2 sm:col-span-2">
-        <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving} className="gap-1.5">
-          <X className="size-4" /> Cancelar
-        </Button>
-        <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
-          <Save className="size-4" /> {saving ? "Salvando…" : "Salvar identidade"}
-        </Button>
-      </div>
+
+      <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--hub-muted)]">
+        {linkedToGestao ? (
+          <>
+            <Sparkles className="size-3 text-[var(--hub-accent)]" />
+            Identidade sincronizada automaticamente com o cadastro da Gestão.
+          </>
+        ) : (
+          <>
+            <Link2Off className="size-3" />
+            Atleta sem vínculo com a Gestão — vincule em IPTV/IPF para puxar nascimento e categoria.
+          </>
+        )}
+      </p>
     </div>
   )
 }
@@ -540,7 +307,9 @@ function VibHero({
   const delta = band1Avg != null ? igd - band1Avg : null
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border p-5 ${tone.border} ${tone.bg}`}>
+    <div
+      className={`relative overflow-hidden rounded-2xl border p-5 ${tone.border} ${tone.bg}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--hub-muted)]">
@@ -572,7 +341,11 @@ function VibHero({
         {delta != null && (
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-wide text-[var(--hub-muted)]">Diferença</p>
-            <p className={`text-lg font-bold tabular-nums ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            <p
+              className={`text-lg font-bold tabular-nums ${
+                delta >= 0 ? "text-emerald-600" : "text-red-600"
+              }`}
+            >
               {delta >= 0 ? "+" : ""}
               {delta}
             </p>
@@ -606,7 +379,9 @@ function BandLadder({ compare, igd }: { compare: VibCompareResult; igd: number }
                 <p className="text-[11px] text-emerald-700/80">Acima da média da Faixa 1</p>
               </div>
             </div>
-            <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">VOCÊ • {igd}</span>
+            <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
+              VOCÊ • {igd}
+            </span>
           </div>
         )}
 
@@ -618,11 +393,15 @@ function BandLadder({ compare, igd }: { compare: VibCompareResult; igd: number }
             <div
               key={b}
               className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
-                isAthlete ? `${tone.border} ${tone.bg}` : "border-[var(--hub-border)] bg-[var(--hub-bg-deep)]"
+                isAthlete
+                  ? `${tone.border} ${tone.bg}`
+                  : "border-[var(--hub-border)] bg-[var(--hub-bg-deep)]"
               }`}
             >
               <div className="flex items-center gap-3">
-                <span className={`flex size-8 items-center justify-center rounded-lg text-sm font-black text-white ${tone.bar}`}>
+                <span
+                  className={`flex size-8 items-center justify-center rounded-lg text-sm font-black text-white ${tone.bar}`}
+                >
                   {b}
                 </span>
                 <div>
@@ -636,7 +415,9 @@ function BandLadder({ compare, igd }: { compare: VibCompareResult; igd: number }
                   <p className="text-sm font-bold tabular-nums text-[var(--hub-text)]">{avg ?? "—"}</p>
                 </div>
                 {isAthlete && (
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold text-white ${tone.bar}`}>VOCÊ • {igd}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold text-white ${tone.bar}`}>
+                    VOCÊ • {igd}
+                  </span>
                 )}
               </div>
             </div>
@@ -695,22 +476,19 @@ function HistoryTimeline({
 function MissingIdentityNotice({
   missingBirth,
   missingPosition,
-  mode,
 }: {
   missingBirth: boolean
   missingPosition: boolean
-  mode: IdentityMode
 }) {
   const faltando = [missingBirth ? "data de nascimento" : null, missingPosition ? "posição" : null]
     .filter(Boolean)
     .join(" e ")
-  const hint =
-    mode === "auto"
-      ? "Esses dados vêm da Gestão (nascimento/gênero) e da posição da atleta. Complete o cadastro na Gestão ou troque para o modo Manual e preencha aqui."
-      : "Preencha esses campos no modo Manual (botão Editar acima) para calcular o VIB."
   return (
     <HubCard>
-      <EmptyState title="Faltam dados para o VIB" description={`Para comparar a atleta o VIB precisa de ${faltando}. ${hint}`} />
+      <EmptyState
+        title="Faltam dados para o VIB"
+        description={`Para comparar a atleta o VIB precisa de ${faltando}. Esses dados vêm do cadastro da Gestão (nascimento) e da posição da atleta — vincule a atleta em IPTV/IPF ou ajuste a posição no perfil.`}
+      />
     </HubCard>
   )
 }
@@ -741,15 +519,18 @@ function SaveHistoryButton({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  // Reabilita o registro quando a temporada/classificação muda.
-  useEffect(() => {
-    setSaved(false)
-  }, [season, classification, igd])
-
   async function save() {
     setSaving(true)
     try {
-      await saveVibHistory({ athleteId, season, classification, band, athleteIgd: igd, band1Avg, sampleSize })
+      await saveVibHistory({
+        athleteId,
+        season,
+        classification,
+        band,
+        athleteIgd: igd,
+        band1Avg,
+        sampleSize,
+      })
       setSaved(true)
       onSaved()
     } catch {
