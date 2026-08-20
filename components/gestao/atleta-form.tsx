@@ -23,6 +23,8 @@ export type AtletaInitial = {
   telefone?: string | null
   email?: string | null
   dataNascimento?: string | null
+  genero?: string | null
+  posicao?: string | null
   dataInscricao?: string | null
   responsavel?: string | null
   telefoneResponsavel?: string | null
@@ -130,6 +132,28 @@ export function AtletaForm({
           <div>
             <label className={labelCls} htmlFor="dataNascimento">Data de nascimento</label>
             <input id="dataNascimento" name="dataNascimento" type="date" defaultValue={initial?.dataNascimento ?? ""} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="genero">Gênero</label>
+            <select id="genero" name="genero" defaultValue={initial?.genero ?? ""} className={inputCls}>
+              <option value="">Não informado</option>
+              <option value="feminino">Feminino</option>
+              <option value="masculino">Masculino</option>
+              <option value="outro">Outro</option>
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">Usado pelo VIB para comparar atletas de grupos semelhantes.</p>
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="posicao">Posição</label>
+            <select id="posicao" name="posicao" defaultValue={initial?.posicao ?? ""} className={inputCls}>
+              <option value="">Não informada</option>
+              <option value="Levantadora">Levantadora</option>
+              <option value="Ponteira">Ponteira</option>
+              <option value="Oposta">Oposta</option>
+              <option value="Central">Central</option>
+              <option value="Líbero">Líbero</option>
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">Parâmetro de comparação do VIB.</p>
           </div>
           <div>
             <label className={labelCls} htmlFor="dataInscricao">Data de inscrição *</label>

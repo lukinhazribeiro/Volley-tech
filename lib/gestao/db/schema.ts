@@ -32,6 +32,8 @@ export const atletas = pgTable("atletas", {
   telefone: text("telefone"),
   email: text("email"),
   dataNascimento: date("data_nascimento"),
+  genero: text("genero"),
+  posicao: text("posicao"),
   dataInscricao: date("data_inscricao"),
   categoriaId: integer("categoria_id"),
   turmaId: integer("turma_id"),
@@ -75,6 +77,13 @@ export const despesas = pgTable("despesas", {
   data: date("data").notNull(),
   observacao: text("observacao"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+})
+
+export const gestaoConfig = pgTable("gestao_config", {
+  userId: uuid("user_id").primaryKey(),
+  clubeNome: text("clube_nome"),
+  administrador: text("administrador"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 })
 
 export const mensalidades = pgTable("mensalidades", {
