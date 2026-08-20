@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { getAthlete, listEntriesForAthlete } from "@/lib/hub/data"
 import { listAssessments } from "@/lib/hub/physical"
 import { computeIGD } from "@/lib/hub/igd"
-import { getGestaoAthlete } from "@/app/volley-hub/actions/gestao-link"
+import { getGestaoAthlete, getGestaoClube, updateGestaoAthleteIdentity } from "@/app/volley-hub/actions/gestao-link"
 import {
   ageFromBirthDate,
   band1Average,
@@ -21,19 +21,37 @@ import {
   type VibClassification,
   type VibCompareResult,
 } from "@/lib/hub/vib"
-import { compareVib, listVibHistory, saveVibHistory, syncVibSample } from "@/lib/hub/vib-data"
+import { compareVib, listVibHistory, saveVibHistory, syncVibSample, updateAthleteIdentity } from "@/lib/hub/vib-data"
 import {
   Cake,
   ChevronLeft,
   Crown,
   Link2Off,
+  Loader2,
+  Pencil,
+  RefreshCw,
   Save,
   Shield,
   Sparkles,
   Target,
   TrendingUp,
   Users,
+  VenusAndMars,
+  X,
 } from "lucide-react"
+
+/** Opções de posição (rótulos reconhecidos por positionToGroup). */
+const POSITION_OPTIONS = ["Levantadora", "Ponteira", "Oposta", "Central", "Líbero"]
+/** Opções de gênero. */
+const GENDER_OPTIONS = [
+  { value: "feminino", label: "Feminino" },
+  { value: "masculino", label: "Masculino" },
+  { value: "outro", label: "Outro" },
+]
+function genderLabel(v: string | null): string | null {
+  if (!v) return null
+  return GENDER_OPTIONS.find((g) => g.value === v.toLowerCase())?.label ?? v
+}
 
 /** Tom semântico por faixa estatística (1 = topo, 4 = base). */
 function bandTone(band: number): { text: string; bg: string; border: string; bar: string } {
@@ -57,9 +75,19 @@ const BAND_TIER_LABEL: Record<number, string> = {
   4: "Abaixo do esperado",
 }
 
+/** Identidade resolvida da atleta (após aplicar a fonte escolhida). */
+interface ResolvedIdentity {
+  birthDate: string | null
+  sex: string | null
+  position: string | null
+  category: string | null
+  club: string | null
+}
+
 export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
   const [athleteId, setAthleteId] = useState<string | undefined>(initialAthleteId)
   const { mutate } = useSWRConfig()
+  const refresh = () => mutate(["vib-atleta", athleteId])
 
   const { data, isLoading } = useSWR(athleteId ? ["vib-atleta", athleteId] : null, async () => {
     const [athlete, entries, assessments] = await Promise.all([
@@ -68,28 +96,34 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
       listAssessments(athleteId!),
     ])
 
-    // Identidade vinda da Gestão (mesmo vínculo usado por IPTV/IPF/TGP).
-    const gestao =
-      athlete?.gestao_atleta_id != null ? await getGestaoAthlete(athlete.gestao_atleta_id) : null
+    const linked = athlete?.gestao_atleta_id != null
+    // Identidade vinda da Gestão (mesmo vínculo usado por IPTV/IPF/TGP) + clube da conta.
+    const [gestao, gestaoClube] = await Promise.all([
+      linked ? getGestaoAthlete(athlete!.gestao_atleta_id!) : Promise.resolve(null),
+      getGestaoClube(),
+    ])
 
-    // Nascimento e categoria priorizam a Gestão; posição/clube vêm da Hub.
-    const birthDate = gestao?.dataNascimento ?? athlete?.birth_date ?? null
-    const category = athlete?.category ?? gestao?.categoria ?? null
+    // Fonte da identidade: "sync" (padrão) usa a Gestão quando vinculada; "manual" usa a Hub.
+    const source: "sync" | "manual" = athlete?.identity_source === "manual" ? "manual" : "sync"
+    const syncing = source === "sync" && linked
+
+    const identity: ResolvedIdentity = {
+      birthDate: syncing ? (gestao?.dataNascimento ?? athlete?.birth_date ?? null) : (athlete?.birth_date ?? null),
+      sex: syncing ? (gestao?.genero ?? athlete?.sex ?? null) : (athlete?.sex ?? null),
+      position: syncing ? (gestao?.posicao ?? athlete?.position ?? null) : (athlete?.position ?? null),
+      category: syncing ? (gestao?.categoria ?? athlete?.category ?? null) : (athlete?.category ?? null),
+      club: syncing ? (gestaoClube ?? athlete?.club ?? null) : (athlete?.club ?? gestaoClube ?? null),
+    }
 
     const parts = computeIGD(entries, assessments)
     const igd = parts.igd
 
     // Participação automática: mantém a amostra anônima em dia e compara.
-    await syncVibSample({
-      athleteId: athleteId!,
-      position: athlete?.position ?? null,
-      birthDate,
-      igd,
-    })
-    const compare = await compareVib({ position: athlete?.position ?? null, birthDate, igd })
+    await syncVibSample({ athleteId: athleteId!, position: identity.position, birthDate: identity.birthDate, igd })
+    const compare = await compareVib({ position: identity.position, birthDate: identity.birthDate, igd })
     const history = await listVibHistory(athleteId!)
 
-    return { athlete, gestao, birthDate, category, igd, compare, history }
+    return { athlete, linked, source, syncing, identity, igd, compare, history }
   })
 
   if (!athleteId) {
@@ -107,14 +141,13 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
   }
 
   const athlete = data?.athlete
+  const identity = data?.identity
   const igd = data?.igd ?? null
   const compare = data?.compare ?? null
   const classification = classifyVib(compare)
-  const birthDate = data?.birthDate ?? null
-  const age = ageFromBirthDate(birthDate)
-  const group = positionToGroup(athlete?.position)
+  const age = ageFromBirthDate(identity?.birthDate)
+  const group = positionToGroup(identity?.position)
   const groupLabel = POSITION_GROUP_LABEL[group]
-  const linkedToGestao = athlete?.gestao_atleta_id != null
 
   return (
     <div className="space-y-5">
@@ -125,16 +158,17 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
 
       {isLoading && <p className="text-sm text-[var(--hub-muted)]">Calculando VIB…</p>}
 
-      {!isLoading && athlete && (
+      {!isLoading && athlete && identity && (
         <>
           <IdentityStrip
+            athleteId={athleteId}
+            gestaoId={athlete.gestao_atleta_id}
             name={athlete.full_name}
-            club={athlete.club ?? athlete.team ?? null}
-            category={data?.category ?? null}
-            position={athlete.position ?? null}
-            birthDate={birthDate}
+            linked={data.linked}
+            source={data.source}
+            identity={identity}
             age={age}
-            linkedToGestao={linkedToGestao}
+            onRefresh={refresh}
           />
 
           {igd == null ? (
@@ -144,8 +178,8 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
                 description="Importe scouts ou cadastre avaliações físicas para gerar o IGD e, com ele, o VIB."
               />
             </HubCard>
-          ) : !birthDate || group === "outro" ? (
-            <MissingIdentityNotice missingBirth={!birthDate} missingPosition={group === "outro"} />
+          ) : !identity.birthDate || group === "outro" ? (
+            <MissingIdentityNotice missingBirth={!identity.birthDate} missingPosition={group === "outro"} />
           ) : compare && compare.sampleSize > 0 ? (
             <>
               <VibHero
@@ -169,7 +203,7 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
                   igd={igd}
                   band1Avg={band1Average(compare)}
                   sampleSize={compare.sampleSize}
-                  onSaved={() => mutate(["vib-atleta", athleteId])}
+                  onSaved={refresh}
                 />
               </div>
             </>
@@ -182,7 +216,7 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
             </HubCard>
           )}
 
-          {data && data.history.length > 0 && <HistoryTimeline history={data.history} />}
+          {data.history.length > 0 && <HistoryTimeline history={data.history} />}
         </>
       )}
     </div>
@@ -190,32 +224,53 @@ export function VibAtleta({ initialAthleteId }: { initialAthleteId?: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Identidade (somente leitura — vem da Gestão + Hub)                  */
+/* Identidade — sincronização automática (Gestão) OU edição manual     */
 /* ------------------------------------------------------------------ */
 
 function IdentityStrip({
+  athleteId,
+  gestaoId,
   name,
-  club,
-  category,
-  position,
-  birthDate,
+  linked,
+  source,
+  identity,
   age,
-  linkedToGestao,
+  onRefresh,
 }: {
+  athleteId: string
+  gestaoId: number | null
   name: string
-  club: string | null
-  category: string | null
-  position: string | null
-  birthDate: string | null
+  linked: boolean
+  source: "sync" | "manual"
+  identity: ResolvedIdentity
   age: number | null
-  linkedToGestao: boolean
+  onRefresh: () => void
 }) {
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const syncing = source === "sync" && linked
+
   const initials = name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
     .join("")
+
+  async function setSource(next: "sync" | "manual") {
+    if (next === source) {
+      if (next === "manual") setEditing(true)
+      return
+    }
+    setBusy(true)
+    try {
+      await updateAthleteIdentity(athleteId, { identitySource: next })
+      if (next === "manual") setEditing(true)
+      onRefresh()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--hub-border)] bg-gradient-to-br from-[var(--hub-surface)] to-[var(--hub-bg-deep)] p-5">
@@ -224,40 +279,94 @@ function IdentityStrip({
           {initials || "?"}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--hub-accent)]">
-            Perfil da atleta
-          </p>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--hub-accent)]">Perfil da atleta</p>
           <h3 className="truncate text-xl font-bold text-[var(--hub-text)]">{name}</h3>
           <p className="truncate text-sm text-[var(--hub-muted)]">
-            {[position, club].filter(Boolean).join(" • ") || "Sem posição definida"}
+            {[identity.position, identity.club].filter(Boolean).join(" • ") || "Sem posição definida"}
           </p>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <IdentityChip icon={Shield} label="Categoria" value={category} />
-        <IdentityChip icon={Target} label="Posição" value={position} />
-        <IdentityChip
-          icon={Cake}
-          label="Nascimento"
-          value={birthDate ? new Date(birthDate).toLocaleDateString("pt-BR") : null}
-        />
-        <IdentityChip icon={Users} label="Idade" value={age != null ? `${age} anos` : null} />
+      {/* Alternância de fonte da identidade */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-xl border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] p-0.5">
+          <button
+            type="button"
+            onClick={() => setSource("sync")}
+            disabled={busy || !linked}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
+              syncing ? "bg-[var(--hub-accent)] text-black" : "text-[var(--hub-muted)] hover:text-[var(--hub-text)]"
+            }`}
+          >
+            <RefreshCw className="size-3.5" /> Sincronizar Gestão
+          </button>
+          <button
+            type="button"
+            onClick={() => setSource("manual")}
+            disabled={busy}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
+              source === "manual" || !linked
+                ? "bg-[var(--hub-accent)] text-black"
+                : "text-[var(--hub-muted)] hover:text-[var(--hub-text)]"
+            }`}
+          >
+            <Pencil className="size-3.5" /> Manual
+          </button>
+        </div>
+        {busy && <Loader2 className="size-4 animate-spin text-[var(--hub-muted)]" />}
+        {(source === "manual" || !linked) && !editing && (
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="h-8 gap-1.5">
+            <Pencil className="size-3.5" /> Editar identidade
+          </Button>
+        )}
       </div>
 
-      <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--hub-muted)]">
-        {linkedToGestao ? (
-          <>
-            <Sparkles className="size-3 text-[var(--hub-accent)]" />
-            Identidade sincronizada automaticamente com o cadastro da Gestão.
-          </>
-        ) : (
-          <>
-            <Link2Off className="size-3" />
-            Atleta sem vínculo com a Gestão — vincule em IPTV/IPF para puxar nascimento e categoria.
-          </>
-        )}
-      </p>
+      {editing && (source === "manual" || !linked) ? (
+        <IdentityEditor
+          athleteId={athleteId}
+          gestaoId={linked ? gestaoId : null}
+          identity={identity}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false)
+            onRefresh()
+          }}
+        />
+      ) : (
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            <IdentityChip icon={Shield} label="Categoria" value={identity.category} />
+            <IdentityChip icon={Target} label="Posição" value={identity.position} />
+            <IdentityChip icon={VenusAndMars} label="Gênero" value={genderLabel(identity.sex)} />
+            <IdentityChip
+              icon={Cake}
+              label="Nascimento"
+              value={identity.birthDate ? new Date(identity.birthDate).toLocaleDateString("pt-BR") : null}
+            />
+            <IdentityChip icon={Users} label="Idade" value={age != null ? `${age} anos` : null} />
+          </div>
+
+          <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--hub-muted)]">
+            {syncing ? (
+              <>
+                <Sparkles className="size-3 text-[var(--hub-accent)]" />
+                Identidade sincronizada com o cadastro da Gestão. Para alterar, edite a atleta na Gestão ou mude para
+                o modo manual.
+              </>
+            ) : linked ? (
+              <>
+                <Pencil className="size-3" />
+                Modo manual: os dados abaixo são editados aqui e também atualizam o cadastro da Gestão vinculado.
+              </>
+            ) : (
+              <>
+                <Link2Off className="size-3" />
+                Atleta sem vínculo com a Gestão — preencha a identidade manualmente ou vincule em IPTV/IPF.
+              </>
+            )}
+          </p>
+        </>
+      )}
     </div>
   )
 }
@@ -278,6 +387,129 @@ function IdentityChip({
         <span className="text-[10px] font-medium uppercase tracking-wide">{label}</span>
       </div>
       <p className="mt-0.5 truncate text-sm font-semibold text-[var(--hub-text)]">{value || "—"}</p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Editor manual da identidade (grava na Hub + write-back à Gestão)    */
+/* ------------------------------------------------------------------ */
+
+const editInput =
+  "w-full rounded-lg border border-[var(--hub-border)] bg-[var(--hub-surface)] px-3 py-2 text-sm text-[var(--hub-text)] focus:border-[var(--hub-accent)] focus:outline-none"
+const editLabel = "mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--hub-muted)]"
+
+function IdentityEditor({
+  athleteId,
+  gestaoId,
+  identity,
+  onClose,
+  onSaved,
+}: {
+  athleteId: string
+  gestaoId: number | null
+  identity: ResolvedIdentity
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [birthDate, setBirthDate] = useState(identity.birthDate ?? "")
+  const [sex, setSex] = useState(identity.sex ?? "")
+  const [position, setPosition] = useState(identity.position ?? "")
+  const [club, setClub] = useState(identity.club ?? "")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    setSaving(true)
+    setError(null)
+    try {
+      // Fixa a fonte como manual e grava a identidade na Hub.
+      await updateAthleteIdentity(athleteId, {
+        birthDate: birthDate || null,
+        sex: sex || null,
+        position: position || null,
+        club: club || null,
+        identitySource: "manual",
+      })
+      // Write-back cadastral para a Gestão vinculada (nascimento, gênero, posição).
+      if (gestaoId != null) {
+        await updateGestaoAthleteIdentity(gestaoId, {
+          dataNascimento: birthDate || null,
+          genero: sex || null,
+          posicao: position || null,
+        })
+      }
+      onSaved()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao salvar a identidade.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-[var(--hub-border)] bg-[var(--hub-bg-deep)] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm font-semibold text-[var(--hub-text)]">Editar identidade</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[var(--hub-muted)] hover:text-[var(--hub-text)]"
+          aria-label="Fechar edição"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      {error && (
+        <p className="mb-3 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-600">{error}</p>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className={editLabel} htmlFor="vib-birth">Data de nascimento</label>
+          <input id="vib-birth" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className={editInput} />
+        </div>
+        <div>
+          <label className={editLabel} htmlFor="vib-sex">Gênero</label>
+          <select id="vib-sex" value={sex} onChange={(e) => setSex(e.target.value)} className={editInput}>
+            <option value="">Não informado</option>
+            {GENDER_OPTIONS.map((g) => (
+              <option key={g.value} value={g.value}>{g.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={editLabel} htmlFor="vib-position">Posição</label>
+          <select id="vib-position" value={position} onChange={(e) => setPosition(e.target.value)} className={editInput}>
+            <option value="">Não informada</option>
+            {POSITION_OPTIONS.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={editLabel} htmlFor="vib-club">Clube</label>
+          <input id="vib-club" value={club} onChange={(e) => setClub(e.target.value)} className={editInput} placeholder="Clube da atleta" />
+        </div>
+      </div>
+
+      {gestaoId != null && (
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--hub-muted)]">
+          <Sparkles className="size-3 text-[var(--hub-accent)]" />
+          Nascimento, gênero e posição também serão atualizados no cadastro da Gestão vinculado.
+        </p>
+      )}
+
+      <div className="mt-4 flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>
+          Cancelar
+        </Button>
+        <Button size="sm" onClick={save} disabled={saving} className="gap-2">
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          Salvar identidade
+        </Button>
+      </div>
     </div>
   )
 }
@@ -307,9 +539,7 @@ function VibHero({
   const delta = band1Avg != null ? igd - band1Avg : null
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-2xl border p-5 ${tone.border} ${tone.bg}`}
-    >
+    <div className={`relative overflow-hidden rounded-2xl border p-5 ${tone.border} ${tone.bg}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--hub-muted)]">
@@ -341,11 +571,7 @@ function VibHero({
         {delta != null && (
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-wide text-[var(--hub-muted)]">Diferença</p>
-            <p
-              className={`text-lg font-bold tabular-nums ${
-                delta >= 0 ? "text-emerald-600" : "text-red-600"
-              }`}
-            >
+            <p className={`text-lg font-bold tabular-nums ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
               {delta >= 0 ? "+" : ""}
               {delta}
             </p>
@@ -379,9 +605,7 @@ function BandLadder({ compare, igd }: { compare: VibCompareResult; igd: number }
                 <p className="text-[11px] text-emerald-700/80">Acima da média da Faixa 1</p>
               </div>
             </div>
-            <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
-              VOCÊ • {igd}
-            </span>
+            <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">VOCÊ • {igd}</span>
           </div>
         )}
 
@@ -393,15 +617,11 @@ function BandLadder({ compare, igd }: { compare: VibCompareResult; igd: number }
             <div
               key={b}
               className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
-                isAthlete
-                  ? `${tone.border} ${tone.bg}`
-                  : "border-[var(--hub-border)] bg-[var(--hub-bg-deep)]"
+                isAthlete ? `${tone.border} ${tone.bg}` : "border-[var(--hub-border)] bg-[var(--hub-bg-deep)]"
               }`}
             >
               <div className="flex items-center gap-3">
-                <span
-                  className={`flex size-8 items-center justify-center rounded-lg text-sm font-black text-white ${tone.bar}`}
-                >
+                <span className={`flex size-8 items-center justify-center rounded-lg text-sm font-black text-white ${tone.bar}`}>
                   {b}
                 </span>
                 <div>
@@ -415,9 +635,7 @@ function BandLadder({ compare, igd }: { compare: VibCompareResult; igd: number }
                   <p className="text-sm font-bold tabular-nums text-[var(--hub-text)]">{avg ?? "—"}</p>
                 </div>
                 {isAthlete && (
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold text-white ${tone.bar}`}>
-                    VOCÊ • {igd}
-                  </span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold text-white ${tone.bar}`}>VOCÊ • {igd}</span>
                 )}
               </div>
             </div>
@@ -487,7 +705,7 @@ function MissingIdentityNotice({
     <HubCard>
       <EmptyState
         title="Faltam dados para o VIB"
-        description={`Para comparar a atleta o VIB precisa de ${faltando}. Esses dados vêm do cadastro da Gestão (nascimento) e da posição da atleta — vincule a atleta em IPTV/IPF ou ajuste a posição no perfil.`}
+        description={`Para comparar a atleta o VIB precisa de ${faltando}. Sincronize com a Gestão (nascimento, gênero e posição) ou use o modo manual acima para preencher.`}
       />
     </HubCard>
   )

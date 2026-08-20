@@ -176,6 +176,8 @@ function parseAtleta(formData: FormData, vinculos: VinculoTurma[]) {
     telefone: String(formData.get("telefone") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     dataNascimento: String(formData.get("dataNascimento") ?? "").trim() || null,
+    genero: String(formData.get("genero") ?? "").trim() || null,
+    posicao: String(formData.get("posicao") ?? "").trim() || null,
     dataInscricao: String(formData.get("dataInscricao") ?? "").trim() || null,
     responsavel: String(formData.get("responsavel") ?? "").trim() || null,
     telefoneResponsavel: String(formData.get("telefoneResponsavel") ?? "").trim() || null,

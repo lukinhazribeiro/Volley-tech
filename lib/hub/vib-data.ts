@@ -36,6 +36,8 @@ export interface AthleteIdentityInput {
   club?: string | null
   category?: string | null
   position?: string | null
+  /** "sync" (identidade automática da Gestão) ou "manual". */
+  identitySource?: "sync" | "manual"
 }
 
 /**
@@ -53,6 +55,7 @@ export async function updateAthleteIdentity(athleteId: string, input: AthleteIde
   if (input.club !== undefined) patch.club = input.club || null
   if (input.category !== undefined) patch.category = input.category || null
   if (input.position !== undefined) patch.position = input.position || null
+  if (input.identitySource !== undefined) patch.identity_source = input.identitySource
   if (Object.keys(patch).length === 0) return
 
   const { error } = await supabase
