@@ -36,6 +36,8 @@ export interface AthleteIdentityInput {
   club?: string | null
   category?: string | null
   position?: string | null
+  /** 'auto' sincroniza com a Gestão; 'manual' usa os campos editados no perfil. */
+  identityMode?: "auto" | "manual"
 }
 
 /**
@@ -53,6 +55,7 @@ export async function updateAthleteIdentity(athleteId: string, input: AthleteIde
   if (input.club !== undefined) patch.club = input.club || null
   if (input.category !== undefined) patch.category = input.category || null
   if (input.position !== undefined) patch.position = input.position || null
+  if (input.identityMode !== undefined) patch.identity_mode = input.identityMode
   if (Object.keys(patch).length === 0) return
 
   const { error } = await supabase
