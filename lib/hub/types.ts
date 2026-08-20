@@ -13,6 +13,12 @@ export interface HubAthlete {
   position: string | null
   /** País da atleta (padrão "Brasil"). Base de comparação futura do VIB. */
   country: string | null
+  /** Identidade da atleta (VIB): data de nascimento (idade derivada no app). */
+  birth_date: string | null
+  /** Identidade da atleta (VIB): sexo. */
+  sex: string | null
+  /** Identidade da atleta (VIB): clube atual. */
+  club: string | null
   /** Vínculo fixo com a atleta correspondente no módulo de Gestão (atletas.id). */
   gestao_atleta_id: number | null
   created_at: string
