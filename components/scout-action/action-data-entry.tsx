@@ -26,6 +26,8 @@ import {
   substitutePlayer,
   updateLiveTeam,
   toStoredTeam,
+  setterAssistPlan,
+  type SetterAssistPlan,
   type LiveState,
 } from "@/lib/scout-action/live"
 import type { ActionKind, ActionSide, ScoutActionMatch } from "@/lib/scout-action/types"
@@ -68,7 +70,14 @@ export function ActionDataEntry({
   )
   const historyRef = useRef<LiveState[]>([])
   const [side, setSide] = useState<ActionSide>("A")
-  const [armed, setArmed] = useState<ActionKind | null>(null)
+  /** Fluxo jogador → resultado: posição da atleta escolhida, aguardando o resultado. */
+  const [selected, setSelected] = useState<Posicao | null>(null)
+  /** Aguardando indicar quem levantou no lugar da levantadora. */
+  const [pendingAssist, setPendingAssist] = useState<{
+    posicao: Posicao
+    kind: ActionKind
+    plan: SetterAssistPlan
+  } | null>(null)
   const [showSheet, setShowSheet] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
@@ -101,24 +110,43 @@ export function ActionDataEntry({
     setState(next)
   }, [])
 
-  function handlePlayer(pos: Posicao) {
-    if (!armed) return
-    historyRef.current.push(state)
-    setState(recordLive(state, side, pos, armed))
-    setArmed(null)
+  /** Passo 1 — escolher a atleta que tocou na bola (alterna a seleção). */
+  function handleSelectPlayer(pos: Posicao) {
+    setSelected((cur) => (cur === pos ? null : pos))
   }
 
-  /** Toque num jogador em quadra: registra a ação armada, ou abre a substituição. */
-  function handleCourtTap(tappedSide: ActionSide, playerId: string) {
-    if (armed && tappedSide === side) {
-      const cells = tappedSide === "A" ? cellsA : cellsB
-      const cell = cells.find((c) => c.player?.id === playerId)
-      if (cell) handlePlayer(cell.posicao)
+  /** Grava a ação; o motor credita o levantamento correspondente. */
+  function commitAction(pos: Posicao, kind: ActionKind, setterOverrideId: string | null) {
+    historyRef.current.push(state)
+    setState(recordLive(state, side, pos, kind, setterOverrideId))
+    setSelected(null)
+    setPendingAssist(null)
+  }
+
+  /**
+   * Passo 2 — dizer o resultado do toque. Quando a própria levantadora fez o
+   * primeiro toque do rally, pergunta quem levantou no lugar dela.
+   */
+  function handleKind(kind: ActionKind) {
+    if (!selected) return
+    const plan = setterAssistPlan(state, side, selected)
+    if (plan.mode === "override" && plan.candidateIds.length > 0) {
+      setPendingAssist({ posicao: selected, kind, plan })
       return
     }
-    // Sem ação armada → substituir este atleta por um reserva.
+    commitAction(selected, kind, null)
+  }
+
+  /** Toque num jogador em quadra: abre a substituição por um reserva. */
+  function handleCourtTap(tappedSide: ActionSide, playerId: string) {
     setSubTarget({ side: tappedSide, outId: playerId })
   }
+
+  const activeTeam = side === "A" ? state.teamA : state.teamB
+  const playerById = useCallback(
+    (id: string) => activeTeam.players.find((p) => p.id === id) ?? null,
+    [activeTeam],
+  )
 
   /** Reservas disponíveis da equipe alvo (elenco menos quem está em quadra). */
   const subReserves = useMemo(() => {
@@ -164,7 +192,8 @@ export function ActionDataEntry({
     // Próximo set: quem perdeu começa sacando (fallback A).
     const nextServer: ActionSide = state.scoreA > state.scoreB ? "B" : "A"
     commit(closeSet(state, nextServer))
-    setArmed(null)
+    setSelected(null)
+    setPendingAssist(null)
   }
 
   function handleFinish() {
@@ -289,7 +318,10 @@ export function ActionDataEntry({
               return (
                 <button
                   key={s}
-                  onClick={() => setSide(s)}
+                  onClick={() => {
+                    setSide(s)
+                    setSelected(null)
+                  }}
                   className={[
                     "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-bold transition",
                     active
@@ -304,45 +336,29 @@ export function ActionDataEntry({
             })}
           </div>
 
-          {/* Botões de ação */}
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            {(["acao", "ponto", "erro"] as ActionKind[]).map((k) => (
-              <button
-                key={k}
-                onClick={() => setArmed((cur) => (cur === k ? null : k))}
-                className={[
-                  "rounded-xl px-2 py-3 text-sm font-black uppercase tracking-wide transition",
-                  KIND_META[k].cls,
-                  armed === k ? "ring-4 ring-white/60" : "opacity-90",
-                ].join(" ")}
-              >
-                {KIND_META[k].label}
-              </button>
-            ))}
-          </div>
-
-          <p className="mb-2 text-center text-[11px] text-slate-400">
-            {armed
-              ? `Toque na atleta que fez a ${KIND_META[armed].label.toLowerCase()}`
-              : "Selecione AÇÃO, PONTO ou ERRO e toque na atleta"}
+          {/* Passo 1 — quem tocou na bola */}
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            1 · Atleta
           </p>
-
-          {/* Grade de jogadores em quadra da equipe selecionada */}
           <div className="grid grid-cols-3 gap-2">
             {GRID_ORDER.map((pos) => {
               const cell = gridCells.find((c) => c.posicao === pos)!
               const p = cell.player
+              const active = selected === pos
               return (
                 <button
                   key={pos}
-                  onClick={() => handlePlayer(pos)}
-                  disabled={!armed || !p}
+                  onClick={() => handleSelectPlayer(pos)}
+                  disabled={!p}
+                  aria-pressed={active}
                   className={[
                     "flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 transition",
-                    cell.isLibero
-                      ? "border-amber-500/40 bg-amber-500/10"
-                      : "border-slate-700 bg-slate-800",
-                    armed && p ? "hover:border-white/60 active:scale-95" : "opacity-60",
+                    active
+                      ? "border-white bg-slate-700 ring-2 ring-white/70"
+                      : cell.isLibero
+                        ? "border-amber-500/40 bg-amber-500/10"
+                        : "border-slate-700 bg-slate-800",
+                    p ? "hover:border-white/60 active:scale-95" : "opacity-60",
                   ].join(" ")}
                 >
                   <span className="text-[9px] font-bold text-slate-500">{pos}</span>
@@ -356,6 +372,36 @@ export function ActionDataEntry({
               )
             })}
           </div>
+
+          {/* Passo 2 — qual foi o resultado do toque dessa atleta */}
+          <p className="mb-2 mt-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            2 · Resultado
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(["acao", "ponto", "erro"] as ActionKind[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => handleKind(k)}
+                disabled={!selected}
+                className={[
+                  "rounded-xl px-2 py-3 text-sm font-black uppercase tracking-wide transition",
+                  KIND_META[k].cls,
+                  selected ? "active:scale-95" : "opacity-40",
+                ].join(" ")}
+              >
+                {KIND_META[k].label}
+              </button>
+            ))}
+          </div>
+
+          <p className="mt-2 text-center text-[11px] text-slate-400">
+            {(() => {
+              if (!selected) return "Toque na atleta que tocou na bola"
+              const cell = gridCells.find((c) => c.posicao === selected)
+              const p = cell?.player
+              return `#${p?.number} ${p?.name || ""} — foi ação, ponto ou erro?`
+            })()}
+          </p>
         </div>
 
         {/* Ações do jogo */}
@@ -408,6 +454,84 @@ export function ActionDataEntry({
           />
         </div>
       </div>
+
+      {/* A levantadora fez o 1º toque: indicar quem levantou no lugar dela */}
+      {pendingAssist && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Indicar quem levantou"
+          onClick={() => setPendingAssist(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-emerald-500/40 bg-slate-900 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-semibold text-white">Quem levantou?</h3>
+            <p className="mt-1 text-xs text-slate-400">
+              {(() => {
+                const setter = pendingAssist.plan.setterId
+                  ? playerById(pendingAssist.plan.setterId)
+                  : null
+                return `A levantadora #${setter?.number ?? "?"} fez o primeiro toque, então outra atleta levantou. Indique quem foi para creditar o TP correto.`
+              })()}
+            </p>
+
+            <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto">
+              {pendingAssist.plan.candidateIds.map((id) => {
+                const p = playerById(id)
+                if (!p) return null
+                const suggested = pendingAssist.plan.suggestedId === id
+                return (
+                  <li key={id}>
+                    <button
+                      onClick={() => commitAction(pendingAssist.posicao, pendingAssist.kind, id)}
+                      className="flex w-full items-center gap-3 rounded-lg border border-slate-700 bg-slate-800 p-2.5 text-left hover:border-emerald-400 hover:bg-slate-700"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white">
+                        {p.number}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-slate-100">
+                          {p.name}
+                        </span>
+                        {p.role && (
+                          <span className="block text-[10px] uppercase text-slate-400">
+                            {ROLE_LABEL[p.role]}
+                          </span>
+                        )}
+                      </span>
+                      {suggested && (
+                        <span className="shrink-0 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-300">
+                          sugerida
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button
+                onClick={() => commitAction(pendingAssist.posicao, pendingAssist.kind, "")}
+                variant="outline"
+                className="border-slate-700 bg-transparent text-slate-200 hover:bg-slate-800 hover:text-white"
+              >
+                Sem levantamento
+              </Button>
+              <Button
+                onClick={() => setPendingAssist(null)}
+                variant="ghost"
+                className="text-slate-400 hover:text-slate-200"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de substituição: trocar o atleta tocado por um reserva do banco */}
       {subTarget && (

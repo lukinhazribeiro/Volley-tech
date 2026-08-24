@@ -11,9 +11,11 @@
  *   - AÇÃO               → jogada positiva que não encerra o rally (sem ponto).
  * Rodízio por sideout: quem marca sem estar sacando recupera o saque e gira.
  * Levantamento automático: credita +1 participação (TP) à levantadora em quadra
- * SOMENTE quando a mesma equipe faz duas ações seguidas (recepção/defesa →
- * ataque), pois é entre elas que a levantadora toca a bola — nunca após cada
- * ação isolada.
+ * SOMENTE quando a mesma equipe encadeia duas ações no mesmo rally
+ * (recepção/defesa → ataque), pois é entre elas que a levantadora toca a bola.
+ * Como PONTO e ERRO encerram o rally, só uma AÇÃO anterior gera levantamento.
+ * Se a própria levantadora fez o primeiro toque, quem levantou no lugar dela é
+ * indicado na coleta (ver `setterAssistPlan`).
  */
 
 import {
@@ -106,12 +108,95 @@ export function courtCells(state: LiveState, side: ActionSide): CourtCell[] {
   })
 }
 
-/** Registra uma ação (AÇÃO/PONTO/ERRO) na posição informada da equipe. */
+/**
+ * Plano de levantamento para a próxima ação registrada.
+ *
+ * O levantamento só existe quando a MESMA equipe encadeia duas ações no mesmo
+ * rally (ex.: recepção/defesa → ataque): é entre elas que a levantadora toca a
+ * bola. Como PONTO e ERRO encerram o rally, apenas uma AÇÃO anterior mantém a
+ * bola viva e gera levantamento.
+ *
+ * Três desfechos:
+ *   - "setter"   → credita +1 TP à levantadora em quadra (caso normal);
+ *   - "override" → a levantadora fez o PRIMEIRO toque, então outra atleta
+ *                  levantou no lugar dela e precisa ser indicada;
+ *   - "none"     → não há levantamento a creditar (rally novo, ou a própria
+ *                  ação é da levantadora, que seria seu TG/TE).
+ */
+export interface SetterAssistPlan {
+  mode: "none" | "setter" | "override"
+  /** Levantadora em quadra no momento. */
+  setterId: string | null
+  /** Quem executou o primeiro toque (ação anterior do encadeamento). */
+  prevPlayerId: string | null
+  /** Sugestão de quem levantou no lugar da levantadora (líbero, quando em quadra). */
+  suggestedId: string | null
+  /** Atletas em quadra elegíveis a levantar no lugar da levantadora. */
+  candidateIds: string[]
+}
+
+const NO_ASSIST: SetterAssistPlan = {
+  mode: "none",
+  setterId: null,
+  prevPlayerId: null,
+  suggestedId: null,
+  candidateIds: [],
+}
+
+/** Decide se a próxima ação nessa posição gera levantamento (e de quem). */
+export function setterAssistPlan(
+  state: LiveState,
+  side: ActionSide,
+  posicao: Posicao,
+): SetterAssistPlan {
+  const team = teamOf(state, side)
+  const isServing = state.servingTeam === null ? true : state.servingTeam === side
+  const playerId = onCourtPlayerId(team, posicao, isServing)
+  if (!playerId) return NO_ASSIST
+
+  // Última ação REAL (ignora levantamentos automáticos já creditados).
+  const prev = [...state.events].reverse().find((e) => !e.auto)
+  const chain =
+    prev != null && prev.side === side && prev.setIndex === state.setIndex && prev.kind === "acao"
+  if (!prev || !chain) return NO_ASSIST
+
+  const setterId = onCourtPlayerId(team, team.setterPosicao, isServing)
+  if (!setterId) return NO_ASSIST
+
+  // A levantadora fez o primeiro toque → quem levantou no lugar dela?
+  if (prev.playerId === setterId) {
+    const onCourt = POSICAO_ORDER.map((p) => onCourtPlayerId(team, p, isServing)).filter(
+      (id): id is string => Boolean(id),
+    )
+    const candidateIds = onCourt.filter((id) => id !== setterId && id !== playerId)
+    // Convenção do motor do Scout View: com a levantadora fora da jogada, o
+    // levantamento fica com o líbero quando ele está em quadra.
+    const suggestedId =
+      team.liberoId && candidateIds.includes(team.liberoId) ? team.liberoId : (candidateIds[0] ?? null)
+    return { mode: "override", setterId, prevPlayerId: prev.playerId, suggestedId, candidateIds }
+  }
+
+  // A ação é da própria levantadora → é o TG/TE dela, sem levantamento extra.
+  if (playerId === setterId) {
+    return { ...NO_ASSIST, setterId, prevPlayerId: prev.playerId }
+  }
+
+  return { mode: "setter", setterId, prevPlayerId: prev.playerId, suggestedId: null, candidateIds: [] }
+}
+
+/**
+ * Registra uma ação (AÇÃO/PONTO/ERRO) na posição informada da equipe.
+ *
+ * `setterOverrideId` indica quem levantou quando a própria levantadora fez o
+ * primeiro toque (modo "override" do plano). Quando omitido, usa a sugestão;
+ * passe string vazia para registrar o lance SEM levantamento (bola devolvida).
+ */
 export function recordLive(
   state: LiveState,
   side: ActionSide,
   posicao: Posicao,
   kind: ActionKind,
+  setterOverrideId?: string | null,
 ): LiveState {
   const team = teamOf(state, side)
   const isServing = state.servingTeam === null ? true : state.servingTeam === side
@@ -119,46 +204,40 @@ export function recordLive(
   if (!playerId) return state
   const player = findPlayer(team, playerId)
 
-  const events: ActionEvent[] = [
-    ...state.events,
-    {
+  // Levantamento creditado ANTES da ação (é o toque que a antecede).
+  const plan = setterAssistPlan(state, side, posicao)
+  const assistId =
+    plan.mode === "setter"
+      ? plan.setterId
+      : plan.mode === "override"
+        ? (setterOverrideId ?? plan.suggestedId)
+        : null
+
+  const events: ActionEvent[] = [...state.events]
+
+  if (assistId && assistId !== playerId) {
+    const assist = findPlayer(team, assistId)
+    events.push({
       id: uid("ev"),
       side,
-      playerId,
-      playerNumber: player?.number ?? 0,
-      kind,
+      playerId: assistId,
+      playerNumber: assist?.number ?? 0,
+      kind: "acao",
       setIndex: state.setIndex,
+      auto: true,
       createdAt: Date.now(),
-    },
-  ]
-
-  // Levantamento automático: o levantamento só ocorre quando a MESMA equipe
-  // faz duas ações seguidas (ex.: recepção/defesa → ataque) — é entre essas
-  // duas ações que a levantadora toca a bola. Portanto só credita +1 à
-  // levantadora quando a ação real anterior foi da mesma equipe, no mesmo set,
-  // e não encerrou o rally (erro). Também não conta se a própria ação é dela.
-  if (kind !== "erro") {
-    // Última ação REAL (ignora levantamentos automáticos já creditados).
-    const prev = [...state.events].reverse().find((e) => !e.auto)
-    const consecutiveSameTeam =
-      prev != null && prev.side === side && prev.setIndex === state.setIndex && prev.kind !== "erro"
-    if (consecutiveSameTeam) {
-      const setterId = onCourtPlayerId(team, team.setterPosicao, isServing)
-      if (setterId && setterId !== playerId) {
-        const setter = findPlayer(team, setterId)
-        events.push({
-          id: uid("ev"),
-          side,
-          playerId: setterId,
-          playerNumber: setter?.number ?? 0,
-          kind: "acao",
-          setIndex: state.setIndex,
-          auto: true,
-          createdAt: Date.now(),
-        })
-      }
-    }
+    })
   }
+
+  events.push({
+    id: uid("ev"),
+    side,
+    playerId,
+    playerNumber: player?.number ?? 0,
+    kind,
+    setIndex: state.setIndex,
+    createdAt: Date.now(),
+  })
 
   // Quem marca o ponto? PONTO = a própria equipe; ERRO = a adversária; AÇÃO = ninguém.
   const scorer: ActionSide | null = kind === "ponto" ? side : kind === "erro" ? other(side) : null
