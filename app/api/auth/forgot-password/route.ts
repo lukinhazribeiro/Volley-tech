@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server"
 import {
-  createResetCode,
+  createResetRequest,
   findUserByEmail,
   isValidEmail,
   normalizeEmail,
 } from "@/lib/auth/password-reset"
-import { sendResetCodeEmail } from "@/lib/email/send-reset-code"
 
 /**
- * Envia um código de 6 dígitos para o email informado.
+ * Abre um pedido de troca de senha para o administrador autorizar.
  *
  * A resposta é sempre genérica quando o email é válido, mesmo se a conta não
- * existir: revelar isso permitiria descobrir quais emails têm conta.
+ * existir: revelar isso permitiria descobrir quais emails têm conta. Quando a
+ * conta existe, devolve o segredo do pedido — guardado somente neste navegador
+ * — que será exigido para concluir a troca depois da aprovação.
  */
 export async function POST(request: Request) {
   let email = ""
+  let message: string | null = null
   try {
     const body = await request.json()
     email = normalizeEmail(body?.email)
+    message = typeof body?.message === "string" ? body.message : null
   } catch {
     return NextResponse.json({ error: "Requisição inválida." }, { status: 400 })
   }
@@ -29,34 +32,25 @@ export async function POST(request: Request) {
   try {
     const user = await findUserByEmail(email)
 
-    // Conta inexistente: responde como sucesso, sem enviar nada.
+    // Conta inexistente: responde como sucesso, sem registrar pedido.
     if (!user) {
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({ ok: true, pending: false })
     }
 
-    const code = await createResetCode(email)
-    if (!code) {
+    const created = await createResetRequest(email, user.id, message)
+    if (!created) {
       return NextResponse.json(
-        { error: "Muitos pedidos de código. Aguarde alguns minutos e tente novamente." },
+        { error: "Você já tem pedidos aguardando aprovação. Fale com o administrador." },
         { status: 429 },
       )
     }
 
-    const sent = await sendResetCodeEmail(email, code)
-    if (!sent.ok) {
-      // Falha de configuração/entrega é problema real do sistema: precisa
-      // aparecer, senão o cliente espera para sempre por um email que não vem.
-      return NextResponse.json(
-        {
-          error: sent.notConfigured
-            ? "O envio de emails ainda não foi configurado. Fale com o administrador."
-            : "Não foi possível enviar o email agora. Tente novamente em instantes.",
-        },
-        { status: 503 },
-      )
-    }
-
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({
+      ok: true,
+      pending: true,
+      requestId: created.requestId,
+      token: created.token,
+    })
   } catch (err) {
     console.log("[v0] forgot-password falhou:", err)
     return NextResponse.json({ error: "Erro inesperado. Tente novamente." }, { status: 500 })

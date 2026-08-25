@@ -1,15 +1,26 @@
 "use client"
 
-import { useState } from "react"
-import { Eye, EyeOff, Mail, Lock, Gift, ArrowUpRight, Check } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Eye, EyeOff, Mail, Lock, Gift, ArrowUpRight, Check, Clock, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
 import { createClient } from "@/lib/supabase/client"
 import { formatPrice, TRIAL_DAYS } from "@/lib/subscription"
 
 type Mode = "signin" | "signup" | "recover"
-/** Etapas da recuperação: pedir o código e depois validá-lo com a nova senha. */
-type RecoverStep = "request" | "confirm"
+/**
+ * Etapas da recuperação com aprovação do administrador:
+ *   request  → o cliente pede a liberação;
+ *   waiting  → pedido registrado, aguardando o ADM autorizar;
+ *   confirm  → autorizado, o cliente define a nova senha.
+ */
+type RecoverStep = "request" | "waiting" | "confirm"
+
+/** Identifica o pedido no navegador de quem pediu. */
+interface PendingReset {
+  requestId: string
+  token: string
+}
 
 export function LoginScreen() {
   const [mode, setMode] = useState<Mode>("signin")
@@ -21,7 +32,11 @@ export function LoginScreen() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [recoverStep, setRecoverStep] = useState<RecoverStep>("request")
-  const [code, setCode] = useState("")
+  const [note, setNote] = useState("")
+  const [pending, setPending] = useState<PendingReset | null>(null)
+  const [checking, setChecking] = useState(false)
+  /** Evita avisar "aprovado!" mais de uma vez durante a checagem automática. */
+  const notifiedRef = useRef(false)
 
   /** Volta a tela ao estado limpo ao alternar entre entrar/criar/recuperar. */
   const switchMode = (next: Mode) => {
@@ -30,9 +45,54 @@ export function LoginScreen() {
     setInfo(null)
     setPassword("")
     setConfirmPassword("")
-    setCode("")
+    setNote("")
+    setPending(null)
     setRecoverStep("request")
+    notifiedRef.current = false
   }
+
+  /** Consulta a situação do pedido; libera a nova senha quando aprovado. */
+  const checkApproval = useCallback(
+    async (target: PendingReset, manual: boolean) => {
+      setChecking(true)
+      try {
+        const res = await fetch("/api/auth/reset-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(target),
+        })
+        const payload = await res.json().catch(() => ({}))
+        if (!res.ok) return
+
+        if (payload.status === "authorized") {
+          setRecoverStep("confirm")
+          if (!notifiedRef.current) {
+            notifiedRef.current = true
+            setError(null)
+            setInfo("Pedido aprovado! Defina sua nova senha abaixo.")
+          }
+        } else if (payload.status === "denied") {
+          setInfo(null)
+          setError("Seu pedido foi recusado pelo administrador.")
+        } else if (manual) {
+          setInfo("Seu pedido ainda está aguardando aprovação do administrador.")
+        }
+      } catch {
+        // Falha de rede na checagem automática é silenciosa: a próxima tentativa resolve.
+      } finally {
+        setChecking(false)
+      }
+    },
+    [],
+  )
+
+  // Enquanto espera, verifica a aprovação a cada 10s para o cliente não
+  // precisar recarregar a página.
+  useEffect(() => {
+    if (recoverStep !== "waiting" || !pending) return
+    const id = setInterval(() => void checkApproval(pending, false), 10_000)
+    return () => clearInterval(id)
+  }, [recoverStep, pending, checkApproval])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,27 +115,33 @@ export function LoginScreen() {
       const supabase = createClient()
 
       if (mode === "recover") {
-        // Etapa 1: dispara o email com o código.
+        // Etapa 1: registra o pedido para o administrador autorizar.
         if (recoverStep === "request") {
           const res = await fetch("/api/auth/forgot-password", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ email, message: note }),
           })
           const payload = await res.json().catch(() => ({}))
-          if (!res.ok) throw new Error(payload?.error ?? "Não foi possível enviar o código.")
+          if (!res.ok) throw new Error(payload?.error ?? "Não foi possível registrar o pedido.")
 
-          setRecoverStep("confirm")
-          setInfo("Enviamos um código de 6 dígitos para o seu email. Ele expira em 15 minutos.")
+          if (payload.pending) {
+            setPending({ requestId: payload.requestId, token: payload.token })
+          }
+          setRecoverStep("waiting")
+          setInfo(
+            "Pedido enviado ao administrador. Assim que ele autorizar, você poderá criar a nova senha nesta mesma tela.",
+          )
           setLoading(false)
           return
         }
 
-        // Etapa 2: valida o código e grava a nova senha.
+        // Etapa 2: pedido aprovado, grava a nova senha.
+        if (!pending) throw new Error("Pedido inválido. Faça um novo pedido.")
         const res = await fetch("/api/auth/reset-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, code, password }),
+          body: JSON.stringify({ ...pending, password }),
         })
         const payload = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(payload?.error ?? "Não foi possível redefinir a senha.")
@@ -205,8 +271,10 @@ export function LoginScreen() {
               {mode === "signup" && `Comece agora com ${TRIAL_DAYS} dias grátis. Sem cartão para testar.`}
               {mode === "recover" &&
                 (recoverStep === "request"
-                  ? "Informe seu email e enviaremos um código de verificação."
-                  : "Digite o código que enviamos e escolha sua nova senha.")}
+                  ? "Informe seu email para solicitar a liberação da troca de senha ao administrador."
+                  : recoverStep === "waiting"
+                    ? "Seu pedido foi enviado. Aguarde a autorização do administrador."
+                    : "Pedido autorizado. Escolha sua nova senha.")}
             </p>
 
             {mode === "signup" && (
@@ -257,42 +325,68 @@ export function LoginScreen() {
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={mode === "recover" && recoverStep === "confirm"}
+                    disabled={mode === "recover" && recoverStep !== "request"}
                     className="h-12 w-full rounded-xl border border-white/10 bg-neutral-950/60 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-60"
                     placeholder="voce@email.com"
                   />
                 </div>
               </div>
 
-              {mode === "recover" && recoverStep === "confirm" && (
+              {/* Recado opcional para o administrador identificar quem pediu */}
+              {mode === "recover" && recoverStep === "request" && (
                 <div className="space-y-1.5">
-                  <label htmlFor="code" className="text-sm font-semibold text-neutral-200">
-                    Código de verificação
+                  <label htmlFor="note" className="text-sm font-semibold text-neutral-200">
+                    Mensagem para o administrador{" "}
+                    <span className="font-normal text-neutral-500">(opcional)</span>
                   </label>
-                  <input
-                    id="code"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    required
-                    maxLength={6}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="h-14 w-full rounded-xl border border-white/10 bg-neutral-950/60 text-center text-2xl font-bold tracking-[0.5em] text-white outline-none transition placeholder:tracking-normal placeholder:text-base placeholder:font-normal placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
-                    placeholder="000000"
+                  <textarea
+                    id="note"
+                    rows={3}
+                    maxLength={300}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="w-full resize-none rounded-xl border border-white/10 bg-neutral-950/60 px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                    placeholder="Ex.: Sou a Ana, treinadora da equipe sub-15."
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRecoverStep("request")
-                      setCode("")
-                      setError(null)
-                      setInfo(null)
-                    }}
-                    className="text-xs font-semibold text-orange-500 hover:underline"
-                  >
-                    Não recebi o código — enviar novamente
-                  </button>
+                  <p className="text-xs text-neutral-500">
+                    Ajuda o administrador a confirmar que o pedido é realmente seu.
+                  </p>
+                </div>
+              )}
+
+              {/* Espera pela autorização do administrador */}
+              {mode === "recover" && recoverStep === "waiting" && (
+                <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
+                  <div className="flex items-center gap-2.5">
+                    <Clock className="h-5 w-5 shrink-0 text-orange-500" aria-hidden="true" />
+                    <span className="text-sm font-bold text-orange-500">
+                      Aguardando autorização
+                    </span>
+                  </div>
+                  <p className="mt-2.5 text-sm leading-relaxed text-neutral-300">
+                    Avise o administrador que seu pedido está no painel. Deixe esta tela aberta:
+                    ela libera a criação da nova senha automaticamente após a aprovação.
+                  </p>
+                  {pending && (
+                    <button
+                      type="button"
+                      onClick={() => void checkApproval(pending, true)}
+                      disabled={checking}
+                      className="mt-3 text-xs font-semibold text-orange-500 hover:underline disabled:opacity-60"
+                    >
+                      {checking ? "Verificando..." : "Já fui aprovado — verificar agora"}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Confirmação da autorização, antes dos campos de senha */}
+              {mode === "recover" && recoverStep === "confirm" && (
+                <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden="true" />
+                  <p className="text-sm text-neutral-300">
+                    Autorizado pelo administrador. Crie sua nova senha abaixo.
+                  </p>
                 </div>
               )}
 
@@ -363,22 +457,25 @@ export function LoginScreen() {
                 </div>
               )}
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 text-base font-bold text-white transition hover:bg-orange-500 disabled:opacity-60"
-              >
-                {loading
-                  ? "Aguarde..."
-                  : mode === "signin"
-                    ? "Entrar"
-                    : mode === "signup"
-                      ? "Criar conta e iniciar trial"
-                      : recoverStep === "request"
-                        ? "Enviar código"
-                        : "Redefinir senha e entrar"}
-                {!loading && <ArrowUpRight className="h-4 w-4" aria-hidden="true" />}
-              </Button>
+              {/* Na espera não há nada a enviar: a aprovação é do administrador. */}
+              {!(mode === "recover" && recoverStep === "waiting") && (
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 text-base font-bold text-white transition hover:bg-orange-500 disabled:opacity-60"
+                >
+                  {loading
+                    ? "Aguarde..."
+                    : mode === "signin"
+                      ? "Entrar"
+                      : mode === "signup"
+                        ? "Criar conta e iniciar trial"
+                        : recoverStep === "request"
+                          ? "Solicitar liberação"
+                          : "Redefinir senha e entrar"}
+                  {!loading && <ArrowUpRight className="h-4 w-4" aria-hidden="true" />}
+                </Button>
+              )}
             </form>
 
             <p className="mt-5 text-center text-sm text-neutral-300">
