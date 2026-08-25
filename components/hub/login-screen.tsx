@@ -7,7 +7,9 @@ import { VolleyTechLogo } from "@/components/hub/volley-tech-logo"
 import { createClient } from "@/lib/supabase/client"
 import { formatPrice, TRIAL_DAYS } from "@/lib/subscription"
 
-type Mode = "signin" | "signup"
+type Mode = "signin" | "signup" | "recover"
+/** Etapas da recuperação: pedir o código e depois validá-lo com a nova senha. */
+type RecoverStep = "request" | "confirm"
 
 export function LoginScreen() {
   const [mode, setMode] = useState<Mode>("signin")
@@ -18,13 +20,26 @@ export function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [recoverStep, setRecoverStep] = useState<RecoverStep>("request")
+  const [code, setCode] = useState("")
+
+  /** Volta a tela ao estado limpo ao alternar entre entrar/criar/recuperar. */
+  const switchMode = (next: Mode) => {
+    setMode(next)
+    setError(null)
+    setInfo(null)
+    setPassword("")
+    setConfirmPassword("")
+    setCode("")
+    setRecoverStep("request")
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setInfo(null)
 
-    if (mode === "signup") {
+    if (mode === "signup" || (mode === "recover" && recoverStep === "confirm")) {
       if (password.length < 6) {
         setError("A senha deve ter pelo menos 6 caracteres.")
         return
@@ -38,6 +53,42 @@ export function LoginScreen() {
     setLoading(true)
     try {
       const supabase = createClient()
+
+      if (mode === "recover") {
+        // Etapa 1: dispara o email com o código.
+        if (recoverStep === "request") {
+          const res = await fetch("/api/auth/forgot-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          })
+          const payload = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(payload?.error ?? "Não foi possível enviar o código.")
+
+          setRecoverStep("confirm")
+          setInfo("Enviamos um código de 6 dígitos para o seu email. Ele expira em 15 minutos.")
+          setLoading(false)
+          return
+        }
+
+        // Etapa 2: valida o código e grava a nova senha.
+        const res = await fetch("/api/auth/reset-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, code, password }),
+        })
+        const payload = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(payload?.error ?? "Não foi possível redefinir a senha.")
+
+        // Entra direto com a senha nova; o AuthGate cuida do redirecionamento.
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) {
+          switchMode("signin")
+          setInfo("Senha redefinida. Faça login com a nova senha.")
+          setLoading(false)
+        }
+        return
+      }
 
       if (mode === "signup") {
         // Cria o usuário já confirmado no servidor, permitindo login imediato.
@@ -133,20 +184,29 @@ export function LoginScreen() {
 
             <div className="w-full rounded-3xl border border-white/10 bg-neutral-900/60 p-7 shadow-2xl sm:p-8">
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              {mode === "signin" ? (
+              {mode === "signin" && (
                 <>
                   Bem-vindo ao <span className="text-orange-500">VolleyTech</span>
                 </>
-              ) : (
+              )}
+              {mode === "signup" && (
                 <>
                   Crie sua <span className="text-orange-500">conta grátis</span>
                 </>
               )}
+              {mode === "recover" && (
+                <>
+                  Recuperar <span className="text-orange-500">senha</span>
+                </>
+              )}
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-neutral-400 text-pretty">
-              {mode === "signin"
-                ? "Entre para acessar sua análise de desempenho no voleibol."
-                : `Comece agora com ${TRIAL_DAYS} dias grátis. Sem cartão para testar.`}
+              {mode === "signin" && "Entre para acessar sua análise de desempenho no voleibol."}
+              {mode === "signup" && `Comece agora com ${TRIAL_DAYS} dias grátis. Sem cartão para testar.`}
+              {mode === "recover" &&
+                (recoverStep === "request"
+                  ? "Informe seu email e enviaremos um código de verificação."
+                  : "Digite o código que enviamos e escolha sua nova senha.")}
             </p>
 
             {mode === "signup" && (
@@ -197,15 +257,49 @@ export function LoginScreen() {
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 w-full rounded-xl border border-white/10 bg-neutral-950/60 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                    disabled={mode === "recover" && recoverStep === "confirm"}
+                    className="h-12 w-full rounded-xl border border-white/10 bg-neutral-950/60 pl-10 pr-3 text-sm text-white outline-none transition placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-60"
                     placeholder="voce@email.com"
                   />
                 </div>
               </div>
 
+              {mode === "recover" && recoverStep === "confirm" && (
+                <div className="space-y-1.5">
+                  <label htmlFor="code" className="text-sm font-semibold text-neutral-200">
+                    Código de verificação
+                  </label>
+                  <input
+                    id="code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className="h-14 w-full rounded-xl border border-white/10 bg-neutral-950/60 text-center text-2xl font-bold tracking-[0.5em] text-white outline-none transition placeholder:tracking-normal placeholder:text-base placeholder:font-normal placeholder:text-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+                    placeholder="000000"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecoverStep("request")
+                      setCode("")
+                      setError(null)
+                      setInfo(null)
+                    }}
+                    className="text-xs font-semibold text-orange-500 hover:underline"
+                  >
+                    Não recebi o código — enviar novamente
+                  </button>
+                </div>
+              )}
+
+              {(mode !== "recover" || recoverStep === "confirm") && (
               <div className="space-y-1.5">
                 <label htmlFor="password" className="text-sm font-semibold text-neutral-200">
-                  Senha
+                  {mode === "recover" ? "Nova senha" : "Senha"}
                 </label>
                 <div className="relative">
                   <Lock
@@ -232,12 +326,22 @@ export function LoginScreen() {
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
+                {mode === "signin" && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode("recover")}
+                    className="text-xs font-semibold text-orange-500 hover:underline"
+                  >
+                    Esqueci minha senha
+                  </button>
+                )}
               </div>
+              )}
 
-              {mode === "signup" && (
+              {(mode === "signup" || (mode === "recover" && recoverStep === "confirm")) && (
                 <div className="space-y-1.5">
                   <label htmlFor="confirmPassword" className="text-sm font-semibold text-neutral-200">
-                    Confirmar senha
+                    {mode === "recover" ? "Confirmar nova senha" : "Confirmar senha"}
                   </label>
                   <div className="relative">
                     <Lock
@@ -264,25 +368,43 @@ export function LoginScreen() {
                 disabled={loading}
                 className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 text-base font-bold text-white transition hover:bg-orange-500 disabled:opacity-60"
               >
-                {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta e iniciar trial"}
+                {loading
+                  ? "Aguarde..."
+                  : mode === "signin"
+                    ? "Entrar"
+                    : mode === "signup"
+                      ? "Criar conta e iniciar trial"
+                      : recoverStep === "request"
+                        ? "Enviar código"
+                        : "Redefinir senha e entrar"}
                 {!loading && <ArrowUpRight className="h-4 w-4" aria-hidden="true" />}
               </Button>
             </form>
 
             <p className="mt-5 text-center text-sm text-neutral-300">
-              {mode === "signin" ? "Não possui conta?" : "Já tem uma conta?"}{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode(mode === "signin" ? "signup" : "signin")
-                  setError(null)
-                  setInfo(null)
-                  setConfirmPassword("")
-                }}
-                className="font-semibold text-orange-500 hover:underline"
-              >
-                {mode === "signin" ? "Criar conta" : "Entrar"}
-              </button>
+              {mode === "recover" ? (
+                <>
+                  Lembrou a senha?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("signin")}
+                    className="font-semibold text-orange-500 hover:underline"
+                  >
+                    Voltar para o login
+                  </button>
+                </>
+              ) : (
+                <>
+                  {mode === "signin" ? "Não possui conta?" : "Já tem uma conta?"}{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
+                    className="font-semibold text-orange-500 hover:underline"
+                  >
+                    {mode === "signin" ? "Criar conta" : "Entrar"}
+                  </button>
+                </>
+              )}
             </p>
 
             <p className="mt-6 text-center text-xs leading-relaxed text-neutral-500">
