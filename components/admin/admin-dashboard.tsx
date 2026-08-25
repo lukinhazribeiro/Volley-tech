@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { formatPrice, PLAN_NAME, type SubscriptionStatus } from "@/lib/subscription"
 import { PixRequests } from "@/components/admin/pix-requests"
+import { PasswordResetRequests } from "@/components/admin/password-reset-requests"
 
 interface AdminSubscription {
   id: string
@@ -393,6 +394,8 @@ export function AdminDashboard({ adminEmail, testMode }: { adminEmail: string; t
         </div>
 
         <PixRequests />
+
+        <PasswordResetRequests />
       </div>
     </main>
   )
