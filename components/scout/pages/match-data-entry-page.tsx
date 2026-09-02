@@ -20,6 +20,7 @@ import { publishVoleiLive, clearVoleiLive, type VoleiLiveSnapshot } from "@/lib/
 import { getStoredUser } from "@/lib/auth"
 import { syncManager, type SyncMessage } from "@/lib/scout/sync-manager"
 import ConnectionStatus from "@/components/scout/connection-status"
+import VoleiLiveWatch from "@/components/scout/volei-live-watch"
 import { createEmptyRotation, type CourtRotation } from "@/lib/scout/rotation-manager"
 import type { PlayerPosition } from "@/lib/scout/rotation-manager"
 import { rotatePositions } from "@/lib/scout/rotation-manager"
@@ -609,6 +610,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
             >
               <ChevronDown className={`h-4 w-4 transition-transform ${barOpen ? "rotate-180" : ""}`} />
             </button>
+            <VoleiLiveWatch />
             <Button onClick={handleReset} variant="outline" size="sm">
               Nova
             </Button>

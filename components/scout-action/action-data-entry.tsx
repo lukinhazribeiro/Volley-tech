@@ -39,6 +39,7 @@ import { publishActionLive, clearActionLive } from "@/lib/scout-action/live-sess
 import { ActionCourt } from "./action-court"
 import { ActionSpreadsheet } from "./action-spreadsheet"
 import { ActionMatchMenu } from "./action-match-menu"
+import { ActionLiveWatch } from "./action-live-watch"
 
 // Ordem de exibição da grade de jogadores (igual à quadra).
 const GRID_ORDER: Posicao[] = ["P4", "P3", "P2", "P5", "P6", "P1"]
@@ -312,6 +313,7 @@ export function ActionDataEntry({
             <span className="rounded-full bg-orange-500/20 px-3 py-1 text-xs font-semibold text-orange-300">
               Scout Action · ao vivo
             </span>
+            <ActionLiveWatch />
             <button
               onClick={() => setShowSaved(true)}
               aria-label="Ver scouts salvos"
