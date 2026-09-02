@@ -18,6 +18,8 @@ export interface ActionLiveSession {
   scoreB: number
   setNum: number
   updatedAt: number
+  /** true quando o pulso parou (parada/sem sinal). Os NÚMEROS continuam. */
+  stale: boolean
   match: ScoutActionMatch
 }
 
@@ -35,10 +37,13 @@ interface LiveRow {
 
 const TABLE = "sa_live_session"
 
-// Janela maior que o heartbeat (15s) para não cair durante tempos técnicos.
-const STALE_MS = 60_000
+// Após esse tempo sem pulso, a transmissão é marcada como "parada" (stale),
+// mas os NÚMEROS continuam visíveis. A linha só desaparece quando o coletor
+// encerra de fato (clearActionLive => DELETE). Assim nada cai nas paradas.
+const STALE_MS = 30_000
 
 function rowToSession(row: LiveRow): ActionLiveSession {
+  const updatedAt = new Date(row.updated_at).getTime()
   return {
     deviceId: row.device_id,
     deviceLabel: row.device_label,
@@ -47,7 +52,8 @@ function rowToSession(row: LiveRow): ActionLiveSession {
     scoreA: row.score_a,
     scoreB: row.score_b,
     setNum: row.set_num,
-    updatedAt: new Date(row.updated_at).getTime(),
+    updatedAt,
+    stale: Date.now() - updatedAt >= STALE_MS,
     match: row.match,
   }
 }
@@ -117,11 +123,11 @@ export async function loadActionLiveSessions(): Promise<ActionLiveSession[]> {
 
   if (error || !data) return []
 
-  const now = Date.now()
+  // Não descarta sessões "paradas": mantém os números durante as paradas.
+  // Só exclui o próprio dispositivo. A linha some apenas quando o coletor
+  // encerra a transmissão (DELETE).
   const myDevice = getDeviceId()
-  return data
-    .map((r) => rowToSession(r as LiveRow))
-    .filter((s) => s.deviceId !== myDevice && now - s.updatedAt < STALE_MS)
+  return data.map((r) => rowToSession(r as LiveRow)).filter((s) => s.deviceId !== myDevice)
 }
 
 /** Reage a mudanças nas transmissões ao vivo (em qualquer dispositivo da conta). */

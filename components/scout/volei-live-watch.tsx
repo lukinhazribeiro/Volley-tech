@@ -36,6 +36,10 @@ export default function VoleiLiveWatch() {
   const [listOpen, setListOpen] = useState(false)
   const [watchingId, setWatchingId] = useState<string | null>(null)
   const [tab, setTab] = useState<TabValue>("stats")
+  // Último dado recebido do dispositivo assistido. Retido para que os NÚMEROS
+  // NUNCA caiam durante uma parada (tempo técnico, troca de lado, sem sinal).
+  const [watched, setWatched] = useState<VoleiLiveSession | null>(null)
+  const [ended, setEnded] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -54,7 +58,18 @@ export default function VoleiLiveWatch() {
     }
   }, [])
 
-  const watched = watchingId ? sessions.find((s) => s.deviceId === watchingId) ?? null : null
+  // Atualiza o dado assistido quando chega algo novo; se a linha sumiu (o
+  // coletor encerrou de fato), marca como encerrado mas mantém o último dado.
+  useEffect(() => {
+    if (!watchingId) return
+    const fresh = sessions.find((s) => s.deviceId === watchingId)
+    if (fresh) {
+      setWatched(fresh)
+      setEnded(false)
+    } else if (watched) {
+      setEnded(true)
+    }
+  }, [sessions, watchingId, watched])
 
   if (watchingId) {
     if (!watched) {
@@ -62,15 +77,23 @@ export default function VoleiLiveWatch() {
         <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-background px-6 text-center text-foreground">
           <Radio className="size-10 text-muted-foreground" aria-hidden />
           <p className="max-w-sm text-balance text-sm text-muted-foreground">
-            A transmissão foi encerrada ou o outro aparelho ficou sem conexão.
+            Aguardando os dados desta coleta...
           </p>
-          <Button onClick={() => setWatchingId(null)} className="bg-orange-600 hover:bg-orange-700">
+          <Button
+            onClick={() => {
+              setWatchingId(null)
+              setEnded(false)
+            }}
+            className="bg-orange-600 hover:bg-orange-700"
+          >
             Voltar
           </Button>
         </div>
       )
     }
 
+    // "Parada" (sem pulso) ou encerrada: os números continuam, só avisamos.
+    const paused = ended || watched.stale
     const snap = watched.snapshot
     const actions = (snap.actions ?? []) as MatchAction[]
     const sets = (snap.sets ?? []) as unknown as Set[]
@@ -78,23 +101,37 @@ export default function VoleiLiveWatch() {
 
     return (
       <div className="fixed inset-0 z-[70] flex flex-col overflow-hidden bg-background">
-        {/* Selo AO VIVO + placar */}
-        <div className="flex items-center justify-between gap-3 border-b bg-red-50 px-4 py-2.5">
+        {/* Selo AO VIVO / PARADO + placar (os números seguem visíveis) */}
+        <div
+          className={`flex items-center justify-between gap-3 border-b px-4 py-2.5 ${
+            paused ? "bg-amber-50" : "bg-red-50"
+          }`}
+        >
           <div className="flex min-w-0 items-center gap-2">
-            <span className="relative flex size-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-red-500" />
-            </span>
-            <p className="truncate text-xs font-semibold text-red-700">
-              AO VIVO · {watched.deviceLabel} · {watched.teamAName} {snap.currentSet?.teamAScore ?? 0} ×{" "}
-              {snap.currentSet?.teamBScore ?? 0} {watched.teamBName} · Set {watched.setNum}
+            {paused ? (
+              <span className="size-2.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
+            ) : (
+              <span className="relative flex size-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-red-500" />
+              </span>
+            )}
+            <p className={`truncate text-xs font-semibold ${paused ? "text-amber-700" : "text-red-700"}`}>
+              {paused ? (ended ? "ENCERRADO" : "PARADO") : "AO VIVO"} · {watched.deviceLabel} · {watched.teamAName}{" "}
+              {snap.currentSet?.teamAScore ?? 0} × {snap.currentSet?.teamBScore ?? 0} {watched.teamBName} · Set{" "}
+              {watched.setNum}
             </p>
           </div>
           <Button
-            onClick={() => setWatchingId(null)}
+            onClick={() => {
+              setWatchingId(null)
+              setEnded(false)
+            }}
             size="sm"
             variant="outline"
-            className="shrink-0 gap-1.5 border-red-300 text-red-700 hover:bg-red-100"
+            className={`shrink-0 gap-1.5 ${
+              paused ? "border-amber-300 text-amber-700 hover:bg-amber-100" : "border-red-300 text-red-700 hover:bg-red-100"
+            }`}
           >
             <X className="size-3.5" />
             Sair
@@ -197,6 +234,8 @@ export default function VoleiLiveWatch() {
                       type="button"
                       onClick={() => {
                         setWatchingId(s.deviceId)
+                        setWatched(s)
+                        setEnded(false)
                         setTab("stats")
                         setListOpen(false)
                       }}
@@ -209,6 +248,7 @@ export default function VoleiLiveWatch() {
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
                           {s.deviceLabel} · Set {s.setNum} · {s.snapshot.actions?.length ?? 0} ações
+                          {s.stale && <span className="font-semibold text-amber-600"> · parado</span>}
                         </p>
                       </div>
                       <span className="flex shrink-0 items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white">
