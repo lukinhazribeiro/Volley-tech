@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import type { MatchAction, TeamStats } from "@/lib/scout/match-parser"
 import type { Player } from "@/components/scout/team-roster-management"
+import { BroadcastCourt, type BroadcastCourtCell } from "@/components/shared/broadcast-court"
 import {
   type CourtPos,
   type Formation,
@@ -35,7 +36,6 @@ import {
   findSetter,
   findPosition,
   finalizeRally,
-  describeSystem,
   BACK_ROW,
   opponentGeneralRally,
   OPPONENT_GENERAL_LABEL,
@@ -85,23 +85,6 @@ function attackTokenFor(role: PlayerRole | undefined, pos: CourtPos | null): Att
   if (role === "oposto") return "O"
   if (role === "levantador") return "S"
   return "P"
-}
-
-function roleShort(role?: PlayerRole): string {
-  switch (role) {
-    case "levantador":
-      return "LEV"
-    case "oposto":
-      return "OP"
-    case "ponteiro":
-      return "PO"
-    case "central":
-      return "CE"
-    case "libero":
-      return "LI"
-    default:
-      return ""
-  }
 }
 
 export default function SmartDataEntry({
@@ -321,6 +304,27 @@ export default function SmartDataEntry({
   const lastLog = log[0]
 
 
+  // Monta as células da quadra no formato genérico da quadra compartilhada
+  // (mesmo visual do Scout Action). Mantém o toque para selecionar o atleta.
+  const buildCells = (team: "A" | "B"): BroadcastCourtCell[] => {
+    const court = team === "A" ? courtA : courtB
+    const setup = team === "A" ? setupA : setupB
+    const setter = team === "A" ? setterA : setterB
+    return ([1, 2, 3, 4, 5, 6] as CourtPos[]).map((pos) => {
+      const num = court[pos]
+      const role = roleOf(team, num)
+      const isSetter = setter === num
+      const isLibero = setup.liberoNumber === num
+      return {
+        posicao: `P${pos}`,
+        player: { id: String(pos), number: num, name: nameOf(team, num) },
+        roleLabel: isSetter ? "Levantador" : role ? ROLE_LABEL[role] : "",
+        isLibero,
+        isSetter,
+      }
+    })
+  }
+
   return (
     <div className="min-h-full w-full bg-slate-100 p-2 sm:p-4">
       <div className="mx-auto max-w-[1120px] space-y-2 sm:space-y-3">
@@ -348,22 +352,13 @@ export default function SmartDataEntry({
               </button>
             </div>
 
-            <VolleyCourt
-              teamAName={teamAName}
-              teamBName={teamBName}
-              courtA={courtA}
-              courtB={courtB}
-              setupA={setupA}
-              setupB={setupB}
-              systemA={describeSystem(setupA)}
-              systemB={describeSystem(setupB)}
-              setterA={setterA}
-              setterB={setterB}
-              servingTeam={servingTeam}
-              possession={possession}
-              onTap={selectPlayer}
-              pending={pending}
-              roleOf={roleOf}
+            <BroadcastCourt
+              nameA={teamAName}
+              nameB={teamBName}
+              cellsA={buildCells("A")}
+              cellsB={buildCells("B")}
+              serving={servingTeam}
+              onPlayerTap={(side, playerId) => selectPlayer(side, Number(playerId) as CourtPos)}
             />
           </div>
 
@@ -661,145 +656,6 @@ function describeResult(f: Fundamento, end: "point" | "error"): string {
   if (f === "B") return "Erro de bloqueio"
   if (f === "P") return "Erro de recepção"
   return "Erro"
-}
-
-interface VolleyCourtProps {
-  teamAName: string
-  teamBName: string
-  courtA: Formation
-  courtB: Formation
-  setupA: TeamSetup
-  setupB: TeamSetup
-  systemA: string
-  systemB: string
-  setterA: number | null
-  setterB: number | null
-  servingTeam: "A" | "B"
-  possession: "A" | "B"
-  onTap: (team: "A" | "B", pos: CourtPos) => void
-  pending: { team: "A" | "B"; player: number; pos: CourtPos | null } | null
-  roleOf: (team: "A" | "B", num: number) => PlayerRole | undefined
-}
-
-/** Quadra de vôlei realista: as duas equipes dividem a mesma quadra, separadas
- *  pela rede central, com linhas de ataque (3m) e limites em branco. */
-function VolleyCourt({
-  teamAName,
-  teamBName,
-  courtA,
-  courtB,
-  setupA,
-  setupB,
-  systemA,
-  systemB,
-  setterA,
-  setterB,
-  servingTeam,
-  possession,
-  onTap,
-  pending,
-  roleOf,
-}: VolleyCourtProps) {
-  // Célula de posição (botão inteligente: número em destaque + P + função).
-  const Cell = ({ team, pos }: { team: "A" | "B"; pos: CourtPos }) => {
-    const isA = team === "A"
-    const court = isA ? courtA : courtB
-    const setup = isA ? setupA : setupB
-    const setter = isA ? setterA : setterB
-    const num = court[pos]
-    const role = roleOf(team, num)
-    const isLibero = setup.liberoNumber === num
-    const isSetter = setter === num
-    const serving = servingTeam === team
-    const selected = pending?.team === team && pending?.pos === pos
-    return (
-      <button
-        onClick={() => onTap(team, pos)}
-        className={`relative flex flex-col items-center justify-center rounded-lg py-2 transition ${
-          isA ? "bg-blue-600/95 hover:bg-blue-600" : "bg-orange-500/95 hover:bg-orange-500"
-        } ${selected ? "ring-2 ring-white" : ""}`}
-      >
-        {isLibero && (
-          <span className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400 text-[9px] font-black text-white">
-            L
-          </span>
-        )}
-        {serving && pos === 1 && (
-          <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-300 text-[9px] font-black text-slate-900">
-            S
-          </span>
-        )}
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-black text-slate-800">
-          {num}
-        </span>
-        <span className="mt-0.5 text-[11px] font-black text-white">P{pos}</span>
-        <span className="text-[8px] font-semibold uppercase text-white/80">{isSetter ? "LEV" : roleShort(role)}</span>
-      </button>
-    )
-  }
-
-  const activeRing = (team: "A" | "B") =>
-    possession === team ? (team === "A" ? "ring-4 ring-blue-400" : "ring-4 ring-orange-400") : "ring-0"
-
-  return (
-    <div className="overflow-hidden rounded-2xl border-4 border-slate-200 bg-emerald-700 shadow-md">
-      {/* Cabeçalho equipe A */}
-      <div className={`flex items-center justify-between bg-blue-600 px-4 py-1.5 text-white ${activeRing("A")}`}>
-        <span className="text-sm font-black">{teamAName}</span>
-        <span className="rounded bg-white/25 px-2 py-0.5 text-[10px] font-bold">{systemA}</span>
-      </div>
-
-      {/* Metade da quadra — Equipe A (fundo em cima, rede embaixo) */}
-      <div className="relative bg-emerald-600 px-3 pt-3">
-        {/* fundo: P1 P6 P5 */}
-        <div className="grid grid-cols-3 gap-2">
-          {([1, 6, 5] as CourtPos[]).map((pos) => (
-            <Cell key={pos} team="A" pos={pos} />
-          ))}
-        </div>
-        {/* linha de ataque (3m) */}
-        <div className="my-2 border-t-2 border-dashed border-white/60" />
-        {/* rede: P2 P3 P4 */}
-        <div className="grid grid-cols-3 gap-2 pb-3">
-          {([2, 3, 4] as CourtPos[]).map((pos) => (
-            <Cell key={pos} team="A" pos={pos} />
-          ))}
-        </div>
-      </div>
-
-      {/* Rede central */}
-      <div className="relative flex h-6 items-center justify-center bg-slate-900">
-        <div className="h-full w-full bg-[repeating-linear-gradient(90deg,transparent,transparent_5px,rgba(255,255,255,0.35)_5px,rgba(255,255,255,0.35)_7px)]" />
-        <span className="absolute rounded bg-white/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-700">
-          Rede
-        </span>
-      </div>
-
-      {/* Metade da quadra — Equipe B (rede em cima, fundo embaixo) */}
-      <div className="relative bg-emerald-600 px-3 pt-3">
-        {/* rede: P4 P3 P2 */}
-        <div className="grid grid-cols-3 gap-2">
-          {([4, 3, 2] as CourtPos[]).map((pos) => (
-            <Cell key={pos} team="B" pos={pos} />
-          ))}
-        </div>
-        {/* linha de ataque (3m) */}
-        <div className="my-2 border-t-2 border-dashed border-white/60" />
-        {/* fundo: P5 P6 P1 */}
-        <div className="grid grid-cols-3 gap-2 pb-3">
-          {([5, 6, 1] as CourtPos[]).map((pos) => (
-            <Cell key={pos} team="B" pos={pos} />
-          ))}
-        </div>
-      </div>
-
-      {/* Cabeçalho equipe B */}
-      <div className={`flex items-center justify-between bg-orange-500 px-4 py-1.5 text-white ${activeRing("B")}`}>
-        <span className="text-sm font-black">{teamBName}</span>
-        <span className="rounded bg-white/25 px-2 py-0.5 text-[10px] font-bold">{systemB}</span>
-      </div>
-    </div>
-  )
 }
 
 function formatTime(totalSeconds: number): string {

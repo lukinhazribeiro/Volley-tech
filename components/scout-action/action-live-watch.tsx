@@ -37,6 +37,10 @@ export function ActionLiveWatch() {
   const [sessions, setSessions] = useState<ActionLiveSession[]>([])
   const [listOpen, setListOpen] = useState(false)
   const [watchingId, setWatchingId] = useState<string | null>(null)
+  // Último dado recebido do dispositivo assistido. Retido para que os NÚMEROS
+  // NUNCA caiam durante uma parada (tempo técnico, troca de lado, sem sinal).
+  const [watched, setWatched] = useState<ActionLiveSession | null>(null)
+  const [ended, setEnded] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -55,7 +59,18 @@ export function ActionLiveWatch() {
     }
   }, [])
 
-  const watched = watchingId ? sessions.find((s) => s.deviceId === watchingId) ?? null : null
+  // Atualiza o dado assistido quando chega algo novo; se a linha sumiu (o
+  // coletor encerrou de fato), marca como encerrado mas mantém o último dado.
+  useEffect(() => {
+    if (!watchingId) return
+    const fresh = sessions.find((s) => s.deviceId === watchingId)
+    if (fresh) {
+      setWatched(fresh)
+      setEnded(false)
+    } else if (watched) {
+      setEnded(true)
+    }
+  }, [sessions, watchingId, watched])
 
   // Tela de acompanhamento (planilha ao vivo, somente leitura).
   if (watchingId) {
@@ -63,12 +78,13 @@ export function ActionLiveWatch() {
       return (
         <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-slate-950 px-6 text-center text-slate-300">
           <Radio className="size-10 text-slate-600" aria-hidden />
-          <p className="max-w-sm text-balance text-sm">
-            A transmissão foi encerrada ou o outro aparelho ficou sem conexão.
-          </p>
+          <p className="max-w-sm text-balance text-sm">Aguardando os dados desta coleta...</p>
           <button
             type="button"
-            onClick={() => setWatchingId(null)}
+            onClick={() => {
+              setWatchingId(null)
+              setEnded(false)
+            }}
             className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500"
           >
             Voltar
@@ -76,23 +92,39 @@ export function ActionLiveWatch() {
         </div>
       )
     }
+    const paused = ended || watched.stale
     return (
       <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-red-500/30 bg-red-950/60 px-4 py-2.5 backdrop-blur">
+        <div
+          className={`sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-4 py-2.5 backdrop-blur ${
+            paused ? "border-amber-500/30 bg-amber-950/60" : "border-red-500/30 bg-red-950/60"
+          }`}
+        >
           <div className="flex min-w-0 items-center gap-2">
-            <span className="relative flex size-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-red-500" />
-            </span>
-            <p className="truncate text-xs font-semibold text-red-200">
-              AO VIVO · {watched.deviceLabel} · {watched.teamAName} {watched.scoreA} × {watched.scoreB}{" "}
-              {watched.teamBName}
+            {paused ? (
+              <span className="size-2.5 shrink-0 rounded-full bg-amber-400" aria-hidden />
+            ) : (
+              <span className="relative flex size-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-red-500" />
+              </span>
+            )}
+            <p className={`truncate text-xs font-semibold ${paused ? "text-amber-200" : "text-red-200"}`}>
+              {paused ? (ended ? "ENCERRADO" : "PARADO") : "AO VIVO"} · {watched.deviceLabel} · {watched.teamAName}{" "}
+              {watched.scoreA} × {watched.scoreB} {watched.teamBName}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => setWatchingId(null)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-red-400/40 bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-200 hover:bg-red-500/20"
+            onClick={() => {
+              setWatchingId(null)
+              setEnded(false)
+            }}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold ${
+              paused
+                ? "border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
+                : "border-red-400/40 bg-red-500/10 text-red-200 hover:bg-red-500/20"
+            }`}
           >
             <X className="size-3.5" />
             Sair
@@ -155,6 +187,8 @@ export function ActionLiveWatch() {
                       type="button"
                       onClick={() => {
                         setWatchingId(s.deviceId)
+                        setWatched(s)
+                        setEnded(false)
                         setListOpen(false)
                       }}
                       className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left transition hover:border-red-400/50 hover:bg-red-500/5"
@@ -165,6 +199,7 @@ export function ActionLiveWatch() {
                         </p>
                         <p className="truncate text-xs text-slate-500">
                           {s.deviceLabel} · Set {s.setNum} · {s.match.events?.length ?? 0} lances
+                          {s.stale && <span className="font-semibold text-amber-400"> · parado</span>}
                         </p>
                       </div>
                       <span className="flex shrink-0 items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white">
