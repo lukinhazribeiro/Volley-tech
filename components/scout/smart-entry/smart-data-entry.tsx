@@ -323,7 +323,7 @@ export default function SmartDataEntry({
 
   return (
     <div className="min-h-full w-full bg-slate-100 p-2 sm:p-4">
-      <div className="mx-auto max-w-[1120px] space-y-3">
+      <div className="mx-auto max-w-[1120px] space-y-2 sm:space-y-3">
         {/* ============ CABEÇALHO + PLACAR ============ */}
         {/* ============ CORPO PRINCIPAL (2 colunas) ============ */}
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">

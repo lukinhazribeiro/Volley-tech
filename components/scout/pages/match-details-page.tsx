@@ -16,17 +16,19 @@ import { SetProgressionVisualization } from "@/components/scout/set-progression-
 
 interface MatchDetailsPageProps {
   matchId: string
+  /** Partida já carregada (da nuvem). Se ausente, cai no cache local por id. */
+  match?: StoredMatch | null
   onBack: () => void
 }
 
-export default function MatchDetailsPage({ matchId, onBack }: MatchDetailsPageProps) {
-  const [match, setMatch] = useState<StoredMatch | null>(null)
+export default function MatchDetailsPage({ matchId, match: matchProp, onBack }: MatchDetailsPageProps) {
+  const [match, setMatch] = useState<StoredMatch | null>(matchProp ?? null)
   const [selectedSet, setSelectedSet] = useState<number>(0)
 
   useEffect(() => {
-    const foundMatch = getMatchById(matchId)
-    setMatch(foundMatch)
-  }, [matchId])
+    // Prioriza a partida vinda da nuvem; só busca no cache local se não veio.
+    setMatch(matchProp ?? getMatchById(matchId))
+  }, [matchId, matchProp])
 
   const teamStats = useMemo(() => {
     if (!match || !match.actions) return null

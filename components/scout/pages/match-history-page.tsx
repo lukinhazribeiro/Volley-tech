@@ -1,7 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { type StoredMatch, getMatches, deleteMatch, getMatchStatistics } from "@/lib/scout/match-storage"
+import { useState, useEffect, useCallback } from "react"
+import { type StoredMatch, getMatchStatistics } from "@/lib/scout/match-storage"
+import {
+  loadVoleiHistory,
+  deleteVoleiFromCloud,
+  subscribeToVoleiHistory,
+  migrateLocalVoleiHistory,
+} from "@/lib/scout/cloud-history"
 import { Card } from "@/components/scout/ui/card"
 import { Button } from "@/components/scout/ui/button"
 import { Badge } from "@/components/scout/ui/badge"
@@ -13,17 +19,33 @@ export default function MatchHistoryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
 
-  useEffect(() => {
-    const allMatches = getMatches()
-    setMatches(allMatches)
-    setStats(getMatchStatistics(allMatches))
+  const refresh = useCallback(async () => {
+    const all = await loadVoleiHistory()
+    setMatches(all)
+    setStats(getMatchStatistics(all))
   }, [])
+
+  // Carrega da nuvem, migra os jogos locais antigos (uma vez) e escuta mudanças
+  // feitas em qualquer dispositivo logado na mesma conta.
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      await migrateLocalVoleiHistory()
+      if (active) await refresh()
+    })()
+    const unsubscribe = subscribeToVoleiHistory(() => {
+      void refresh()
+    })
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [refresh])
 
   const filteredMatches = selectedCategory ? matches.filter((m) => m.category === selectedCategory) : matches
 
-  const handleDelete = (id: string) => {
-    deleteMatch(id)
-    const updated = getMatches()
+  const handleDelete = async (id: string) => {
+    const updated = await deleteVoleiFromCloud(id)
     setMatches(updated)
     setStats(getMatchStatistics(updated))
   }
@@ -45,7 +67,13 @@ export default function MatchHistoryPage() {
   }
 
   if (selectedMatchId) {
-    return <MatchDetailsPage matchId={selectedMatchId} onBack={() => setSelectedMatchId(null)} />
+    return (
+      <MatchDetailsPage
+        matchId={selectedMatchId}
+        match={matches.find((m) => m.id === selectedMatchId) ?? null}
+        onBack={() => setSelectedMatchId(null)}
+      />
+    )
   }
 
   return (

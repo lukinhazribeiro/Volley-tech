@@ -33,10 +33,13 @@ import {
 import type { ActionKind, ActionSide, ScoutActionMatch } from "@/lib/scout-action/types"
 import { matchTotals } from "@/lib/scout-action/types"
 import type { ActionMatchConfig } from "@/lib/scout-action/config"
-import { saveActionMatch, clearInProgressActionMatch, type ActionMatch } from "@/lib/scout-action/storage"
+import { clearInProgressActionMatch, type ActionMatch } from "@/lib/scout-action/storage"
+import { saveActionToCloud } from "@/lib/scout-action/cloud-history"
+import { publishActionLive, clearActionLive } from "@/lib/scout-action/live-session"
 import { ActionCourt } from "./action-court"
 import { ActionSpreadsheet } from "./action-spreadsheet"
 import { ActionMatchMenu } from "./action-match-menu"
+import { ActionLiveWatch } from "./action-live-watch"
 
 // Ordem de exibição da grade de jogadores (igual à quadra).
 const GRID_ORDER: Posicao[] = ["P4", "P3", "P2", "P5", "P6", "P1"]
@@ -96,6 +99,57 @@ export function ActionDataEntry({
       1000,
     )
     return () => clearInterval(id)
+  }, [])
+
+  // Transmissão ao vivo por conta: publica o estado atual (com debounce) para
+  // que outros aparelhos logados na mesma conta acompanhem em tempo real. Um
+  // heartbeat a cada 15s mantém a sessão "no ar" mesmo sem novas ações, e a
+  // transmissão é encerrada ao sair da tela.
+  useEffect(() => {
+    const snapshot: ScoutActionMatch = {
+      id: "live",
+      category,
+      competition,
+      teamA: toStoredTeam(state.teamA),
+      teamB: toStoredTeam(state.teamB),
+      events: state.events,
+      setScores: state.setScores,
+      setsA: setsWon(state).a,
+      setsB: setsWon(state).b,
+      createdAt: new Date(startRef.current).toISOString(),
+      completedAt: null,
+      winner: null,
+    }
+    const debounce = setTimeout(() => {
+      void publishActionLive(snapshot)
+    }, 400)
+    return () => clearTimeout(debounce)
+  }, [state, category, competition])
+
+  useEffect(() => {
+    const heartbeat = setInterval(() => {
+      const snapshot: ScoutActionMatch = {
+        id: "live",
+        category,
+        competition,
+        teamA: toStoredTeam(state.teamA),
+        teamB: toStoredTeam(state.teamB),
+        events: state.events,
+        setScores: state.setScores,
+        setsA: setsWon(state).a,
+        setsB: setsWon(state).b,
+        createdAt: new Date(startRef.current).toISOString(),
+        completedAt: null,
+        winner: null,
+      }
+      void publishActionLive(snapshot)
+    }, 15_000)
+    return () => {
+      clearInterval(heartbeat)
+      // Ao sair da coleta, encerra a transmissão ao vivo deste dispositivo.
+      void clearActionLive()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const nameA = state.teamA.name || "Equipe A"
@@ -208,7 +262,8 @@ export function ActionDataEntry({
       if (s.scoreA > s.scoreB) a++
       else if (s.scoreB > s.scoreA) b++
     }
-    const match: Omit<ScoutActionMatch, "id"> = {
+    const match: ScoutActionMatch = {
+      id: `saction_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       category,
       competition,
       teamA: toStoredTeam(state.teamA),
@@ -221,7 +276,10 @@ export function ActionDataEntry({
       completedAt: new Date().toISOString(),
       winner: a === b ? null : a > b ? "A" : "B",
     }
-    saveActionMatch(match)
+    // Salva o jogo na conta (nuvem) e encerra a transmissão ao vivo deste
+    // dispositivo. onFinish recarrega a lista a partir da nuvem.
+    void saveActionToCloud(match)
+    void clearActionLive()
     clearInProgressActionMatch()
     onFinish()
   }
@@ -255,6 +313,7 @@ export function ActionDataEntry({
             <span className="rounded-full bg-orange-500/20 px-3 py-1 text-xs font-semibold text-orange-300">
               Scout Action · ao vivo
             </span>
+            <ActionLiveWatch />
             <button
               onClick={() => setShowSaved(true)}
               aria-label="Ver scouts salvos"
