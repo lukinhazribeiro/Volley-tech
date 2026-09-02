@@ -15,6 +15,8 @@ import SetDisplay from "@/components/scout/set-display"
 import Card from "@/components/scout/ui/card"
 import AdvancedAnalyticsCharts from "@/components/scout/charts/advanced-analytics-charts"
 import { saveMatch, saveInProgressMatch, getInProgressMatch, clearInProgressMatch } from "@/lib/scout/match-storage"
+import { saveVoleiToCloud } from "@/lib/scout/cloud-history"
+import { publishVoleiLive, clearVoleiLive, type VoleiLiveSnapshot } from "@/lib/scout/live-session"
 import { getStoredUser } from "@/lib/auth"
 import { syncManager, type SyncMessage } from "@/lib/scout/sync-manager"
 import ConnectionStatus from "@/components/scout/connection-status"
@@ -89,6 +91,53 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
     if (!matchStarted) return
     saveInProgressMatch({ matchData, sets, currentSet, rallyExtras })
   }, [matchStarted, matchData, sets, currentSet, rallyExtras])
+
+  // ===== Transmissão ao vivo por conta =====
+  // Publica o estado atual (com debounce) para que outros aparelhos logados na
+  // MESMA conta acompanhem placar, planilha e gráficos em tempo real. Não usa
+  // mais "sala": a coleta fica atrelada à conta, como no Scout View.
+  useEffect(() => {
+    if (!matchStarted) return
+    const snapshot: VoleiLiveSnapshot = {
+      teamAName: matchData.teamAName,
+      teamBName: matchData.teamBName,
+      category: matchData.category,
+      actions: matchData.actions,
+      sets,
+      currentSet,
+      teamAPlayers: matchData.teamAPlayers,
+      teamBPlayers: matchData.teamBPlayers,
+    }
+    const debounce = setTimeout(() => {
+      void publishVoleiLive(snapshot)
+    }, 400)
+    return () => clearTimeout(debounce)
+  }, [matchStarted, matchData, sets, currentSet])
+
+  // Heartbeat de 15s (mantém "no ar" sem novas ações) e encerra ao sair.
+  useEffect(() => {
+    if (!matchStarted) return
+    const heartbeat = setInterval(() => {
+      void publishVoleiLive({
+        teamAName: matchData.teamAName,
+        teamBName: matchData.teamBName,
+        category: matchData.category,
+        actions: matchData.actions,
+        sets,
+        currentSet,
+        teamAPlayers: matchData.teamAPlayers,
+        teamBPlayers: matchData.teamBPlayers,
+      })
+    }, 15_000)
+    return () => clearInterval(heartbeat)
+  }, [matchStarted, matchData, sets, currentSet])
+
+  // Ao desmontar a tela de coleta, encerra a transmissão ao vivo do aparelho.
+  useEffect(() => {
+    return () => {
+      void clearVoleiLive()
+    }
+  }, [])
 
   // Restaura a partida em andamento ao montar, para não perder nada num refresh.
   useEffect(() => {
@@ -386,7 +435,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
     const winner = sets.filter((s) => s.winner === "A").length >= 3 ? "A" : "B"
     const totalDuration = Math.floor((new Date().getTime() - new Date(matchData.startTime).getTime()) / 1000)
 
-    saveMatch({
+    const stored = saveMatch({
       teamAName: matchData.teamAName,
       teamBName: matchData.teamBName,
       category: matchData.category,
@@ -400,6 +449,10 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
       teamAPlayers: matchData.teamAPlayers,
       teamBPlayers: matchData.teamBPlayers,
     })
+    // Salva o jogo na conta (nuvem) e encerra a transmissão ao vivo deste
+    // dispositivo. O histórico lê da nuvem em qualquer aparelho da conta.
+    void saveVoleiToCloud(stored)
+    void clearVoleiLive()
     handleReset()
   }
 

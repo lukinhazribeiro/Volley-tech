@@ -6,7 +6,11 @@
 // enquanto cada um segue coletando de forma independente.
 
 import { createClient } from "@/lib/supabase/client"
+import { getDeviceId, getDeviceLabel } from "@/lib/scout/device"
 import type { MatchState } from "./match"
+
+// Reexporta para manter compatível quem importa daqui.
+export { getDeviceId, getDeviceLabel }
 
 export interface LiveSession {
   deviceId: string
@@ -36,41 +40,6 @@ interface LiveRow {
 // que o intervalo do heartbeat (15s) para NÃO cair durante os tempos técnicos,
 // quando a coleta para mas o dispositivo continua enviando o "pulso".
 const STALE_MS = 60_000
-
-const DEVICE_ID_KEY = "volleytech_device_id_v1"
-const DEVICE_LABEL_KEY = "volleytech_device_label_v1"
-
-/** Identificador estável do dispositivo/navegador atual. */
-export function getDeviceId(): string {
-  if (typeof window === "undefined") return "server"
-  let id = window.localStorage.getItem(DEVICE_ID_KEY)
-  if (!id) {
-    id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `dev_${Date.now()}_${Math.random().toString(36).slice(2)}`
-    window.localStorage.setItem(DEVICE_ID_KEY, id)
-  }
-  return id
-}
-
-/** Rótulo amigável do dispositivo (para identificar quem está coletando). */
-export function getDeviceLabel(): string {
-  if (typeof window === "undefined") return "Dispositivo"
-  const saved = window.localStorage.getItem(DEVICE_LABEL_KEY)
-  if (saved) return saved
-
-  const ua = navigator.userAgent
-  let label = "Dispositivo"
-  if (/iPhone|iPad|iPod/i.test(ua)) label = "iPhone/iPad"
-  else if (/Android/i.test(ua)) label = "Android"
-  else if (/Macintosh|Mac OS X/i.test(ua)) label = "Mac"
-  else if (/Windows/i.test(ua)) label = "Windows"
-  else if (/Linux/i.test(ua)) label = "Linux"
-
-  window.localStorage.setItem(DEVICE_LABEL_KEY, label)
-  return label
-}
 
 function rowToSession(row: LiveRow): LiveSession {
   return {
