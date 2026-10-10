@@ -82,7 +82,29 @@ export interface TeamStats {
 
 export function normalizeMatchActions(actions: MatchAction[]): MatchAction[] {
   const seen = new Set<string>()
-  return actions.filter((action) => {
+  return actions.flatMap((action) => {
+    const normalized: MatchAction = { ...action }
+    const oppositeTeam = action.attackingTeam === "A" ? "B" : "A"
+
+    // Toda indicação de erro concede o ponto à outra equipe. Persistimos essa
+    // leitura antes dos cálculos para que resumo, planilha e TGR usem a mesma regra.
+    if (action.serveQuality === "-") {
+      normalized.pointScoredBy = oppositeTeam
+      normalized.pointType = "error"
+    } else if (action.passingQuality === "D") {
+      normalized.pointScoredBy = action.servingTeam
+      normalized.pointType = "error"
+    } else if (["!", "%", "$"].includes(action.resultComplemento ?? "")) {
+      normalized.pointScoredBy = oppositeTeam
+      normalized.pointType = "error"
+    } else if (action.serveQuality === "ka") {
+      normalized.pointScoredBy = action.servingTeam
+      normalized.pointType = "serve"
+    } else if (action.resultComplemento === "#") {
+      normalized.pointScoredBy = action.attackingTeam
+      normalized.pointType = "attack"
+    }
+
     const signature = [
       action.servingTeam,
       action.servingPlayer,
@@ -98,11 +120,12 @@ export function normalizeMatchActions(actions: MatchAction[]): MatchAction[] {
       action.blockingPlayer ?? "",
       action.settingPlayer ?? "",
       action.pointScoredBy ?? "",
-      action.pointType ?? "",
+      normalized.pointScoredBy ?? "",
+      normalized.pointType ?? "",
     ].join("|")
-    if (seen.has(signature)) return false
+    if (seen.has(signature)) return []
     seen.add(signature)
-    return true
+    return [normalized]
   })
 }
 
