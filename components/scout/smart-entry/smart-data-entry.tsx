@@ -246,7 +246,7 @@ export default function SmartDataEntry({
   const handleEnd = (end: "point" | "error") => {
     if (touches.length === 0) return
     const lastF = touches[touches.length - 1].fundamento
-    const result = finalizeRally(touches, end)
+    const result = finalizeRally(touches, end, undefined, { A: setterA, B: setterB })
     // Prefere o registro em LOTE para que TODAS as ações do rally sejam salvas
     // (saque, recepção, defesas, bloqueios e ataque), não apenas a última.
     if (onActionsBatch) onActionsBatch(result.actions)

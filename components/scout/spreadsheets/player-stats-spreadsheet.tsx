@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import type { MatchAction } from "@/lib/scout/match-parser"
+import { normalizeMatchActions } from "@/lib/scout/match-parser"
 import { Card } from "@/components/scout/ui/card"
 import { Button } from "@/components/scout/ui/button"
 import { Download, Printer } from 'lucide-react'
@@ -92,8 +93,9 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
 
     // Filtra as ações pelo set selecionado usando o campo setNumber gravado
     // em cada ação no momento da coleta.
-    const filteredActions =
-      selectedSet === "all" ? actions : actions.filter((action) => action.setNumber === selectedSet)
+    const filteredActions = normalizeMatchActions(
+      selectedSet === "all" ? actions : actions.filter((action) => action.setNumber === selectedSet),
+    )
 
     let teamTotalPoints = 0
     for (const action of filteredActions) {
@@ -191,9 +193,10 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             serve: { certo: 0, erro: 0, ace: 0 },
             attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
             block: { O: 0, P: 0, M: 0, FS: 0 },
-            defense: { D: 0, V: 0, R: 0 },
-            tp: 0,
-            te: 0,
+              defense: { D: 0, V: 0, R: 0 },
+              levantamento: 0,
+              tp: 0,
+              te: 0,
             tg: 0,
             tgp: 0,
           }
@@ -225,9 +228,10 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             serve: { certo: 0, erro: 0, ace: 0 },
             attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
             block: { O: 0, P: 0, M: 0, FS: 0 },
-            defense: { D: 0, V: 0, R: 0 },
-            tp: 0,
-            te: 0,
+              defense: { D: 0, V: 0, R: 0 },
+              levantamento: 0,
+              tp: 0,
+              te: 0,
             tg: 0,
             tgp: 0,
           }
@@ -708,6 +712,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           V: acc.defense.V + stat.defense.V,
           R: acc.defense.R + stat.defense.R,
         },
+        levantamento: acc.levantamento + stat.levantamento,
         tg: acc.tg + stat.tg,
         tp: acc.tp + stat.tp,
         te: acc.te + stat.te,
@@ -718,6 +723,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
         block: { O: 0, P: 0, M: 0, FS: 0 },
         defense: { D: 0, V: 0, R: 0 },
+        levantamento: 0,
         tg: 0,
         tp: 0,
         te: 0,

@@ -347,6 +347,7 @@ export function finalizeRally(
   touches: Touch[],
   end: RallyEnd,
   directionOverride?: AttackDirection,
+  defaultSetters?: Partial<Record<"A" | "B", number | null>>,
 ): RallyResult {
   const actions: MatchAction[] = []
   // Garante os campos obrigatórios do MatchAction. serveQuality é obrigatório no
@@ -442,7 +443,15 @@ export function finalizeRally(
     for (let j = attackIdx - 1; j >= 0; j--) {
       if (touches[j].fundamento === "L" && touches[j].team === team) return touches[j].player
     }
-    return undefined
+    // Regra automática: se não houve toque L explícito, o levantador da
+    // formação é o responsável pelo levantamento da sequência ofensiva.
+    for (let j = attackIdx - 1; j >= 0; j--) {
+      const candidate = touches[j]
+      if (candidate.team === team && candidate.fundamento !== "A" && candidate.fundamento !== "S") {
+        return candidate.player
+      }
+    }
+    return defaultSetters?.[team] ?? undefined
   }
   const lastIdx = touches.length - 1
 

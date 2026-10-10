@@ -80,11 +80,37 @@ export interface TeamStats {
   points: number
 }
 
+export function normalizeMatchActions(actions: MatchAction[]): MatchAction[] {
+  const seen = new Set<string>()
+  return actions.filter((action) => {
+    const signature = [
+      action.servingTeam,
+      action.servingPlayer,
+      action.serveQuality,
+      action.serveZone ?? "",
+      action.passingPlayer ?? "",
+      action.passingQuality ?? "",
+      action.attackingTeam,
+      action.attackPosition ?? "",
+      action.resultComplemento ?? "",
+      action.actionPlayer ?? "",
+      action.defensivePlayer ?? "",
+      action.blockingPlayer ?? "",
+      action.settingPlayer ?? "",
+      action.pointScoredBy ?? "",
+      action.pointType ?? "",
+    ].join("|")
+    if (seen.has(signature)) return false
+    seen.add(signature)
+    return true
+  })
+}
+
 export function calculateMatchStats(actions: MatchAction[]) {
   const statsA: TeamStats = createEmptyStats()
   const statsB: TeamStats = createEmptyStats()
 
-  const uniqueActions = Array.from(new Map(actions.map((action) => [action.id, action])).values())
+  const uniqueActions = normalizeMatchActions(actions)
   for (const action of uniqueActions) {
     processAction(action, statsA, statsB)
   }
@@ -109,7 +135,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
   const stats = createEmptyStats()
   const opposingTeam = team === "A" ? "B" : "A"
   
-  for (const action of actions) {
+  for (const action of normalizeMatchActions(actions)) {
     // Count serves for this team
     if (action.servingTeam === team) {
       if (action.serveQuality === "ka") {
