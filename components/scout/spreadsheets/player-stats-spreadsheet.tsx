@@ -211,10 +211,36 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           action.serveQuality === "ka" ||
           action.serveQuality === "-" ||
           (action.serveQuality === "+" && !!action.serveZone)
-        if (isServeAction) {
+        if (isServeAction && action.servingPlayer > 0 && playerStats[action.servingPlayer]) {
           if (action.serveQuality === "+") playerStats[action.servingPlayer].serve.certo++
           else if (action.serveQuality === "-") playerStats[action.servingPlayer].serve.erro++
           else if (action.serveQuality === "ka") playerStats[action.servingPlayer].serve.ace++
+        }
+
+        // Passe e recepção são o mesmo fundamento: o jogador indicado no
+        // passe recebe a leitura individual, inclusive quando ela termina em
+        // erro e o ponto vai para a equipe adversária.
+        const receivingTeam = action.servingTeam === "A" ? "B" : "A"
+        if (action.passingPlayer && action.passingPlayer > 0 && receivingTeam === team && action.passingQuality) {
+          if (!playerStats[action.passingPlayer]) {
+            playerStats[action.passingPlayer] = {
+              number: action.passingPlayer,
+              position: playerPositions[team]?.[action.passingPlayer] || "",
+              name: playerNames[team]?.[action.passingPlayer] || "",
+              reception: { certo: 0, erro: 0 },
+              serve: { certo: 0, erro: 0, ace: 0 },
+              attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
+              block: { O: 0, P: 0, M: 0, FS: 0 },
+              defense: { D: 0, V: 0, R: 0 },
+              levantamento: 0,
+              tp: 0,
+              te: 0,
+              tg: 0,
+              tgp: 0,
+            }
+          }
+          if (action.passingQuality === "D") playerStats[action.passingPlayer].reception.erro++
+          else playerStats[action.passingPlayer].reception.certo++
         }
       }
 

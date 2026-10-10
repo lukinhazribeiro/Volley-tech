@@ -91,7 +91,7 @@ export function normalizeMatchActions(actions: MatchAction[]): MatchAction[] {
     if (action.serveQuality === "-") {
       normalized.pointScoredBy = oppositeTeam
       normalized.pointType = "error"
-    } else if (action.passingQuality === "D") {
+    } else if (action.passingQuality === "D" || action.passingQuality === "R") {
       normalized.pointScoredBy = action.servingTeam
       normalized.pointType = "error"
     } else if (["!", "%", "$"].includes(action.resultComplemento ?? "")) {
