@@ -296,9 +296,24 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       if (action.settingPlayer && action.settingPlayer > 0 && action.attackingTeam === team) {
         // O levantamento pertence ao levantador identificado no rally, inclusive
         // quando foi feito pelo líbero ou por outro atleta após uma defesa.
-        if (playerStats[action.settingPlayer]) {
-          playerStats[action.settingPlayer].levantamento++
+        if (!playerStats[action.settingPlayer]) {
+          playerStats[action.settingPlayer] = {
+            number: action.settingPlayer,
+            position: playerPositions[team]?.[action.settingPlayer] || "",
+            name: playerNames[team]?.[action.settingPlayer] || "",
+            reception: { certo: 0, erro: 0 },
+            serve: { certo: 0, erro: 0, ace: 0 },
+            attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
+            block: { O: 0, P: 0, M: 0, FS: 0 },
+            defense: { D: 0, V: 0, R: 0 },
+            levantamento: 0,
+            tp: 0,
+            te: 0,
+            tg: 0,
+            tgp: 0,
+          }
         }
+        playerStats[action.settingPlayer].levantamento++
       }
 
       if (action.defensivePlayer && action.defensivePlayer > 0) {
@@ -369,7 +384,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
   const computeOpponentGeneral = (team: "A" | "B"): OpponentGeneralSummary | null => {
     const filtered =
       selectedSet === "all" ? actions : actions.filter((action) => action.setNumber === selectedSet)
-    const general = filtered.filter((a) => a.general)
+    const general = normalizeMatchActions(filtered.filter((a) => a.general))
     if (general.length === 0) return null
 
     let acao = 0
@@ -390,7 +405,13 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     }
 
     const tg = ponto
-    const tgr = erro
+    // TGR da adversária = pontos recebidos por erros da equipe A,
+    // independentemente de o erro ter sido saque, passe, ataque ou bloqueio.
+    const tgr = filtered.filter((a) =>
+      ((a.attackingTeam !== team && ["!", "%", "$"].includes(a.resultComplemento ?? "")) ||
+        (a.servingTeam !== team && a.serveQuality === "-") ||
+        (a.servingTeam === team && a.passingQuality === "D")),
+    ).length
     const tp = ponto + acao + saque
     const te = erro
     const tgp = computeTGP({ tp, te, tg })

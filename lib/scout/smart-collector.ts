@@ -348,6 +348,7 @@ export function finalizeRally(
   end: RallyEnd,
   directionOverride?: AttackDirection,
   defaultSetters?: Partial<Record<"A" | "B", number | null>>,
+  defaultLiberos?: Partial<Record<"A" | "B", number | null>>,
 ): RallyResult {
   const actions: MatchAction[] = []
   // Garante os campos obrigatórios do MatchAction. serveQuality é obrigatório no
@@ -440,18 +441,20 @@ export function finalizeRally(
   // do índice do ataque. O levantamento é automático, mas se um não-levantador
   // levantou (levantador defendeu), o toque "L" registrado reflete isso.
   const setterBefore = (attackIdx: number, team: "A" | "B"): number | undefined => {
-    for (let j = attackIdx - 1; j >= 0; j--) {
-      if (touches[j].fundamento === "L" && touches[j].team === team) return touches[j].player
-    }
-    // Regra automática: se não houve toque L explícito, o levantador da
-    // formação é o responsável pelo levantamento da sequência ofensiva.
-    for (let j = attackIdx - 1; j >= 0; j--) {
-      const candidate = touches[j]
-      if (candidate.team === team && candidate.fundamento !== "A" && candidate.fundamento !== "S") {
-        return candidate.player
+    const explicitSetter = (() => {
+      for (let j = attackIdx - 1; j >= 0; j--) {
+        if (touches[j].fundamento === "L" && touches[j].team === team) return { player: touches[j].player, index: j }
       }
-    }
-    return defaultSetters?.[team] ?? undefined
+      return undefined
+    })()
+    const setter = explicitSetter?.player ?? defaultSetters?.[team] ?? undefined
+    if (!setter) return undefined
+
+    // Quando o levantador toca como 1º ou 2º toque da sequência, o toque de
+    // levantamento é creditado ao líbero, conforme a regra do Scout Volleyball.
+    const setterIndex = explicitSetter?.index ?? touches.findIndex((touch) => touch.team === team && touch.player === setter)
+    if (setterIndex >= 0 && setterIndex <= 1) return defaultLiberos?.[team] ?? setter
+    return setter
   }
   const lastIdx = touches.length - 1
 
@@ -520,7 +523,6 @@ export function finalizeRally(
         actionPlayer: atk?.player ?? 0,
         defensivePlayer: t.player,
         defensiveTeam: t.team,
-        settingPlayer: atk ? setterBefore(i, atk.team) : undefined,
         ...(code === "REC" ? { blockingPosition: blockPosFromToken(atk?.attackToken) } : {}),
       })
       continue
@@ -768,12 +770,13 @@ export function opponentGeneralRally(
   // passa a posse de saque para a adversária (líbero/rodízio da minha equipe
   // reagem a isso no painel).
   if (kind === "serve") {
-    const action = mk({
-      servingTeam: opponent,
-      attackingTeam: myTeam,
-      serveQuality: "+",
-      serveZone: "8.6",
-    })
+  const action = mk({
+    servingTeam: opponent,
+    attackingTeam: myTeam,
+    serveQuality: "+",
+    serveZone: "8.6",
+    passingQuality: "A",
+  })
     return { actions: [action], pointScoredBy: null, nextServingTeam: opponent }
   }
 
