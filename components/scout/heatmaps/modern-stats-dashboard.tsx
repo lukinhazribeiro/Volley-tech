@@ -56,27 +56,28 @@ export default function ModernStatsDashboard({
     }
     const statsB: TeamStats = JSON.parse(JSON.stringify(statsA))
 
-    // Count serves and aces
-    setActions.forEach((action) => {
-      if (action.serveQuality === "+") {
-        ;(action.servingTeam === "A" ? statsA : statsB).serves.correct++
-      } else if (action.serveQuality === "-") {
-        ;(action.servingTeam === "A" ? statsA : statsB).serves.errors++
-      } else if (action.serveQuality === "ka") {
-        // Ace only counts as ace, not as correct serve
-        ;(action.servingTeam === "A" ? statsA : statsB).serves.aces++
-      }
+  // Count the real serve only. Smart Volleyball emits "+" on every action
+  // inherited from the rally, so a normal serve is identified by serveZone.
+  // Aces and errors are terminal serve actions and do not have a zone.
+  setActions.forEach((action) => {
+    const teamStats = action.servingTeam === "A" ? statsA : statsB
+    if (action.serveQuality === "ka") {
+      teamStats.serves.aces++
+    } else if (action.serveQuality === "-") {
+      teamStats.serves.errors++
+    } else if (action.serveQuality === "+" && action.serveZone) {
+      teamStats.serves.correct++
+      teamStats.serves.zones[action.serveZone]++
+    }
 
-      // Count attacks
-      if (action.resultComplemento === "#") {
-        ;(action.attackingTeam === "A" ? statsA : statsB).attacks.successful++
-      }
+    if (action.resultComplemento === "#") {
+      ;(action.attackingTeam === "A" ? statsA : statsB).attacks.successful++
+    }
 
-      // Count blocks
-      if (action.resultComplemento === "+") {
-        ;(action.attackingTeam === "A" ? statsB : statsA).blocks.successful++
-      }
-    })
+    if (action.resultComplemento === "+") {
+      ;(action.attackingTeam === "A" ? statsB : statsA).blocks.successful++
+    }
+  })
 
     return { statsA, statsB }
   }, [selectedSet, actions, sets, stats])
