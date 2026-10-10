@@ -54,6 +54,8 @@ export interface TeamStats {
     F: number
     S: number
   }
+  /** Pontos concedidos pelo adversário em erros próprios. */
+  opponentErrors: number
   attacks: {
     successful: number
     errors: number
@@ -82,7 +84,8 @@ export function calculateMatchStats(actions: MatchAction[]) {
   const statsA: TeamStats = createEmptyStats()
   const statsB: TeamStats = createEmptyStats()
 
-  for (const action of actions) {
+  const uniqueActions = Array.from(new Map(actions.map((action) => [action.id, action])).values())
+  for (const action of uniqueActions) {
     processAction(action, statsA, statsB)
   }
 
@@ -94,6 +97,7 @@ export function createEmptyStats(): TeamStats {
     serves: { correct: 0, errors: 0, aces: 0, zones: { "7.5": 0, "8.6": 0, "9.1": 0 } },
     reception: { qualityA: 0, qualityB: 0, qualityC: 0, errors: 0 },
     distribution: { O: 0, M: 0, P: 0, F: 0, S: 0 },
+    opponentErrors: 0,
     attacks: { successful: 0, errors: 0, blocked: 0, defended: 0 },
     transitions: { k1: 0, k2: 0, k3: 0 },
     blocks: { successful: 0, errors: 0, positions: { O: 0, M: 0, P: 0, FS: 0 } },
@@ -169,6 +173,9 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
     // Count points for this team
     if (action.pointScoredBy === team) {
       stats.points++
+      if (action.pointType === "error" || action.serveQuality === "-" || action.passingQuality === "D" || action.resultComplemento === "!" || action.resultComplemento === "%") {
+        stats.opponentErrors++
+      }
     }
   }
   

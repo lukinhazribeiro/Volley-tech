@@ -24,6 +24,8 @@ interface PlayerStats {
   attack: { ponto: number; certo: number; erro: number; O: number; P: number; M: number; FS: number }
   block: { O: number; P: number; M: number; FS: number }
   defense: { D: number; V: number; R: number }
+  /** Levantamentos positivos, incluindo quando o líbero levanta. */
+  levantamento: number
   tp: number
   te: number
   /** Total Great: pontos feitos pela atleta (ataque + ace + bloqueio). */
@@ -45,6 +47,8 @@ interface OpponentGeneralSummary {
   tp: number
   /** Total Great (pontos). */
   tg: number
+  /** Total Great de erros adversários convertidos em ponto. */
+  tgr: number
   /** TGP calculado. */
   tgp: number
 }
@@ -124,6 +128,24 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     }
 
     for (const action of filteredActions) {
+      if (action.settingPlayer && action.settingPlayer > 0 && action.attackingTeam === team && !playerStats[action.settingPlayer]) {
+        playerStats[action.settingPlayer] = {
+          number: action.settingPlayer,
+          position: playerPositions[team]?.[action.settingPlayer] || "",
+          name: playerNames[team]?.[action.settingPlayer] || "",
+          reception: { certo: 0, erro: 0 },
+          serve: { certo: 0, erro: 0, ace: 0 },
+          attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
+          block: { O: 0, P: 0, M: 0, FS: 0 },
+          defense: { D: 0, V: 0, R: 0 },
+          levantamento: 0,
+          tp: 0,
+          te: 0,
+          tg: 0,
+          tgp: 0,
+        }
+      }
+
       const receivingTeam = action.servingTeam === "A" ? "B" : "A"
 
       if (
@@ -145,6 +167,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
             attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
               block: { O: 0, P: 0, M: 0, FS: 0 },
               defense: { D: 0, V: 0, R: 0 },
+              levantamento: 0,
               tp: 0,
               te: 0,
               tg: 0,
@@ -249,6 +272,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
               attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
               block: { O: 0, P: 0, M: 0, FS: 0 },
               defense: { D: 0, V: 0, R: 0 },
+              levantamento: 0,
               tp: 0,
               te: 0,
               tg: 0,
@@ -262,6 +286,14 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
           else if (action.attackPosition === "M") playerStats[action.blockingPlayer].block.M++
           else if (action.attackPosition === "F" || action.attackPosition === "S")
             playerStats[action.blockingPlayer].block.FS++
+        }
+      }
+
+      if (action.settingPlayer && action.settingPlayer > 0 && action.attackingTeam === team) {
+        // O levantamento pertence ao levantador identificado no rally, inclusive
+        // quando foi feito pelo líbero ou por outro atleta após uma defesa.
+        if (playerStats[action.settingPlayer]) {
+          playerStats[action.settingPlayer].levantamento++
         }
       }
 
@@ -286,6 +318,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
               attack: { ponto: 0, certo: 0, erro: 0, O: 0, P: 0, M: 0, FS: 0 },
               block: { O: 0, P: 0, M: 0, FS: 0 },
               defense: { D: 0, V: 0, R: 0 },
+              levantamento: 0,
               tp: 0,
               te: 0,
               tg: 0,
@@ -310,7 +343,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       const totalBlock = stat.block.O + stat.block.P + stat.block.M + stat.block.FS
 
       const totalDefense = stat.defense.D + stat.defense.V + stat.defense.R
-      stat.tp = totalReceptionCorrect + totalServeCorrect + totalAttackCorrect + totalBlock + totalDefense
+      stat.tp = totalReceptionCorrect + totalServeCorrect + totalAttackCorrect + totalBlock + totalDefense + stat.levantamento
 
       stat.te = stat.reception.erro + stat.serve.erro + stat.attack.erro
 
@@ -353,10 +386,11 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     }
 
     const tg = ponto
+    const tgr = erro
     const tp = ponto + acao + saque
     const te = erro
     const tgp = computeTGP({ tp, te, tg })
-    return { acao, saque, ponto, erro, tp, tg, tgp }
+    return { acao, saque, ponto, erro, tp, tg, tgr, tgp }
   }
 
   /** Monta a tabela do resumo geral da adversária no PDF. */
@@ -369,8 +403,8 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     )
     autoTable(doc, {
       startY: 22,
-      head: [["AÇÃO", "SAQUE", "PONTO", "TG", "TP", "TE", "TGP"]],
-      body: [[s.acao, s.saque, s.ponto, s.tg, s.tp, s.erro, `${s.tgp}%`]],
+      head: [["AÇÃO", "SAQUE", "PONTO", "TG", "TGR", "TP", "TE", "TGP"]],
+      body: [[s.acao, s.saque, s.ponto, s.tg, s.tgr, s.tp, s.erro, `${s.tgp}%`]],
       theme: "grid",
       styles: {
         fillColor: [255, 255, 255],
