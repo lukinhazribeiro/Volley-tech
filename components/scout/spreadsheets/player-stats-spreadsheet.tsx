@@ -368,7 +368,9 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
 
       // TG (Total Great) = pontos feitos pela atleta:
       // ataque convertido + ace de saque + pontos de bloqueio.
-      stat.tg = stat.attack.ponto + stat.serve.ace + totalBlock
+      // Cada passe seguido de ataque tem um TG para o levantador indicado,
+      // inclusive quando o levantamento foi feito pelo líbero.
+      stat.tg = stat.attack.ponto + stat.serve.ace + totalBlock + stat.levantamento
 
       // TGP definitivo (fórmula única compartilhada com Scout View e Hub).
       stat.tgp = computeTGP({ tp: stat.tp, te: stat.te, tg: stat.tg })
@@ -407,11 +409,15 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
     const tg = ponto
     // TGR da adversária = pontos recebidos por erros da equipe A,
     // independentemente de o erro ter sido saque, passe, ataque ou bloqueio.
-    const tgr = filtered.filter((a) =>
-      ((a.attackingTeam !== team && ["!", "%", "$"].includes(a.resultComplemento ?? "")) ||
-        (a.servingTeam !== team && a.serveQuality === "-") ||
-        (a.servingTeam === team && a.passingQuality === "D")),
-    ).length
+    const tgr = filtered.filter((a) => {
+      if (a.pointScoredBy !== team) return false
+      const opponent = team === "A" ? "B" : "A"
+      return (
+        (a.attackingTeam === opponent && ["!", "%", "$"].includes(a.resultComplemento ?? "")) ||
+        (a.servingTeam === opponent && a.serveQuality === "-") ||
+        (a.servingTeam === team && a.passingQuality === "D")
+      )
+    }).length
     const tp = ponto + acao + saque
     const te = erro
     const tgp = computeTGP({ tp, te, tg })
@@ -786,6 +792,9 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                   DEFESA
                 </th>
                 <th className="border border-gray-300 p-1" rowSpan={2}>
+                  LEV
+                </th>
+                <th className="border border-gray-300 p-1" rowSpan={2}>
                   TG
                 </th>
                 <th className="border border-gray-300 p-1" rowSpan={2}>
@@ -861,6 +870,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                   <td className="border border-gray-300 p-1 text-center">{stat.defense.D}</td>
                   <td className="border border-gray-300 p-1 text-center">{stat.defense.V}</td>
                   <td className="border border-gray-300 p-1 text-center">{stat.defense.R}</td>
+                <td className="border border-gray-300 p-1 text-center font-bold">{stat.levantamento}</td>
                 <td className="border border-gray-300 p-1 text-center font-bold">{stat.tg}</td>
                 <td className="border border-gray-300 p-1 text-center font-bold">{stat.tp}</td>
                 <td className="border border-gray-300 p-1 text-center font-bold">{stat.te}</td>
@@ -890,6 +900,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
                 <td className="border border-gray-300 p-1 text-center">{totals.defense.D}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.defense.V}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.defense.R}</td>
+                <td className="border border-gray-300 p-1 text-center">{totals.levantamento}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.tg}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.tp}</td>
                 <td className="border border-gray-300 p-1 text-center">{totals.te}</td>
@@ -911,6 +922,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       { label: "SAQUE", value: s.saque },
       { label: "PONTO", value: s.ponto },
       { label: "TG", value: s.tg },
+      { label: "TGR", value: s.tgr },
       { label: "TP", value: s.tp },
       { label: "TE", value: s.erro },
       { label: "TGP", value: `${s.tgp}%`, highlight: true },

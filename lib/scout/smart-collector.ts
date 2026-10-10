@@ -425,6 +425,8 @@ export function finalizeRally(
       passingQuality: passingQuality ?? "A",
       passingPlayer: reception?.player ?? 0,
       attackingTeam: receivingTeam,
+      // Saque que gera uma ação adversária é saque certo, mesmo sem toque P.
+      pointScoredBy: undefined,
     })
   }
 
