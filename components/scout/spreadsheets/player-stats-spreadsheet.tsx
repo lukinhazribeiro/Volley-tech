@@ -221,7 +221,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         // passe recebe a leitura individual, inclusive quando ela termina em
         // erro e o ponto vai para a equipe adversária.
         const receivingTeam = action.servingTeam === "A" ? "B" : "A"
-        if (action.passingPlayer && action.passingPlayer > 0 && receivingTeam === team && action.passingQuality) {
+        if (action.passingPlayer && action.passingPlayer > 0 && receivingTeam === team && action.serveZone && action.passingQuality) {
           if (!playerStats[action.passingPlayer]) {
             playerStats[action.passingPlayer] = {
               number: action.passingPlayer,

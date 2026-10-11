@@ -403,11 +403,14 @@ export function finalizeRally(
 
   // PASSE = RECEPÇÃO, lido pela CONTINUIDADE (regra do usuário):
   //   • tem toque depois (o rally continua) OU termina em ponto => CERTO ("A")
-  //   • é o último toque e o rally termina em ERRO              => ERRADO ("D")
-  let passingQuality: "A" | "D" | undefined
+  //   • é o último toque e o rally termina em ERRO              => ERRADO ("E")
+  let passingQuality: "A" | "E" | undefined
   if (reception) {
+    // O passe/recepção é certo quando a equipe consegue dar continuidade
+    // (por exemplo, passe do 3 seguido de ataque do 4). Só é erro quando o
+    // passe é o último toque e encerra o rally em erro.
     const hasContinuity = receptionIdx < touches.length - 1
-    passingQuality = hasContinuity || end === "point" ? "A" : "D"
+    passingQuality = hasContinuity || end === "point" ? "A" : "E"
   }
 
   // Zona do saque = posição de quadra de quem recebeu (P5=7.5, P6=8.6, P1=9.1).

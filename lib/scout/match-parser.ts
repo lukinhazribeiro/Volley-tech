@@ -177,7 +177,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
     }
     
     // Count receptions for this team (when opposing team serves)
-    if (action.servingTeam === opposingTeam && action.passingQuality) {
+    if (action.servingTeam === opposingTeam && action.serveZone && action.passingPlayer > 0 && action.passingQuality) {
       if (action.passingQuality === "A") stats.reception.qualityA++
       else if (action.passingQuality === "B") stats.reception.qualityB++
       else if (action.passingQuality === "C") stats.reception.qualityC++
