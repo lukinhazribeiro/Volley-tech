@@ -173,7 +173,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
         stats.serves.aces++
       } else if (action.serveQuality === "-") {
         stats.serves.errors++
-      } else if (action.serveQuality === "+" && action.serveZone && action.servingPlayer > 0 && !action.attackPosition && !action.resultComplemento) {
+      } else if (action.serveQuality === "+" && action.serveZone && action.servingPlayer > 0) {
         // Saque certo: o saque entrou em jogo e houve ação adversária.
         stats.serves.correct++
       }
