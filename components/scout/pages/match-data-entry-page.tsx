@@ -249,7 +249,7 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
       pointScoredBy = action.pointScoredBy
     } else if (action.resultComplemento === "%") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
-    } else if (action.passingQuality === "D") {
+    } else if (action.passingQuality === "D" || action.passingQuality === "R") {
       pointScoredBy = action.servingTeam as "A" | "B"
     } else if (action.resultComplemento === "#") {
       pointScoredBy = action.attackingTeam as "A" | "B"

@@ -181,7 +181,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
       if (action.passingQuality === "A") stats.reception.qualityA++
       else if (action.passingQuality === "B") stats.reception.qualityB++
       else if (action.passingQuality === "C") stats.reception.qualityC++
-      else if (action.passingQuality === "D") stats.reception.errors++
+      else if (action.passingQuality === "D" || action.passingQuality === "R") stats.reception.errors++
     }
     
     // Count attacks for this team

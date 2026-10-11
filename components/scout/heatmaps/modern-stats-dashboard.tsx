@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import type { TeamStats } from "@/lib/scout/match-parser"
+import { calculateMatchStats } from "@/lib/scout/match-parser"
 import type { MatchAction } from "@/lib/scout/match-parser"
 import type { Set } from "@/lib/scout/set-manager"
 import { Card } from "@/components/scout/ui/card"
@@ -45,41 +45,9 @@ export default function ModernStatsDashboard({
 
     const setActions = actions.slice(setStartIndex, setEndIndex)
 
-    // Recalculate stats for the selected set
-    const statsA: TeamStats = {
-      serves: { correct: 0, errors: 0, aces: 0, zones: { "7.5": 0, "8.6": 0, "9.1": 0 } },
-      reception: { qualityA: 0, qualityB: 0, qualityC: 0, errors: 0 },
-      distribution: { O: 0, M: 0, P: 0, F: 0, S: 0 },
-      attacks: { successful: 0, errors: 0, blocked: 0, defended: 0 },
-      blocks: { successful: 0, errors: 0, positions: { O: 0, M: 0, P: 0, FS: 0 } },
-      points: 0,
-    }
-    const statsB: TeamStats = JSON.parse(JSON.stringify(statsA))
-
-  // Count the real serve only. Smart Volleyball emits "+" on every action
-  // inherited from the rally, so a normal serve is identified by serveZone.
-  // Aces and errors are terminal serve actions and do not have a zone.
-  setActions.forEach((action) => {
-    const teamStats = action.servingTeam === "A" ? statsA : statsB
-    if (action.serveQuality === "ka") {
-      teamStats.serves.aces++
-    } else if (action.serveQuality === "-") {
-      teamStats.serves.errors++
-    } else if (action.serveQuality === "+" && action.serveZone) {
-      teamStats.serves.correct++
-      teamStats.serves.zones[action.serveZone]++
-    }
-
-    if (action.resultComplemento === "#") {
-      ;(action.attackingTeam === "A" ? statsA : statsB).attacks.successful++
-    }
-
-    if (action.resultComplemento === "+") {
-      ;(action.attackingTeam === "A" ? statsB : statsA).blocks.successful++
-    }
-  })
-
-    return { statsA, statsB }
+    // Todos os painéis usam o mesmo parser, inclusive erros de recepção,
+    // saque certo/ace/erro e o ponto atribuído à equipe adversária.
+    return calculateMatchStats(setActions)
   }, [selectedSet, actions, sets, stats])
 
   const statRows = [

@@ -3,7 +3,7 @@
 import React from "react"
 import { Card } from "@/components/scout/ui/card"
 import { Button } from "@/components/scout/ui/button"
-import type { MatchAction } from "@/lib/scout/match-parser"
+import { normalizeMatchActions, type MatchAction } from "@/lib/scout/match-parser"
 import type { Set } from "@/lib/scout/set-manager"
 
 interface AdvancedAnalyticsChartsProps {
@@ -106,7 +106,7 @@ export default function AdvancedAnalyticsCharts({ actions, teamAName, teamBName,
   const [selectedSet, setSelectedSet] = React.useState<number | "all">("all")
 
   const filteredActions = React.useMemo(() => {
-    if (selectedSet === "all" || !sets || sets.length === 0) return actions
+    if (selectedSet === "all" || !sets || sets.length === 0) return normalizeMatchActions(actions)
 
     // Calculate which actions belong to the selected set
     let actionIndex = 0
@@ -122,7 +122,7 @@ export default function AdvancedAnalyticsCharts({ actions, teamAName, teamBName,
         ? actionIndex + sets[selectedSet - 1].teamAScore + sets[selectedSet - 1].teamBScore
         : actions.length
 
-    return actions.slice(setStartIndex, setEndIndex)
+    return normalizeMatchActions(actions.slice(setStartIndex, setEndIndex))
   }, [actions, selectedSet, sets])
 
   const getTeamActions = (team: "A" | "B") =>

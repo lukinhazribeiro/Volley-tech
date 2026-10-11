@@ -116,6 +116,7 @@ export default function SmartDataEntry({
   const [pending, setPending] = useState<{ team: "A" | "B"; player: number; pos: CourtPos | null } | null>(null)
   const [negative, setNegative] = useState(false)
   const [log, setLog] = useState<LogEntry[]>([])
+  const [opponentServingPlayer, setOpponentServingPlayer] = useState<number>(() => teamBPlayers[0]?.number ?? 0)
 
   const [setterChooser, setSetterChooser] = useState<{ options: { role: PlayerRole; player: number; pos: CourtPos }[] } | null>(
     null,
@@ -279,7 +280,7 @@ export default function SmartDataEntry({
   // Registro GERAL da equipe adversária (sem leitura por atleta). Mantém placar,
   // saque e rodízio 5x1 da MINHA equipe corretos.
   const handleOpponentGeneral = (kind: OpponentGeneralKind) => {
-    const res = opponentGeneralRally(kind, "A", servingTeam)
+    const res = opponentGeneralRally(kind, "A", servingTeam, kind === "serve" ? opponentServingPlayer : 0)
     if (res.actions.length > 0) {
       if (onActionsBatch) onActionsBatch(res.actions)
       else res.actions.forEach((a) => onActionComplete(a))
@@ -558,6 +559,19 @@ export default function SmartDataEntry({
             A adversária é registrada de forma geral (sem leitura por atleta). Mantém o placar, o saque e o rodízio da
             sua equipe corretos.
           </p>
+          <label className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
+            Jogador do saque adversário
+            <select
+              value={opponentServingPlayer}
+              onChange={(event) => setOpponentServingPlayer(Number(event.target.value))}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm"
+            >
+              <option value={0}>Selecionar</option>
+              {teamBPlayers.map((player) => (
+                <option key={player.number} value={player.number}>#{player.number} — {player.name}</option>
+              ))}
+            </select>
+          </label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {(
               [

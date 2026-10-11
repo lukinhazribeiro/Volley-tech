@@ -640,6 +640,9 @@ export function finalizeRally(
       actionPlayer: atk?.player ?? 0,
       defensivePlayer: lastTouch.player,
       defensiveTeam: lastTouch.team,
+      ...(end === "error"
+        ? { pointScoredBy: lastTouch.team === "A" ? "B" : "A", pointType: "error" as const }
+        : {}),
       ...(code === "REC" ? { blockingPosition: blockPosFromToken(atk?.attackToken) } : {}),
     })
     const scorer = end === "point" ? lastTouch.team : lastTouch.team === "A" ? "B" : "A"
@@ -732,13 +735,14 @@ export function opponentGeneralRally(
   kind: OpponentGeneralKind,
   myTeam: "A" | "B",
   servingTeam: "A" | "B",
+  servingPlayer = 0,
 ): { actions: MatchAction[]; pointScoredBy: "A" | "B" | null; nextServingTeam: "A" | "B" } {
   const opponent: "A" | "B" = myTeam === "A" ? "B" : "A"
   const mk = (a: Partial<MatchAction> & Pick<MatchAction, "servingTeam" | "attackingTeam">): MatchAction =>
     ({
       id: newId(),
       timestamp: Date.now(),
-      servingPlayer: 0,
+      servingPlayer,
       serveQuality: "+",
       general: true,
       ...a,
