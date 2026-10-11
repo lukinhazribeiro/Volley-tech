@@ -165,9 +165,8 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
         stats.serves.aces++
       } else if (action.serveQuality === "-") {
         stats.serves.errors++
-      } else if (action.serveQuality === "+" && action.serveZone) {
-        // Só conta o saque certo na ação real de saque em jogo (com serveZone),
-        // evitando que ações herdeiras do rally contem o mesmo saque de novo.
+      } else if (action.serveQuality === "+" && action.serveZone && action.servingPlayer > 0) {
+        // Saque certo: o saque entrou em jogo e houve ação adversária.
         stats.serves.correct++
       }
       
@@ -222,7 +221,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
     // Count points for this team
     if (action.pointScoredBy === team) {
       stats.points++
-      if (action.pointType === "error" || action.serveQuality === "-" || action.passingQuality === "D" || action.resultComplemento === "!" || action.resultComplemento === "%") {
+      if (action.pointType === "error" || action.serveQuality === "-" || action.passingQuality === "D" || action.passingQuality === "R" || action.resultComplemento === "!" || action.resultComplemento === "%") {
         stats.opponentErrors++
       }
     }

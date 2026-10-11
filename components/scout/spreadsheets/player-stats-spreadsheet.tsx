@@ -239,7 +239,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
               tgp: 0,
             }
           }
-          if (action.passingQuality === "D") playerStats[action.passingPlayer].reception.erro++
+          if (action.passingQuality === "D" || action.passingQuality === "R") playerStats[action.passingPlayer].reception.erro++
           else playerStats[action.passingPlayer].reception.certo++
         }
       }
@@ -396,7 +396,9 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       // ataque convertido + ace de saque + pontos de bloqueio.
       // Cada passe seguido de ataque tem um TG para o levantador indicado,
       // inclusive quando o levantamento foi feito pelo líbero.
-      stat.tg = stat.attack.ponto + stat.serve.ace + totalBlock + stat.levantamento
+      // TG é somente ponto próprio: ataque, ace ou bloqueio positivo.
+      // Levantamento permanece em LEV/TP, nunca em TG.
+      stat.tg = stat.attack.ponto + stat.serve.ace + totalBlock
 
       // TGP definitivo (fórmula única compartilhada com Scout View e Hub).
       stat.tgp = computeTGP({ tp: stat.tp, te: stat.te, tg: stat.tg })
