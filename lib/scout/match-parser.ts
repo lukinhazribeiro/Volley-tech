@@ -86,13 +86,20 @@ export function normalizeMatchActions(actions: MatchAction[]): MatchAction[] {
   return actions.flatMap((action) => {
     const normalized: MatchAction = { ...action }
     const oppositeTeam = action.attackingTeam === "A" ? "B" : "A"
+    const runtimePassingQuality = action.passingQuality as string | undefined
+
+    // Ações antigas gravadas como D/R só são passe quando possuem saque e
+    // jogador receptor; D/V/R sem esses campos continuam sendo defesa.
+    if (action.serveZone && action.passingPlayer && (runtimePassingQuality === "D" || runtimePassingQuality === "R")) {
+      normalized.passingQuality = "E"
+    }
 
     // Toda indicação de erro concede o ponto à outra equipe. Persistimos essa
     // leitura antes dos cálculos para que resumo, planilha e TGR usem a mesma regra.
     if (action.serveQuality === "-") {
       normalized.pointScoredBy = oppositeTeam
       normalized.pointType = "error"
-    } else if (action.passingQuality === "E") {
+    } else if (normalized.passingQuality === "E") {
       normalized.pointScoredBy = action.servingTeam
       normalized.pointType = "error"
     } else if (["!", "%", "$"].includes(action.resultComplemento ?? "")) {
@@ -177,7 +184,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
     }
     
     // Count receptions for this team (when opposing team serves)
-    if (action.servingTeam === opposingTeam && action.serveZone && action.passingPlayer > 0 && action.passingQuality) {
+    if (action.servingTeam === opposingTeam && action.serveQuality === "+" && action.passingPlayer > 0 && action.passingQuality) {
       if (action.passingQuality === "A") stats.reception.qualityA++
       else if (action.passingQuality === "B") stats.reception.qualityB++
       else if (action.passingQuality === "C") stats.reception.qualityC++
@@ -332,14 +339,7 @@ function processAction(action: MatchAction, statsA: TeamStats, statsB: TeamStats
   if (action.passingQuality === "A") receivingStats.reception.qualityA++
   else if (action.passingQuality === "B") receivingStats.reception.qualityB++
   else if (action.passingQuality === "C") receivingStats.reception.qualityC++
-  else if (action.passingQuality === "R") {
-    // Rebote de passe: contabiliza erro de recepção do passador
-    receivingStats.reception.errors++
-    // Se o rebote resultou em ponto direto, credita o ponto à equipe indicada
-    if (action.pointScoredBy === "A") statsA.points++
-    else if (action.pointScoredBy === "B") statsB.points++
-    return
-  } else if (action.passingQuality === "D") {
+  else if (action.passingQuality === "E") {
     // Reception error: serving team scores
     receivingStats.reception.errors++
     servingStats.points++

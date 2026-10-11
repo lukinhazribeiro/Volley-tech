@@ -108,7 +108,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       if (action.serveQuality === "-" && servingTeam !== team) {
         teamTotalPoints++
       }
-      if (action.passingQuality === "E" && attackingTeam === team) {
+      if (action.passingQuality === "E" && action.servingTeam === team) {
         teamTotalPoints++
       }
       if (action.resultComplemento === "#" && attackingTeam === team) {
@@ -154,7 +154,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         action.passingPlayer &&
         action.passingPlayer > 0 &&
         receivingTeam === team &&
-        action.serveZone && // Recepção de saque (inclui a recepção-erro que encerra o rally)
+        action.serveQuality === "+" && // Recepção originada por saque adversário
         !processedReceptionIds.has(action.id)
       ) {
         processedReceptionIds.add(action.id)
