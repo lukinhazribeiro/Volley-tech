@@ -245,8 +245,9 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
       pointScoredBy = action.servingTeam as "A" | "B"
     } else if (action.serveQuality === "-") {
       pointScoredBy = (action.servingTeam === "A" ? "B" : "A") as "A" | "B"
-    } else if (action.passingQuality === "E" && action.pointType === "point") {
-      pointScoredBy = action.pointScoredBy
+    } else if (action.passingQuality === "E") {
+      // Erro de recepção originado por saque adversário: o ponto é do sacador.
+      pointScoredBy = action.servingTeam as "A" | "B"
     } else if (action.resultComplemento === "%") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
     } else if (action.passingQuality === "E") {

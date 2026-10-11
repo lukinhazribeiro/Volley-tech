@@ -173,7 +173,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
         stats.serves.aces++
       } else if (action.serveQuality === "-") {
         stats.serves.errors++
-      } else if (action.serveQuality === "+" && action.serveZone && action.servingPlayer > 0) {
+      } else if (action.serveQuality === "+" && action.serveZone && action.servingPlayer > 0 && !action.attackPosition && !action.resultComplemento) {
         // Saque certo: o saque entrou em jogo e houve ação adversária.
         stats.serves.correct++
       }
@@ -184,7 +184,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
     }
     
     // Count receptions for this team (when opposing team serves)
-    if (action.servingTeam === opposingTeam && action.serveQuality === "+" && action.passingPlayer > 0 && action.passingQuality) {
+    if (action.servingTeam === opposingTeam && action.serveZone && action.passingPlayer > 0 && action.passingQuality) {
       if (action.passingQuality === "A") stats.reception.qualityA++
       else if (action.passingQuality === "B") stats.reception.qualityB++
       else if (action.passingQuality === "C") stats.reception.qualityC++

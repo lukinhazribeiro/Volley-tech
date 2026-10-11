@@ -154,7 +154,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         action.passingPlayer &&
         action.passingPlayer > 0 &&
         receivingTeam === team &&
-        action.serveQuality === "+" && // Recepção originada por saque adversário
+        action.serveZone && // Recepção originada por saque adversário, inclusive erro
         !processedReceptionIds.has(action.id)
       ) {
         processedReceptionIds.add(action.id)
@@ -210,7 +210,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         const isServeAction =
           action.serveQuality === "ka" ||
           action.serveQuality === "-" ||
-          (action.serveQuality === "+" && !!action.serveZone)
+          (action.serveQuality === "+" && !!action.serveZone && !action.attackPosition && !action.resultComplemento)
         if (isServeAction && action.servingPlayer > 0 && playerStats[action.servingPlayer]) {
           if (action.serveQuality === "+") playerStats[action.servingPlayer].serve.certo++
           else if (action.serveQuality === "-") playerStats[action.servingPlayer].serve.erro++
@@ -443,7 +443,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       return (
         (a.attackingTeam === opponent && ["!", "%", "$"].includes(a.resultComplemento ?? "")) ||
         (a.servingTeam === opponent && a.serveQuality === "-") ||
-        (a.servingTeam === team && a.passingQuality === "D")
+        (a.servingTeam === team && a.passingQuality === "E")
       )
     }).length
     const tp = ponto + acao + saque
