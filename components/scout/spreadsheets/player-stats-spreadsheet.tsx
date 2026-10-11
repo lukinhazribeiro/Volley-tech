@@ -151,10 +151,10 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         action.passingPlayer &&
         action.passingPlayer > 0 &&
         receivingTeam === team &&
-        action.serveZone && // Recepção originada por saque adversário, inclusive erro
-        !processedReceptionIds.has(action.id)
+        action.servingPlayer > 0 && // Todo passe registrado após saque é recepção
+        !processedReceptionIds.has(`${action.servingTeam}:${action.servingPlayer}:${action.passingPlayer}:${action.timestamp}`)
       ) {
-        processedReceptionIds.add(action.id)
+        processedReceptionIds.add(`${action.servingTeam}:${action.servingPlayer}:${action.passingPlayer}:${action.timestamp}`)
 
         if (!playerStats[action.passingPlayer]) {
           playerStats[action.passingPlayer] = {
@@ -207,7 +207,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
         const isServeAction =
           action.serveQuality === "ka" ||
           action.serveQuality === "-" ||
-          (action.serveQuality === "+" && !!action.serveZone)
+          (action.serveQuality === "+" && !!action.servingPlayer && !action.passingPlayer && !action.actionPlayer && !action.resultComplemento)
         if (isServeAction && action.servingPlayer > 0 && playerStats[action.servingPlayer]) {
           if (action.serveQuality === "+") playerStats[action.servingPlayer].serve.certo++
           else if (action.serveQuality === "-") playerStats[action.servingPlayer].serve.erro++
