@@ -245,11 +245,11 @@ export default function MatchDataEntryPage({ roomId, isSynced }: MatchDataEntryP
       pointScoredBy = action.servingTeam as "A" | "B"
     } else if (action.serveQuality === "-") {
       pointScoredBy = (action.servingTeam === "A" ? "B" : "A") as "A" | "B"
-    } else if (action.passingQuality === "R" && action.pointType === "point") {
+    } else if (action.passingQuality === "E" && action.pointType === "point") {
       pointScoredBy = action.pointScoredBy
     } else if (action.resultComplemento === "%") {
       pointScoredBy = (action.attackingTeam === "A" ? "B" : "A") as "A" | "B"
-    } else if (action.passingQuality === "D" || action.passingQuality === "R") {
+    } else if (action.passingQuality === "E") {
       pointScoredBy = action.servingTeam as "A" | "B"
     } else if (action.resultComplemento === "#") {
       pointScoredBy = action.attackingTeam as "A" | "B"

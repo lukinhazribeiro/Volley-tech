@@ -135,7 +135,7 @@ export default function AdvancedAnalyticsCharts({ actions, teamAName, teamBName,
     // Passe/recepção BINÁRIO: positivo (A/B/C antigos) = CERTO; erro (D/R) = ERRADO.
     return {
       certo: receptionActions.filter((a) => ["A", "B", "C"].includes(a.passingQuality as string)).length,
-      errado: receptionActions.filter((a) => a.passingQuality === "D" || a.passingQuality === "R").length,
+      errado: receptionActions.filter((a) => a.passingQuality === "E").length,
     }
   }
 

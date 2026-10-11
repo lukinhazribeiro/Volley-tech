@@ -5,7 +5,8 @@ export interface MatchAction {
   servingPlayer: number
   serveQuality: "+" | "-" | "ka"
   serveZone?: "7.5" | "8.6" | "9.1"
-  passingQuality?: "A" | "B" | "C" | "D" | "R"
+  /** Qualidade da recepção/passe; E é erro de passe. D/V/R são somente defesa. */
+  passingQuality?: "A" | "B" | "C" | "E"
   passingPlayer?: number
   attackingTeam: "A" | "B"
   attackPosition?: "O" | "M" | "P" | "F" | "S"
@@ -91,7 +92,7 @@ export function normalizeMatchActions(actions: MatchAction[]): MatchAction[] {
     if (action.serveQuality === "-") {
       normalized.pointScoredBy = oppositeTeam
       normalized.pointType = "error"
-    } else if (action.passingQuality === "D" || action.passingQuality === "R") {
+    } else if (action.passingQuality === "E") {
       normalized.pointScoredBy = action.servingTeam
       normalized.pointType = "error"
     } else if (["!", "%", "$"].includes(action.resultComplemento ?? "")) {
@@ -180,7 +181,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
       if (action.passingQuality === "A") stats.reception.qualityA++
       else if (action.passingQuality === "B") stats.reception.qualityB++
       else if (action.passingQuality === "C") stats.reception.qualityC++
-      else if (action.passingQuality === "D" || action.passingQuality === "R") stats.reception.errors++
+      else if (action.passingQuality === "E") stats.reception.errors++
     }
     
     // Count attacks for this team
@@ -221,7 +222,7 @@ export function calculateTeamStats(actions: MatchAction[], team: "A" | "B"): Tea
     // Count points for this team
     if (action.pointScoredBy === team) {
       stats.points++
-      if (action.pointType === "error" || action.serveQuality === "-" || action.passingQuality === "D" || action.passingQuality === "R" || action.resultComplemento === "!" || action.resultComplemento === "%") {
+      if (action.pointType === "error" || action.serveQuality === "-" || action.passingQuality === "E" || action.resultComplemento === "!" || action.resultComplemento === "%") {
         stats.opponentErrors++
       }
     }

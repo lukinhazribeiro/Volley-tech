@@ -658,7 +658,7 @@ export function finalizeRally(
     emit({
       servingTeam,
       servingPlayer,
-      passingQuality: "D",
+      passingQuality: "E",
       passingPlayer: lastTouch.player,
       attackingTeam: scorer,
     })

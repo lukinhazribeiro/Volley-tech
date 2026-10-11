@@ -153,7 +153,7 @@ export default function EightFaceDataEntry({
           servingPlayer: actionData.servingPlayer as number,
           serveQuality: actionData.serveQuality as "+" | "-" | "ka",
           serveZone: actionData.serveZone as "7.5" | "8.6" | "9.1",
-          passingQuality: "R",
+          passingQuality: "E",
           passingPlayer: actionData.passingPlayer as number,
           // attackingTeam é o oposto da equipe que pontuou, de modo que o
           // bloqueio (F/S) seja creditado ao jogador da equipe pontuadora.
@@ -193,7 +193,7 @@ export default function EightFaceDataEntry({
           servingPlayer: actionData.servingPlayer as number,
           serveQuality: actionData.serveQuality as "+" | "-" | "ka",
           serveZone: actionData.serveZone as "7.5" | "8.6" | "9.1",
-          passingQuality: "R",
+          passingQuality: "E",
           passingPlayer: actionData.passingPlayer as number,
           defensivePlayer: value as number,
           // attackingTeam aqui representa quem originou a bola (equipe receptora),
@@ -232,7 +232,7 @@ export default function EightFaceDataEntry({
           servingPlayer: actionData.servingPlayer as number,
           serveQuality: actionData.serveQuality as "+" | "-" | "ka",
           serveZone: actionData.serveZone as "7.5" | "8.6" | "9.1",
-          passingQuality: "D",
+          passingQuality: "E",
           passingPlayer: value as number,
           attackingTeam: actionData.servingTeam === "A" ? "B" : "A",
         }

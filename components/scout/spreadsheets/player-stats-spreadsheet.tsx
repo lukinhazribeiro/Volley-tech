@@ -108,7 +108,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
       if (action.serveQuality === "-" && servingTeam !== team) {
         teamTotalPoints++
       }
-      if (action.passingQuality === "D" && attackingTeam === team) {
+      if (action.passingQuality === "E" && attackingTeam === team) {
         teamTotalPoints++
       }
       if (action.resultComplemento === "#" && attackingTeam === team) {
@@ -239,7 +239,7 @@ export default function PlayerStatsSpreadsheet({ actions, teamAName, teamBName }
               tgp: 0,
             }
           }
-          if (action.passingQuality === "D" || action.passingQuality === "R") playerStats[action.passingPlayer].reception.erro++
+          if (action.passingQuality === "E") playerStats[action.passingPlayer].reception.erro++
           else playerStats[action.passingPlayer].reception.certo++
         }
       }
